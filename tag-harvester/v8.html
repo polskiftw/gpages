@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f2f2f7">
+<title>Tag Gremlin v8</title>
+<style>
+:root{color-scheme:light dark;--bg:#f2f2f7;--card:#fff;--text:#111;--muted:#6e6e73;--border:rgba(60,60,67,.18);--accent:#007aff}@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#f5f5f7;--muted:#98989d;--border:rgba(84,84,88,.65);--accent:#0a84ff}}*{box-sizing:border-box}body{margin:0;padding:max(28px,env(safe-area-inset-top)) 16px max(28px,env(safe-area-inset-bottom));background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif}main{width:min(100%,720px);margin:0 auto}h1{font-size:32px;margin:4px 0 6px}.sub,.note{color:var(--muted);line-height:1.48}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;margin:14px 0}h2{font-size:18px;margin:0 0 10px}ol{padding-left:22px;line-height:1.55}.btn{width:100%;min-height:48px;border:0;border-radius:12px;background:var(--accent);color:#fff;font-weight:700;font-size:16px}.btn:disabled{opacity:.45}.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;word-break:break-all;background:rgba(127,127,127,.12);border-radius:12px;padding:12px;margin:10px 0;max-height:110px;overflow:auto}.ok{font-size:13px;color:var(--muted);min-height:20px;margin-top:8px}
+</style>
+</head>
+<body><main>
+<h1>Tag Gremlin v8</h1>
+<p class="sub">Language-guided harvesting with v7's hard completeness proofs.</p>
+<div class="card"><h2>Install</h2><ol><li><strong>Pause + Save v7 first</strong> so its newest local progress is committed.</li><li>Wait for this page to say <strong>v8 bookmarklet ready</strong>.</li><li>Tap <strong>Copy v8 bookmarklet</strong>.</li><li>Create a fresh Safari bookmark named <strong>Tag Gremlin v8</strong> and replace its URL with the copied code.</li><li>Reload the logged-in target page, run the v8 bookmark, then tap <strong>Start / Resume</strong>.</li></ol><button class="btn" id="copy" disabled>Preparing v8 bookmarklet…</button><div class="ok" id="ok"></div><div class="code" id="code"></div></div>
+<div class="card"><h2>What v8 does differently</h2><p class="note">v8 automatically imports saved v7 tags, proven closed substrings, saturated proofs, and the learned same-origin JSON endpoint into a separate v8 database. It learns a tiny local language model from the harvested corpus: known prefixes, character n-grams, sibling productivity, and a weak popularity weighting. That model controls <strong>order only</strong>; it never gets permission to prune a branch.</p><p class="note">The scheduler alternates between <strong>harvest mode</strong> for language-like productive candidates and <strong>prune mode</strong> for short sparse candidates likely to close large regions. The ratio changes automatically as new-tag yield falls, and a depth horizon prevents the language model from diving arbitrarily far ahead of shorter completeness proofs.</p></div>
+<div class="card"><h2>Safety + instrumentation</h2><p class="note">Only a real autocomplete result below the measured hard cap of 40 can close a substring. The existing ≥40-known exact-tag inference remains the only zero-request saturation proof. The live panel shows scheduler mode, frontier depth, moving new-tags-per-request yield, request latency, tags/minute, requests/minute, free inferences, and an eight-line decision history. An invariant guard blocks any attempted request containing a substring already proven closed.</p></div>
+</main>
+<script>
+let bm='';
+(async()=>{const b=document.getElementById('copy'),ok=document.getElementById('ok'),code=document.getElementById('code');try{let r=await fetch('./v8.js?v=8',{cache:'no-store'});if(!r.ok)throw new Error('v8.js HTTP '+r.status);let js=await r.text();if(!js.includes('__tagGremlinV8'))throw new Error('v8.js did not look like Tag Gremlin v8');bm='javascript:'+js;code.textContent=bm;b.disabled=false;b.textContent='Copy v8 bookmarklet';ok.textContent='v8 bookmarklet ready';b.onclick=async()=>{try{await navigator.clipboard.writeText(bm);ok.textContent='Copied. Pause/save v7, make a fresh v8 bookmark, then reload the target page.'}catch{ok.textContent='Long-press the code below and copy it manually.'}}}catch(e){b.textContent='Could not prepare bookmarklet';ok.textContent='Preparation failed: '+e.message}})();
+</script>
+</body></html>
