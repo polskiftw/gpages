@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f2f2f7">
+<title>Boolean Search Builder</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f2f2f7;
+    --card: #ffffff;
+    --text: #111111;
+    --muted: #6e6e73;
+    --border: rgba(60,60,67,.18);
+    --accent: #007aff;
+    --danger: #ff3b30;
+    --field: #f7f7fa;
+    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 28px rgba(0,0,0,.06);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000;
+      --card: #1c1c1e;
+      --text: #f5f5f7;
+      --muted: #98989d;
+      --border: rgba(84,84,88,.65);
+      --accent: #0a84ff;
+      --danger: #ff453a;
+      --field: #2c2c2e;
+      --shadow: none;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: max(22px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  main {
+    width: min(100%, 680px);
+    margin: 0 auto;
+  }
+
+  h1 {
+    margin: 6px 2px 6px;
+    font-size: 30px;
+    line-height: 1.1;
+    letter-spacing: -0.6px;
+  }
+
+  .subtitle {
+    margin: 0 2px 22px;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 16px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow);
+  }
+
+  label {
+    display: block;
+    font-weight: 700;
+    font-size: 16px;
+    margin-bottom: 7px;
+  }
+
+  .hint {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.35;
+    margin: -2px 0 9px;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 78px;
+    resize: vertical;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--field);
+    color: var(--text);
+    padding: 12px;
+    font: 16px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    outline: none;
+    -webkit-appearance: none;
+  }
+
+  textarea:focus {
+    border-color: var(--accent);
+  }
+
+  .field + .field { margin-top: 18px; }
+
+  #output {
+    min-height: 150px;
+    font-size: 15px;
+  }
+
+  .buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  button {
+    min-height: 48px;
+    border: 0;
+    border-radius: 12px;
+    font: 700 16px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:active { transform: scale(.985); }
+
+  .primary {
+    background: var(--accent);
+    color: white;
+  }
+
+  .secondary {
+    background: var(--field);
+    color: var(--accent);
+    border: 1px solid var(--border);
+  }
+
+  .full { grid-column: 1 / -1; }
+
+  #status {
+    min-height: 20px;
+    margin: 10px 2px 0;
+    font-size: 14px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  #status.ok { color: var(--accent); }
+  #status.error { color: var(--danger); }
+
+  .logic {
+    margin-top: 11px;
+    padding: 11px 12px;
+    border-radius: 12px;
+    background: var(--field);
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .logic strong { color: var(--text); }
+
+  footer {
+    color: var(--muted);
+    text-align: center;
+    font-size: 12px;
+    line-height: 1.4;
+    margin: 18px 8px 4px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Boolean Search Builder</h1>
+  <p class="subtitle">Builds the expanded query format so normal exclusions can be overridden by exception tags.</p>
+
+  <section class="card">
+    <div class="field">
+      <label for="required">Required tags</label>
+      <div class="hint">Every result must contain these.</div>
+      <textarea id="required" autocapitalize="characters" autocomplete="off" spellcheck="false">HST</textarea>
+    </div>
+
+    <div class="field">
+      <label for="blocked">Normally blocked tags</label>
+      <div class="hint">These are excluded unless an exception tag is also present.</div>
+      <textarea id="blocked" autocapitalize="characters" autocomplete="off" spellcheck="false">NS
+NN</textarea>
+    </div>
+
+    <div class="field">
+      <label for="exceptions">Exception tags</label>
+      <div class="hint">Any one of these allows the blocked tags.</div>
+      <textarea id="exceptions" autocapitalize="characters" autocomplete="off" spellcheck="false">HC
+SR
+MP
+OFS</textarea>
+    </div>
+
+    <div class="logic">
+      <strong>Input:</strong> separate tags with spaces, commas, or new lines.<br>
+      <strong>Rule:</strong> required tags + no blocked tags <em>OR</em> required tags + any exception.
+    </div>
+  </section>
+
+  <section class="card">
+    <label for="output">Search query</label>
+    <textarea id="output" readonly spellcheck="false"></textarea>
+
+    <div class="buttons">
+      <button class="primary full" id="copyBtn" type="button">Copy to Clipboard</button>
+      <button class="secondary" id="exampleBtn" type="button">Reset Example</button>
+      <button class="secondary" id="clearBtn" type="button">Clear All</button>
+    </div>
+
+    <div id="status" aria-live="polite"></div>
+  </section>
+
+  <footer>
+    Uses the documented syntax: implicit AND, <b>|</b> for OR, <b>-term</b> for NOT, and parentheses for grouping.
+  </footer>
+</main>
+
+<script>
+(() => {
+  const required = document.getElementById('required');
+  const blocked = document.getElementById('blocked');
+  const exceptions = document.getElementById('exceptions');
+  const output = document.getElementById('output');
+  const status = document.getElementById('status');
+  const copyBtn = document.getElementById('copyBtn');
+
+  function tokens(value) {
+    const seen = new Set();
+    return value
+      .split(/[\s,]+/)
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(s => s.replace(/^[!-]+/, ''))
+      .filter(Boolean)
+      .filter(s => {
+        const key = s.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }
+
+  function buildQuery() {
+    const req = tokens(required.value);
+    const ban = tokens(blocked.value);
+    const exc = tokens(exceptions.value);
+
+    status.className = '';
+
+    if (!req.length) {
+      output.value = '';
+      status.textContent = 'Add at least one required tag.';
+      status.className = 'error';
+      return;
+    }
+
+    const base = req.join(' ');
+
+    if (!ban.length) {
+      output.value = base;
+      status.textContent = 'Ready.';
+      return;
+    }
+
+    const normalBranch = `${base} ${ban.map(t => '-' + t).join(' ')}`.trim();
+
+    if (!exc.length) {
+      output.value = normalBranch;
+      status.textContent = 'Ready.';
+      return;
+    }
+
+    const branches = [
+      `(${normalBranch})`,
+      ...exc.map(tag => `(${base} ${tag})`)
+    ];
+
+    output.value = branches.join(' | ');
+    status.textContent = `${branches.length} branches generated.`;
+  }
+
+  async function copyText() {
+    buildQuery();
+    if (!output.value) return;
+
+    let copied = false;
+
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(output.value);
+        copied = true;
+      } catch (_) {}
+    }
+
+    if (!copied) {
+      output.removeAttribute('readonly');
+      output.focus();
+      output.select();
+      output.setSelectionRange(0, output.value.length);
+      try {
+        copied = document.execCommand('copy');
+      } catch (_) {
+        copied = false;
+      }
+      output.setAttribute('readonly', '');
+      window.getSelection()?.removeAllRanges();
+    }
+
+    if (copied) {
+      const old = copyBtn.textContent;
+      copyBtn.textContent = 'Copied ✓';
+      status.textContent = 'Copied to clipboard.';
+      status.className = 'ok';
+      setTimeout(() => { copyBtn.textContent = old; }, 1200);
+    } else {
+      status.textContent = 'Could not auto-copy. Press and hold the query to copy it manually.';
+      status.className = 'error';
+    }
+  }
+
+  [required, blocked, exceptions].forEach(el => {
+    el.addEventListener('input', buildQuery);
+  });
+
+  copyBtn.addEventListener('click', copyText);
+
+  document.getElementById('exampleBtn').addEventListener('click', () => {
+    required.value = 'HST';
+    blocked.value = 'NS\nNN';
+    exceptions.value = 'HC\nSR\nMP\nOFS';
+    buildQuery();
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    required.value = '';
+    blocked.value = '';
+    exceptions.value = '';
+    buildQuery();
+    required.focus();
+  });
+
+  buildQuery();
+})();
+</script>
+</body>
+</html>
