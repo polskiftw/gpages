@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f2f2f7">
+<title>Tag Gremlin</title>
+<style>
+:root{color-scheme:light dark;--bg:#f2f2f7;--card:#fff;--text:#111;--muted:#6e6e73;--border:rgba(60,60,67,.18);--accent:#007aff}
+@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#f5f5f7;--muted:#98989d;--border:rgba(84,84,88,.65);--accent:#0a84ff}}
+*{box-sizing:border-box}body{margin:0;padding:max(28px,env(safe-area-inset-top)) 16px max(28px,env(safe-area-inset-bottom));background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}main{width:min(100%,680px);margin:0 auto}h1{font-size:32px;margin:4px 0 6px;letter-spacing:-.7px}.sub{color:var(--muted);line-height:1.45;margin:0 0 18px}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;margin:14px 0}h2{font-size:18px;margin:0 0 10px}ol{padding-left:22px;line-height:1.55}.note{font-size:13px;color:var(--muted);line-height:1.45}.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;word-break:break-all;background:rgba(127,127,127,.12);border-radius:12px;padding:12px;margin:10px 0;max-height:140px;overflow:auto}.btn{width:100%;min-height:48px;border:0;border-radius:12px;background:var(--accent);color:#fff;font-weight:700;font-size:16px}.ok{font-size:13px;color:var(--muted);min-height:20px;margin-top:8px}
+</style>
+</head>
+<body><main>
+<h1>Tag Gremlin</h1>
+<p class="sub">A resumable iPhone-friendly autocomplete harvester. It walks tag prefixes, collects suggestions and their counts, and stores progress in the target site's local storage.</p>
+<div class="card">
+<h2>Install on iPhone Safari</h2>
+<ol>
+<li>Bookmark this page.</li>
+<li>Open Safari's bookmarks, edit that bookmark, and rename it <strong>Tag Gremlin</strong>.</li>
+<li>Delete the bookmark's URL and paste the code copied below.</li>
+<li>Open the logged-in target site and tap the Tag Gremlin bookmark.</li>
+</ol>
+<button class="btn" id="copy">Copy bookmarklet</button>
+<div class="ok" id="ok"></div>
+<div class="code" id="code"></div>
+<p class="note">If the target site blocks scripts loaded from GitHub Pages, the bookmarklet will tell you. That just means we need a self-contained fallback.</p>
+</div>
+<div class="card">
+<h2>Using it</h2>
+<p class="note">Tap <strong>Start / Resume</strong>. It first probes broad prefixes to learn how many autocomplete results the site returns, then recursively splits crowded prefixes until branches are exhausted. It saves after every query, so Safari suspending the tab does not wipe the run. Use <strong>Copy tags</strong> or <strong>Export JSON</strong> whenever you want a snapshot.</p>
+</div>
+</main>
+<script>
+const src='https://polskiftw.github.io/gpages/tag-harvester/harvester.js';
+const bm=`javascript:(()=>{if(window.__tagGremlin){window.__tagGremlin.show();return}const s=document.createElement('script');s.src='${src}?v='+Date.now();s.onerror=()=>alert('Tag Gremlin could not load. The site may block external scripts.');document.documentElement.appendChild(s)})()`;
+document.getElementById('code').textContent=bm;
+document.getElementById('copy').onclick=async()=>{try{await navigator.clipboard.writeText(bm);document.getElementById('ok').textContent='Copied. Now paste it into the bookmark URL field.'}catch{document.getElementById('ok').textContent='Long-press the code and copy it manually.'}};
+</script>
+</body>
+</html>
