@@ -1,10 +1,9 @@
 name: Tag Gremlin frozen dynamic certificate 100k holdout
 
+# The raw 100k holdout completed successfully and is retained for provenance.
+# It is manual-only now so later research commits do not rerun the expensive
+# superseded matrix.  The quota-calibrated holdout is the active scale test.
 on:
-  pull_request:
-    paths:
-      - 'research/tag-gremlin-v10/**'
-      - '.github/workflows/tag-gremlin-v10-pass3-rollout.yml'
   workflow_dispatch:
 
 permissions:
