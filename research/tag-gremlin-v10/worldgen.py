@@ -30,6 +30,16 @@ def build_tag_table(n:int, seed:int, archetype:str):
         if s not in seen:
             seen.add(s); tags.append(s)
 
+    # Site-fidelity invariant (2026-08-20 correction): tag strings may contain
+    # only lowercase letters, digits, and period. Hyphen is not supported by
+    # the real site, so any generated '-' invalidates the universe immediately.
+    allowed=set(b.NEXT)
+    bad=[t for t in tags if any(ch not in allowed for ch in t)]
+    if bad:
+        raise RuntimeError(f'unsupported character in generated tag: {bad[0]!r}')
+    if any('-' in t for t in tags):
+        raise RuntimeError('hyphen leaked into period-only synthetic universe')
+
     order=list(range(n)); r.shuffle(order)
     rank=[0]*n
     for j,i in enumerate(order,1): rank[i]=j
@@ -80,5 +90,6 @@ def main():
     tags,scores=build_tag_table(a.n,a.seed,a.archetype)
     with open(a.out,'w',encoding='utf-8',newline='\n') as f:
         for score,tag in zip(scores,tags): f.write(f'{score}\t{tag}\n')
-    print(f'generated n={len(tags)} seed={a.seed} archetype={a.archetype} out={a.out}')
+    period_tags=sum('.' in t for t in tags)
+    print(f'generated n={len(tags)} seed={a.seed} archetype={a.archetype} period_tags={period_tags} out={a.out}')
 if __name__=='__main__': main()
