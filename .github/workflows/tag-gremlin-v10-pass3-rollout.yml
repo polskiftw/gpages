@@ -11,35 +11,33 @@ permissions:
   contents: read
 
 jobs:
-  scale-macro-labels:
+  oracle-ceiling:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { archetype: balanced,   n: 10000, seed: 74001 }
-          - { archetype: linguistic, n: 10000, seed: 74101 }
-          - { archetype: names,      n: 10000, seed: 74201 }
-          - { archetype: weird,      n: 10000, seed: 74301 }
-          - { archetype: shortheavy, n: 10000, seed: 74401 }
-          - { archetype: compound,   n: 10000, seed: 74501 }
+          - { archetype: balanced,   n: 10000, seed: 75001 }
+          - { archetype: linguistic, n: 10000, seed: 75101 }
+          - { archetype: names,      n: 10000, seed: 75201 }
+          - { archetype: weird,      n: 10000, seed: 75301 }
+          - { archetype: shortheavy, n: 10000, seed: 75401 }
+          - { archetype: compound,   n: 10000, seed: 75501 }
     steps:
       - uses: actions/checkout@v4
-      - name: Compile macro rollout collector
+      - name: Compile hidden-outcome ranking probe
         working-directory: research/tag-gremlin-v10
-        run: g++ -O3 -std=c++20 -march=x86-64-v3 collect_macro_rollouts.cpp -o collect_macro_rollouts
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 oracle_ceiling.cpp -o oracle_ceiling
       - name: Generate fresh corrected 10k world
         working-directory: research/tag-gremlin-v10
         run: python3 worldgen.py --n ${{ matrix.n }} --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
-      - name: Collect 50/100-query episodic rollout values
+      - name: Compare runtime rankers with hidden-outcome rankers
         working-directory: research/tag-gremlin-v10
-        run: ./collect_macro_rollouts world.tsv labels.csv | tee summary.txt
-      - name: Upload labels
+        run: ./oracle_ceiling world.tsv | tee oracle-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+      - name: Upload oracle result
         uses: actions/upload-artifact@v4
         with:
-          name: scale-macro-${{ matrix.archetype }}-${{ matrix.seed }}
-          path: |
-            research/tag-gremlin-v10/labels.csv
-            research/tag-gremlin-v10/summary.txt
+          name: oracle-${{ matrix.archetype }}-${{ matrix.seed }}
+          path: research/tag-gremlin-v10/oracle-${{ matrix.archetype }}-${{ matrix.seed }}.txt
           if-no-files-found: error
