@@ -1,4 +1,4 @@
-name: Tag Gremlin grammar-corrected semantic period revalidation
+name: Tag Gremlin grammar-corrected period-child ablation
 
 on:
   pull_request:
@@ -11,9 +11,9 @@ permissions:
   contents: read
 
 jobs:
-  grammar-corrected-period:
+  grammar-child-ablation:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
@@ -29,9 +29,9 @@ jobs:
       - name: Build grammar-corrected period-only simulator
         working-directory: research/tag-gremlin-v10
         run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
-      - name: Compile period probe
+      - name: Compile period-child ablation
         working-directory: research/tag-gremlin-v10
-        run: g++ -O3 -std=c++20 -march=x86-64-v3 punctuation_probe.cpp -o period_probe
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_child_ablation.cpp -o period_child_ablation
       - name: Generate semantic period-boundary world
         working-directory: research/tag-gremlin-v10
         run: python3 worldgen.py --n ${{ matrix.n }} --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
@@ -48,12 +48,12 @@ jobs:
               assert '..' not in tag
               assert all(tag.split('.'))
           PY
-      - name: Recompare period-root depths with known grammar
+      - name: Measure legal period-child marginals
         working-directory: research/tag-gremlin-v10
-        run: ./period_probe world.tsv | tee grammar-period-${{ matrix.archetype }}-${{ matrix.seed }}.txt
-      - name: Upload grammar-corrected result
+        run: ./period_child_ablation world.tsv | tee grammar-ablation-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+      - name: Upload grammar-corrected ablation
         uses: actions/upload-artifact@v4
         with:
-          name: grammar-period-${{ matrix.archetype }}-${{ matrix.seed }}
-          path: research/tag-gremlin-v10/grammar-period-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+          name: grammar-ablation-${{ matrix.archetype }}-${{ matrix.seed }}
+          path: research/tag-gremlin-v10/grammar-ablation-${{ matrix.archetype }}-${{ matrix.seed }}.txt
           if-no-files-found: error
