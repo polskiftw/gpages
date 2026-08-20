@@ -75,7 +75,7 @@ static void processDynamicCert(Sim &sm,const string&q,int activeCov,int support,
         ds.closed++;
     }else{
         // External certificate queries deliberately do NOT spawn a period-root
-        // prefix tree.  Arbitrary substring queries let us ask useful grams
+        // prefix tree. Arbitrary substring queries let us ask useful grams
         // directly, so recursive descent would only add traversal overhead.
         sm.satq++;
         sm.noteFront(f0,1);
@@ -141,6 +141,7 @@ static pair<Result,DynStats> runDynamic(World&w,const DynPolicy&pol,const vector
     return {finishResult(sm),ds};
 }
 
+#ifndef TAG_GREMLIN_DYNAMIC_NO_MAIN
 int main(int argc,char**argv){
     if(argc<2){cerr<<"usage: period_dynamic_certificate WORLD.tsv\n";return 2;}
     World w=loadWorld(argv[1]);
@@ -185,3 +186,4 @@ int main(int argc,char**argv){
     }
     return 0;
 }
+#endif
