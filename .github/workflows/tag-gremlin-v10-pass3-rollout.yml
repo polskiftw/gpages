@@ -11,39 +11,35 @@ permissions:
   contents: read
 
 jobs:
-  adaptive-holdout:
+  scale-macro-labels:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { archetype: balanced,   n: 10000, seed: 73001 }
-          - { archetype: balanced,   n: 10000, seed: 73002 }
-          - { archetype: linguistic, n: 10000, seed: 73101 }
-          - { archetype: linguistic, n: 10000, seed: 73102 }
-          - { archetype: names,      n: 10000, seed: 73201 }
-          - { archetype: names,      n: 10000, seed: 73202 }
-          - { archetype: weird,      n: 10000, seed: 73301 }
-          - { archetype: weird,      n: 10000, seed: 73302 }
-          - { archetype: shortheavy, n: 10000, seed: 73401 }
-          - { archetype: shortheavy, n: 10000, seed: 73402 }
-          - { archetype: compound,   n: 10000, seed: 73501 }
-          - { archetype: compound,   n: 10000, seed: 73502 }
+          - { archetype: balanced,   n: 10000, seed: 74001 }
+          - { archetype: linguistic, n: 10000, seed: 74101 }
+          - { archetype: names,      n: 10000, seed: 74201 }
+          - { archetype: weird,      n: 10000, seed: 74301 }
+          - { archetype: shortheavy, n: 10000, seed: 74401 }
+          - { archetype: compound,   n: 10000, seed: 74501 }
     steps:
       - uses: actions/checkout@v4
-      - name: Compile adaptive validation probe
+      - name: Compile macro rollout collector
         working-directory: research/tag-gremlin-v10
-        run: g++ -O3 -std=c++20 -march=x86-64-v3 adaptive_mix_probe.cpp -o adaptive_mix_probe
-      - name: Generate fresh corrected holdout world
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 collect_macro_rollouts.cpp -o collect_macro_rollouts
+      - name: Generate fresh corrected 10k world
         working-directory: research/tag-gremlin-v10
         run: python3 worldgen.py --n ${{ matrix.n }} --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
-      - name: Compare learned-prune against adaptive controllers
+      - name: Collect 50/100-query episodic rollout values
         working-directory: research/tag-gremlin-v10
-        run: ./adaptive_mix_probe world.tsv | tee adaptive-${{ matrix.archetype }}-${{ matrix.seed }}.txt
-      - name: Upload holdout result
+        run: ./collect_macro_rollouts world.tsv labels.csv | tee summary.txt
+      - name: Upload labels
         uses: actions/upload-artifact@v4
         with:
-          name: adaptive-${{ matrix.archetype }}-${{ matrix.seed }}
-          path: research/tag-gremlin-v10/adaptive-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+          name: scale-macro-${{ matrix.archetype }}-${{ matrix.seed }}
+          path: |
+            research/tag-gremlin-v10/labels.csv
+            research/tag-gremlin-v10/summary.txt
           if-no-files-found: error
