@@ -1,4 +1,4 @@
-name: Tag Gremlin direct period coverage and unique-scale proof
+name: Tag Gremlin dynamic direct period certificates
 
 on:
   pull_request:
@@ -11,69 +11,79 @@ permissions:
   contents: read
 
 jobs:
-  coverage-oracle:
+  dynamic-certificate-training:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { label: balanced-10k, archetype: balanced, n: 10000, seed: 87001 }
-          - { label: weird-10k, archetype: weird, n: 10000, seed: 87301 }
-          - { label: balanced-30k, archetype: balanced, n: 30000, seed: 88001 }
-          - { label: compound-30k, archetype: compound, n: 30000, seed: 88501 }
-          - { label: weird-30k, archetype: weird, n: 30000, seed: 88301 }
+          - { archetype: balanced,   seed: 90001 }
+          - { archetype: linguistic, seed: 90101 }
+          - { archetype: names,      seed: 90201 }
+          - { archetype: weird,      seed: 90301 }
+          - { archetype: shortheavy, seed: 90401 }
+          - { archetype: compound,   seed: 90501 }
     steps:
       - uses: actions/checkout@v4
       - name: Build grammar-corrected period-only simulator
         working-directory: research/tag-gremlin-v10
         run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
-      - name: Compile direct period coverage oracle
+      - name: Compile dynamic direct-certificate scheduler
         working-directory: research/tag-gremlin-v10
-        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_coverage_oracle.cpp -o period_coverage_oracle
-      - name: Generate semantic period world
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_dynamic_certificate.cpp -o period_dynamic_certificate
+      - name: Generate fresh semantic training world
         working-directory: research/tag-gremlin-v10
-        run: python3 worldgen.py --n ${{ matrix.n }} --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
-      - name: Measure exact old-proof coverage of direct period substrings
+        run: python3 worldgen.py --n 10000 --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
+      - name: Assert real-site grammar
         working-directory: research/tag-gremlin-v10
-        run: ./period_coverage_oracle world.tsv 4 | tee coverage-${{ matrix.label }}.txt
-      - name: Upload coverage result
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for line in Path('world.tsv').read_text().splitlines():
+              tag=line.split('\t',1)[1]
+              assert '-' not in tag
+              assert all(c.islower() or c.isdigit() or c=='.' for c in tag)
+              assert not tag.startswith('.') and not tag.endswith('.')
+              assert '..' not in tag and all(tag.split('.'))
+          PY
+      - name: Sweep runtime-observable dynamic certificate policies
+        shell: bash
+        working-directory: research/tag-gremlin-v10
+        run: |
+          set -euo pipefail
+          ./period_dynamic_certificate world.tsv | tee dynamic-${{ matrix.archetype }}.txt
+      - name: Upload dynamic result
         uses: actions/upload-artifact@v4
         with:
-          name: direct-period-coverage-${{ matrix.label }}
-          path: research/tag-gremlin-v10/coverage-${{ matrix.label }}.txt
+          name: dynamic-period-cert-${{ matrix.archetype }}
+          path: research/tag-gremlin-v10/dynamic-${{ matrix.archetype }}.txt
           if-no-files-found: error
 
-  unique-scale-model:
+  repair-weird-unique-scale:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { archetype: balanced, seed: 89000 }
-          - { archetype: linguistic, seed: 89100 }
-          - { archetype: names, seed: 89200 }
-          - { archetype: weird, seed: 89300 }
-          - { archetype: shortheavy, seed: 89400 }
-          - { archetype: compound, seed: 89500 }
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Build exact-quota unique 330k vocabulary model
+      - name: Re-run exact 330k weird quota with sufficient shard budget
+        shell: bash
         working-directory: research/tag-gremlin-v10
-        run: >-
-          python3 period_unique_scale_model.py
-          --archetype ${{ matrix.archetype }}
-          --seed-base ${{ matrix.seed }}
-          --shard-n 10000
-          --target-total 330000
-          --target-dotted 229000
-          --max-shards 250
-          --max-after 3
-          | tee unique-scale-${{ matrix.archetype }}.txt
-      - name: Upload unique-scale result
+        run: |
+          set -euo pipefail
+          python3 period_unique_scale_model.py \
+            --archetype weird \
+            --seed-base 89300 \
+            --shard-n 10000 \
+            --target-total 330000 \
+            --target-dotted 229000 \
+            --max-shards 300 \
+            --max-after 3 \
+            | tee unique-scale-weird-repair.txt
+          grep -q 'UNIQUE_SCALE archetype=weird' unique-scale-weird-repair.txt
+          grep -q 'total=330000 dotted=229000 plain=101000' unique-scale-weird-repair.txt
+      - name: Upload repaired weird unique-scale result
         uses: actions/upload-artifact@v4
         with:
-          name: unique-period-scale-${{ matrix.archetype }}
-          path: research/tag-gremlin-v10/unique-scale-${{ matrix.archetype }}.txt
+          name: unique-period-scale-weird-repair
+          path: research/tag-gremlin-v10/unique-scale-weird-repair.txt
           if-no-files-found: error
