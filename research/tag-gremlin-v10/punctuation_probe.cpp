@@ -1,5 +1,5 @@
 #define main tag_gremlin_native_main
-#include "native_sim.cpp"
+#include "native_sim_period_only.cpp"
 #undef main
 
 #include <deque>
@@ -42,10 +42,10 @@ static int processProbe(Sim &sm,const string &q,int &closedN,int &satN,int &fres
 }
 
 static PunctResult runPunct(World &w,int maxDepth){
-    Policy p=v1(); p.name="punct";
+    Policy p=v1(); p.name="period-root";
     Sim sm(w,p,"learnedprune");
     deque<string> todo;
-    todo.push_back("."); todo.push_back("-");
+    todo.push_back(".");
     int pq=0,pc=0,ps=0,pf=0,pp=0;
     while(!todo.empty()){
         string q=move(todo.front()); todo.pop_front();
@@ -67,11 +67,11 @@ int main(int argc,char **argv){
     Sim base(w,p,"learnedprune");
     Result br=base.run();
     if(!br.complete){cerr<<"baseline incomplete\n";return 3;}
-    cout<<"PUNCT_BASE queries="<<br.queries<<" closed="<<br.closedq<<" sat="<<br.satq<<" inferred="<<br.inferred<<" complete=1\n";
+    cout<<"PERIOD_BASE queries="<<br.queries<<" closed="<<br.closedq<<" sat="<<br.satq<<" inferred="<<br.inferred<<" complete=1\n";
     for(int d: {1,2,3,4}){
         auto x=runPunct(w,d);
         auto &r=x.result;
-        cout<<"PUNCT depth="<<d
+        cout<<"PERIOD depth="<<d
             <<" queries="<<r.queries
             <<" delta="<<(r.queries-br.queries)
             <<" closed="<<r.closedq
