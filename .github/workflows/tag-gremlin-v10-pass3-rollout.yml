@@ -1,0 +1,48 @@
+name: Tag Gremlin v10 Pass 3 rollouts
+
+on:
+  pull_request:
+    paths:
+      - 'research/tag-gremlin-v10/**'
+      - '.github/workflows/tag-gremlin-v10-pass3-rollout.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rollout-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - archetype: balanced
+            n: 2500
+            seed: 71001
+          - archetype: compound
+            n: 2500
+            seed: 71002
+          - archetype: weird
+            n: 2500
+            seed: 71003
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile rollout probe
+        working-directory: research/tag-gremlin-v10
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 rollout_pass3.cpp -o rollout_pass3
+      - name: Generate corrected synthetic world
+        working-directory: research/tag-gremlin-v10
+        run: python3 worldgen.py --n ${{ matrix.n }} --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
+      - name: Run counterfactual rollouts
+        working-directory: research/tag-gremlin-v10
+        run: ./rollout_pass3 world.tsv rollout-${{ matrix.archetype }}.csv 10 | tee summary-${{ matrix.archetype }}.txt
+      - name: Upload rollout labels
+        uses: actions/upload-artifact@v4
+        with:
+          name: pass3-${{ matrix.archetype }}-${{ matrix.seed }}
+          path: |
+            research/tag-gremlin-v10/rollout-${{ matrix.archetype }}.csv
+            research/tag-gremlin-v10/summary-${{ matrix.archetype }}.txt
+          if-no-files-found: error
