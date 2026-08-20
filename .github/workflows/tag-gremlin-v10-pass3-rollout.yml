@@ -1,4 +1,4 @@
-name: Tag Gremlin v10 punctuation architecture probe
+name: Tag Gremlin period-only correction matrix
 
 on:
   pull_request:
@@ -11,33 +11,69 @@ permissions:
   contents: read
 
 jobs:
-  punctuation-probe:
+  corrected-matrix:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { archetype: balanced,   n: 10000, seed: 80001 }
-          - { archetype: linguistic, n: 10000, seed: 80101 }
-          - { archetype: names,      n: 10000, seed: 80201 }
-          - { archetype: weird,      n: 10000, seed: 80301 }
-          - { archetype: shortheavy, n: 10000, seed: 80401 }
-          - { archetype: compound,   n: 10000, seed: 80501 }
+          - { archetype: balanced,   n: 10000, seed: 81001 }
+          - { archetype: linguistic, n: 10000, seed: 81101 }
+          - { archetype: names,      n: 10000, seed: 81201 }
+          - { archetype: weird,      n: 10000, seed: 81301 }
+          - { archetype: shortheavy, n: 10000, seed: 81401 }
+          - { archetype: compound,   n: 10000, seed: 81501 }
     steps:
       - uses: actions/checkout@v4
-      - name: Compile punctuation-start probe
+      - name: Build period-only simulator source
         working-directory: research/tag-gremlin-v10
-        run: g++ -O3 -std=c++20 -march=x86-64-v3 punctuation_probe.cpp -o punctuation_probe
-      - name: Generate fresh corrected world
+        run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
+      - name: Compile corrected simulator and period probe
+        working-directory: research/tag-gremlin-v10
+        run: |
+          g++ -O3 -std=c++20 -march=x86-64-v3 native_sim_period_only.cpp -o native_sim_period_only
+          g++ -O3 -std=c++20 -march=x86-64-v3 punctuation_probe.cpp -o period_probe
+      - name: Generate fresh period-only world
         working-directory: research/tag-gremlin-v10
         run: python3 worldgen.py --n ${{ matrix.n }} --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
-      - name: Compare optional punctuation-start probe depths
+      - name: Assert site alphabet
         working-directory: research/tag-gremlin-v10
-        run: ./punctuation_probe world.tsv | tee punct-${{ matrix.archetype }}-${{ matrix.seed }}.txt
-      - name: Upload punctuation result
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          bad=[]
+          periods=0
+          for line in Path('world.tsv').read_text().splitlines():
+              tag=line.split('\t',1)[1]
+              if '-' in tag or any(not (c.islower() or c.isdigit() or c=='.') for c in tag):
+                  bad.append(tag)
+              periods += ('.' in tag)
+          assert not bad, bad[:3]
+          print('period-bearing tags:', periods)
+          PY
+      - name: Run corrected controls
+        working-directory: research/tag-gremlin-v10
+        run: |
+          ./native_sim_period_only world.tsv v9 | tee v9.json
+          ./native_sim_period_only world.tsv v1 | tee v1.json
+          ./native_sim_period_only world.tsv learnedprune 3 1 | tee learned.json
+          python3 - <<'PY'
+          import json
+          for p in ('v9.json','v1.json','learned.json'):
+              r=json.loads(open(p).read().strip().splitlines()[-1])
+              assert r['complete'], (p,r)
+          PY
+      - name: Test period-root architecture
+        working-directory: research/tag-gremlin-v10
+        run: ./period_probe world.tsv | tee period-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+      - name: Upload corrected results
         uses: actions/upload-artifact@v4
         with:
-          name: punct-${{ matrix.archetype }}-${{ matrix.seed }}
-          path: research/tag-gremlin-v10/punct-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+          name: period-only-${{ matrix.archetype }}-${{ matrix.seed }}
+          path: |
+            research/tag-gremlin-v10/v9.json
+            research/tag-gremlin-v10/v1.json
+            research/tag-gremlin-v10/learned.json
+            research/tag-gremlin-v10/period-${{ matrix.archetype }}-${{ matrix.seed }}.txt
           if-no-files-found: error
