@@ -41,6 +41,13 @@ static int processProbe(Sim &sm,const string &q,int &closedN,int &satN,int &fres
     return count;
 }
 
+static bool legalSeparatorProbe(const string &q){
+    // Period is a space surrogate.  A substring query may begin/end at a word
+    // boundary, but consecutive periods would mean an empty word and are
+    // syntactically impossible on the target site.
+    return q.find("..") == string::npos;
+}
+
 static PunctResult runPunct(World &w,int maxDepth){
     Policy p=v1(); p.name="period-root";
     Sim sm(w,p,"learnedprune");
@@ -49,11 +56,14 @@ static PunctResult runPunct(World &w,int maxDepth){
     int pq=0,pc=0,ps=0,pf=0,pp=0;
     while(!todo.empty()){
         string q=move(todo.front()); todo.pop_front();
-        if(sm.isCovered(q)) continue;
+        if(!legalSeparatorProbe(q) || sm.isCovered(q)) continue;
         int count=processProbe(sm,q,pc,ps,pf,pp); pq++;
         while(sm.inferSweep()){}
         if(count>=K && (int)q.size()<maxDepth){
-            for(char c:NEXT) todo.push_back(q+string(1,c));
+            for(char c:NEXT){
+                string x=q+string(1,c);
+                if(legalSeparatorProbe(x)) todo.push_back(move(x));
+            }
         }
     }
     Result tail=sm.run();
