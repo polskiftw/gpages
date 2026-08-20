@@ -1,0 +1,151 @@
+name: Tag Gremlin v10 Research
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'research/tag-gremlin-v10/**'
+      - '.github/workflows/tag-gremlin-v10-research.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'research/tag-gremlin-v10/**'
+      - '.github/workflows/tag-gremlin-v10-research.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tag-gremlin-v10-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: research/tag-gremlin-v10
+
+jobs:
+  parity:
+    name: parity-1k
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile native simulator
+        run: g++ -O3 -flto -march=native -std=c++20 -DNDEBUG native_sim.cpp -o native_sim
+      - name: Generate parity world
+        run: python3 worldgen.py --n 1000 --seed 60001 --archetype balanced --out parity.tsv
+      - name: Verify exact control parity
+        run: |
+          ./native_sim parity.tsv v9 > v9.json
+          ./native_sim parity.tsv v1 > v1.json
+          ./native_sim parity.tsv learnedprune 3 1 > learned.json
+          python3 - <<'PY'
+          import json
+          def one(p): return json.loads(open(p).read().strip().splitlines()[-1])
+          got={"v9":one("v9.json"),"v1":one("v1.json"),"lp":one("learned.json")}
+          assert got["v9"]["queries"]==1088 and got["v9"]["complete"]
+          assert got["v1"]["queries"]==812 and got["v1"]["complete"]
+          assert got["lp"]["queries"]==807 and got["lp"]["complete"]
+          print(json.dumps(got,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: parity-1k
+          path: |
+            research/tag-gremlin-v10/v9.json
+            research/tag-gremlin-v10/v1.json
+            research/tag-gremlin-v10/learned.json
+
+  scale25:
+    if: github.event_name == 'workflow_dispatch'
+    name: 25k-${{ matrix.archetype }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { archetype: balanced,   seed: 91001 }
+          - { archetype: linguistic, seed: 91002 }
+          - { archetype: names,      seed: 91003 }
+          - { archetype: weird,      seed: 91004 }
+          - { archetype: shortheavy, seed: 91005 }
+          - { archetype: compound,   seed: 91006 }
+    steps:
+      - uses: actions/checkout@v4
+      - run: g++ -O3 -flto -march=native -std=c++20 -DNDEBUG native_sim.cpp -o native_sim
+      - run: python3 worldgen.py --n 25000 --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
+      - name: Run control and leaders
+        run: python3 run_suite.py --sim ./native_sim --world world.tsv --out results.json --include-v9
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 25k-${{ matrix.archetype }}
+          path: research/tag-gremlin-v10/results.json
+
+  scale50:
+    if: github.event_name == 'workflow_dispatch'
+    name: 50k-${{ matrix.archetype }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { archetype: balanced, seed: 92001 }
+          - { archetype: weird,    seed: 92002 }
+          - { archetype: compound, seed: 92003 }
+    steps:
+      - uses: actions/checkout@v4
+      - run: g++ -O3 -flto -march=native -std=c++20 -DNDEBUG native_sim.cpp -o native_sim
+      - run: python3 worldgen.py --n 50000 --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
+      - run: python3 run_suite.py --sim ./native_sim --world world.tsv --out results.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 50k-${{ matrix.archetype }}
+          path: research/tag-gremlin-v10/results.json
+
+  scale100:
+    if: github.event_name == 'workflow_dispatch'
+    name: 100k-balanced
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - run: g++ -O3 -flto -march=native -std=c++20 -DNDEBUG native_sim.cpp -o native_sim
+      - run: python3 worldgen.py --n 100000 --seed 93001 --archetype balanced --out world.tsv
+      - run: python3 run_suite.py --sim ./native_sim --world world.tsv --out results.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 100k-balanced
+          path: research/tag-gremlin-v10/results.json
+
+  debtless:
+    if: github.event_name == 'workflow_dispatch'
+    name: debtless-t${{ matrix.target }}-s${{ matrix.slope }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: '0.10', slope: '3' }
+          - { target: '0.15', slope: '3' }
+          - { target: '0.20', slope: '3' }
+          - { target: '0.25', slope: '3' }
+          - { target: '0.15', slope: '6' }
+          - { target: '0.20', slope: '6' }
+          - { target: '0.25', slope: '6' }
+          - { target: '0.35', slope: '6' }
+    steps:
+      - uses: actions/checkout@v4
+      - run: g++ -O3 -flto -march=native -std=c++20 -DNDEBUG native_sim.cpp -o native_sim
+      - run: python3 worldgen.py --n 5000 --seed 94001 --archetype balanced --out world.tsv
+      - name: Run debtless contender
+        run: ./native_sim world.tsv softmix ${{ matrix.target }} ${{ matrix.slope }} | tee result.json
+      - name: Assert completeness
+        run: python3 -c 'import json; r=json.loads(open("result.json").read().strip().splitlines()[-1]); assert r["complete"]'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: debtless-t${{ matrix.target }}-s${{ matrix.slope }}
+          path: research/tag-gremlin-v10/result.json
