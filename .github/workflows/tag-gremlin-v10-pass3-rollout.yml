@@ -1,4 +1,4 @@
-name: Tag Gremlin rare recursive period probe
+name: Tag Gremlin direct period coverage and unique-scale proof
 
 on:
   pull_request:
@@ -11,56 +11,69 @@ permissions:
   contents: read
 
 jobs:
-  rare-recursive:
+  coverage-oracle:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Fresh 10k semantic worlds: small-scale regression and completeness.
-          - { label: balanced-10k,   archetype: balanced,   n: 10000, seed: 87001 }
-          - { label: linguistic-10k, archetype: linguistic, n: 10000, seed: 87101 }
-          - { label: names-10k,      archetype: names,      n: 10000, seed: 87201 }
-          - { label: weird-10k,      archetype: weird,      n: 10000, seed: 87301 }
-          - { label: shortheavy-10k, archetype: shortheavy, n: 10000, seed: 87401 }
-          - { label: compound-10k,   archetype: compound,   n: 10000, seed: 87501 }
-
-          # Transition-scale worlds: by ~30k q/v/x begin crossing K=40, so this
-          # is where recursive `.xy` probing should distinguish itself from the
-          # fixed small-DB depth-2 rule.
+          - { label: balanced-10k, archetype: balanced, n: 10000, seed: 87001 }
+          - { label: weird-10k, archetype: weird, n: 10000, seed: 87301 }
           - { label: balanced-30k, archetype: balanced, n: 30000, seed: 88001 }
-          - { label: weird-30k,    archetype: weird,    n: 30000, seed: 88301 }
           - { label: compound-30k, archetype: compound, n: 30000, seed: 88501 }
+          - { label: weird-30k, archetype: weird, n: 30000, seed: 88301 }
     steps:
       - uses: actions/checkout@v4
       - name: Build grammar-corrected period-only simulator
         working-directory: research/tag-gremlin-v10
         run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
-      - name: Compile rare recursive probe
+      - name: Compile direct period coverage oracle
         working-directory: research/tag-gremlin-v10
-        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_rare_recursive_probe.cpp -o period_rare_recursive_probe
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_coverage_oracle.cpp -o period_coverage_oracle
       - name: Generate semantic period world
         working-directory: research/tag-gremlin-v10
         run: python3 worldgen.py --n ${{ matrix.n }} --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
-      - name: Assert site grammar
+      - name: Measure exact old-proof coverage of direct period substrings
         working-directory: research/tag-gremlin-v10
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          for line in Path('world.tsv').read_text().splitlines():
-              tag=line.split('\t',1)[1]
-              assert '-' not in tag
-              assert all(c.islower() or c.isdigit() or c=='.' for c in tag)
-              assert not tag.startswith('.') and not tag.endswith('.')
-              assert '..' not in tag and all(tag.split('.'))
-          PY
-      - name: Compare scale-adaptive recursive separator policies
-        working-directory: research/tag-gremlin-v10
-        run: ./period_rare_recursive_probe world.tsv | tee rare-${{ matrix.label }}.txt
-      - name: Upload recursive result
+        run: ./period_coverage_oracle world.tsv 4 | tee coverage-${{ matrix.label }}.txt
+      - name: Upload coverage result
         uses: actions/upload-artifact@v4
         with:
-          name: rare-recursive-${{ matrix.label }}
-          path: research/tag-gremlin-v10/rare-${{ matrix.label }}.txt
+          name: direct-period-coverage-${{ matrix.label }}
+          path: research/tag-gremlin-v10/coverage-${{ matrix.label }}.txt
+          if-no-files-found: error
+
+  unique-scale-model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { archetype: balanced, seed: 89000 }
+          - { archetype: linguistic, seed: 89100 }
+          - { archetype: names, seed: 89200 }
+          - { archetype: weird, seed: 89300 }
+          - { archetype: shortheavy, seed: 89400 }
+          - { archetype: compound, seed: 89500 }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build exact-quota unique 330k vocabulary model
+        working-directory: research/tag-gremlin-v10
+        run: >-
+          python3 period_unique_scale_model.py
+          --archetype ${{ matrix.archetype }}
+          --seed-base ${{ matrix.seed }}
+          --shard-n 10000
+          --target-total 330000
+          --target-dotted 229000
+          --max-shards 250
+          --max-after 3
+          | tee unique-scale-${{ matrix.archetype }}.txt
+      - name: Upload unique-scale result
+        uses: actions/upload-artifact@v4
+        with:
+          name: unique-period-scale-${{ matrix.archetype }}
+          path: research/tag-gremlin-v10/unique-scale-${{ matrix.archetype }}.txt
           if-no-files-found: error
