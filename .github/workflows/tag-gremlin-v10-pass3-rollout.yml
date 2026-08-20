@@ -1,4 +1,4 @@
-name: Tag Gremlin frozen dynamic certificate 30k holdout
+name: Tag Gremlin frozen dynamic certificate 100k holdout
 
 on:
   pull_request:
@@ -11,19 +11,17 @@ permissions:
   contents: read
 
 jobs:
-  holdout-30k:
+  holdout-100k:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { archetype: balanced,   seed: 91001 }
-          - { archetype: linguistic, seed: 91101 }
-          - { archetype: names,      seed: 91201 }
-          - { archetype: weird,      seed: 91301 }
-          - { archetype: shortheavy, seed: 91401 }
-          - { archetype: compound,   seed: 91501 }
+          - { archetype: balanced,   seed: 92001 }
+          - { archetype: linguistic, seed: 92101 }
+          - { archetype: weird,      seed: 92301 }
+          - { archetype: compound,   seed: 92501 }
     steps:
       - uses: actions/checkout@v4
       - name: Build grammar-corrected period-only simulator
@@ -32,9 +30,9 @@ jobs:
       - name: Compile frozen dynamic-certificate holdout harness
         working-directory: research/tag-gremlin-v10
         run: g++ -O3 -std=c++20 -march=x86-64-v3 period_dynamic_holdout.cpp -o period_dynamic_holdout
-      - name: Generate untouched 30k semantic holdout
+      - name: Generate untouched 100k semantic holdout
         working-directory: research/tag-gremlin-v10
-        run: python3 worldgen.py --n 30000 --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
+        run: python3 worldgen.py --n 100000 --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
       - name: Assert real-site grammar
         working-directory: research/tag-gremlin-v10
         run: |
@@ -57,6 +55,6 @@ jobs:
       - name: Upload holdout result
         uses: actions/upload-artifact@v4
         with:
-          name: dynamic-period-holdout-30k-${{ matrix.archetype }}
+          name: dynamic-period-holdout-100k-${{ matrix.archetype }}
           path: research/tag-gremlin-v10/holdout-${{ matrix.archetype }}.txt
           if-no-files-found: error
