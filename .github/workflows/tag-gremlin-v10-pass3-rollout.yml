@@ -11,36 +11,41 @@ permissions:
   contents: read
 
 jobs:
-  burst-probe:
+  macro-labels:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
-          - archetype: balanced
-            n: 2500
-            seed: 71001
-          - archetype: compound
-            n: 2500
-            seed: 71002
-          - archetype: weird
-            n: 2500
-            seed: 71003
+          - { archetype: balanced,   n: 3000, seed: 72001 }
+          - { archetype: balanced,   n: 3000, seed: 72002 }
+          - { archetype: linguistic, n: 3000, seed: 72101 }
+          - { archetype: linguistic, n: 3000, seed: 72102 }
+          - { archetype: names,      n: 3000, seed: 72201 }
+          - { archetype: names,      n: 3000, seed: 72202 }
+          - { archetype: weird,      n: 3000, seed: 72301 }
+          - { archetype: weird,      n: 3000, seed: 72302 }
+          - { archetype: shortheavy, n: 3000, seed: 72401 }
+          - { archetype: shortheavy, n: 3000, seed: 72402 }
+          - { archetype: compound,   n: 3000, seed: 72501 }
+          - { archetype: compound,   n: 3000, seed: 72502 }
     steps:
       - uses: actions/checkout@v4
-      - name: Compile burst probe
+      - name: Compile macro rollout collector
         working-directory: research/tag-gremlin-v10
-        run: g++ -O3 -std=c++20 -march=x86-64-v3 rollout_bursts.cpp -o rollout_bursts
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 collect_macro_rollouts.cpp -o collect_macro_rollouts
       - name: Generate corrected synthetic world
         working-directory: research/tag-gremlin-v10
         run: python3 worldgen.py --n ${{ matrix.n }} --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
-      - name: Run long-horizon rollout bursts
+      - name: Collect counterfactual macro-action labels
         working-directory: research/tag-gremlin-v10
-        run: ./rollout_bursts world.tsv | tee burst-${{ matrix.archetype }}.txt
-      - name: Upload burst summary
+        run: ./collect_macro_rollouts world.tsv labels.csv | tee summary.txt
+      - name: Upload labels
         uses: actions/upload-artifact@v4
         with:
-          name: pass3-burst-${{ matrix.archetype }}-${{ matrix.seed }}
-          path: research/tag-gremlin-v10/burst-${{ matrix.archetype }}.txt
+          name: macro-${{ matrix.archetype }}-${{ matrix.seed }}
+          path: |
+            research/tag-gremlin-v10/labels.csv
+            research/tag-gremlin-v10/summary.txt
           if-no-files-found: error
