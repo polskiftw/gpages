@@ -1,4 +1,4 @@
-name: Tag Gremlin v10 Pass 3 proof battery
+name: Tag Gremlin v10 punctuation architecture probe
 
 on:
   pull_request:
@@ -11,71 +11,33 @@ permissions:
   contents: read
 
 jobs:
-  certificate-bound:
+  punctuation-probe:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { archetype: balanced,   n: 10000, seed: 78001 }
-          - { archetype: balanced,   n: 10000, seed: 78002 }
-          - { archetype: balanced,   n: 10000, seed: 78003 }
-          - { archetype: linguistic, n: 10000, seed: 78101 }
-          - { archetype: linguistic, n: 10000, seed: 78102 }
-          - { archetype: linguistic, n: 10000, seed: 78103 }
-          - { archetype: names,      n: 10000, seed: 78201 }
-          - { archetype: names,      n: 10000, seed: 78202 }
-          - { archetype: names,      n: 10000, seed: 78203 }
-          - { archetype: weird,      n: 10000, seed: 78301 }
-          - { archetype: weird,      n: 10000, seed: 78302 }
-          - { archetype: weird,      n: 10000, seed: 78303 }
-          - { archetype: shortheavy, n: 10000, seed: 78401 }
-          - { archetype: shortheavy, n: 10000, seed: 78402 }
-          - { archetype: shortheavy, n: 10000, seed: 78403 }
-          - { archetype: compound,   n: 10000, seed: 78501 }
-          - { archetype: compound,   n: 10000, seed: 78502 }
-          - { archetype: compound,   n: 10000, seed: 78503 }
-          - { archetype: balanced,   n: 30000, seed: 79001 }
-          - { archetype: weird,      n: 30000, seed: 79301 }
-          - { archetype: compound,   n: 30000, seed: 79501 }
+          - { archetype: balanced,   n: 10000, seed: 80001 }
+          - { archetype: linguistic, n: 10000, seed: 80101 }
+          - { archetype: names,      n: 10000, seed: 80201 }
+          - { archetype: weird,      n: 10000, seed: 80301 }
+          - { archetype: shortheavy, n: 10000, seed: 80401 }
+          - { archetype: compound,   n: 10000, seed: 80501 }
     steps:
       - uses: actions/checkout@v4
-      - name: Compile certificate bound probe
+      - name: Compile punctuation-start probe
         working-directory: research/tag-gremlin-v10
-        run: g++ -O3 -std=c++20 -march=x86-64-v3 certificate_bound.cpp -o certificate_bound
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 punctuation_probe.cpp -o punctuation_probe
       - name: Generate fresh corrected world
         working-directory: research/tag-gremlin-v10
         run: python3 worldgen.py --n ${{ matrix.n }} --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
-      - name: Compute scheduler improvement bound
+      - name: Compare optional punctuation-start probe depths
         working-directory: research/tag-gremlin-v10
-        run: ./certificate_bound world.tsv | tee cert-${{ matrix.archetype }}-${{ matrix.n }}-${{ matrix.seed }}.txt
-      - name: Upload certificate analysis
+        run: ./punctuation_probe world.tsv | tee punct-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+      - name: Upload punctuation result
         uses: actions/upload-artifact@v4
         with:
-          name: cert-${{ matrix.archetype }}-${{ matrix.n }}-${{ matrix.seed }}
-          path: research/tag-gremlin-v10/cert-${{ matrix.archetype }}-${{ matrix.n }}-${{ matrix.seed }}.txt
-          if-no-files-found: error
-
-  summarize:
-    needs: certificate-bound
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: cert-*
-          path: research/tag-gremlin-v10/proof-artifacts
-          merge-multiple: true
-      - name: Aggregate proof battery
-        working-directory: research/tag-gremlin-v10
-        run: python3 summarize_certificate.py 'proof-artifacts/cert-*.txt' | tee proof-summary.txt
-      - name: Upload proof summary
-        uses: actions/upload-artifact@v4
-        with:
-          name: proof-summary
-          path: |
-            research/tag-gremlin-v10/proof-summary.txt
-            research/tag-gremlin-v10/proof-summary.tsv
+          name: punct-${{ matrix.archetype }}-${{ matrix.seed }}
+          path: research/tag-gremlin-v10/punct-${{ matrix.archetype }}-${{ matrix.seed }}.txt
           if-no-files-found: error
