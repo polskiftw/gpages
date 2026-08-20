@@ -1,4 +1,4 @@
-name: Tag Gremlin calibrated 330k boundary-depth model
+name: Tag Gremlin rare recursive period probe
 
 on:
   pull_request:
@@ -11,36 +11,56 @@ permissions:
   contents: read
 
 jobs:
-  real-scale-model:
+  rare-recursive:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { archetype: balanced,   seed: 86000 }
-          - { archetype: linguistic, seed: 86100 }
-          - { archetype: names,      seed: 86200 }
-          - { archetype: weird,      seed: 86300 }
-          - { archetype: shortheavy, seed: 86400 }
-          - { archetype: compound,   seed: 86500 }
+          # Fresh 10k semantic worlds: small-scale regression and completeness.
+          - { label: balanced-10k,   archetype: balanced,   n: 10000, seed: 87001 }
+          - { label: linguistic-10k, archetype: linguistic, n: 10000, seed: 87101 }
+          - { label: names-10k,      archetype: names,      n: 10000, seed: 87201 }
+          - { label: weird-10k,      archetype: weird,      n: 10000, seed: 87301 }
+          - { label: shortheavy-10k, archetype: shortheavy, n: 10000, seed: 87401 }
+          - { label: compound-10k,   archetype: compound,   n: 10000, seed: 87501 }
+
+          # Transition-scale worlds: by ~30k q/v/x begin crossing K=40, so this
+          # is where recursive `.xy` probing should distinguish itself from the
+          # fixed small-DB depth-2 rule.
+          - { label: balanced-30k, archetype: balanced, n: 30000, seed: 88001 }
+          - { label: weird-30k,    archetype: weird,    n: 30000, seed: 88301 }
+          - { label: compound-30k, archetype: compound, n: 30000, seed: 88501 }
     steps:
       - uses: actions/checkout@v4
-      - name: Model 330k period boundary trie from 33 independent 10k shards
+      - name: Build grammar-corrected period-only simulator
         working-directory: research/tag-gremlin-v10
-        run: >-
-          python3 period_real_scale_model.py
-          --archetype ${{ matrix.archetype }}
-          --shards 33
-          --shard-n 10000
-          --seed-base ${{ matrix.seed }}
-          --target-total 330000
-          --target-dotted 229000
-          --max-after 3
-          | tee real-scale-${{ matrix.archetype }}.txt
-      - name: Upload calibrated scale model
+        run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
+      - name: Compile rare recursive probe
+        working-directory: research/tag-gremlin-v10
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_rare_recursive_probe.cpp -o period_rare_recursive_probe
+      - name: Generate semantic period world
+        working-directory: research/tag-gremlin-v10
+        run: python3 worldgen.py --n ${{ matrix.n }} --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
+      - name: Assert site grammar
+        working-directory: research/tag-gremlin-v10
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for line in Path('world.tsv').read_text().splitlines():
+              tag=line.split('\t',1)[1]
+              assert '-' not in tag
+              assert all(c.islower() or c.isdigit() or c=='.' for c in tag)
+              assert not tag.startswith('.') and not tag.endswith('.')
+              assert '..' not in tag and all(tag.split('.'))
+          PY
+      - name: Compare scale-adaptive recursive separator policies
+        working-directory: research/tag-gremlin-v10
+        run: ./period_rare_recursive_probe world.tsv | tee rare-${{ matrix.label }}.txt
+      - name: Upload recursive result
         uses: actions/upload-artifact@v4
         with:
-          name: real-scale-period-${{ matrix.archetype }}
-          path: research/tag-gremlin-v10/real-scale-${{ matrix.archetype }}.txt
+          name: rare-recursive-${{ matrix.label }}
+          path: research/tag-gremlin-v10/rare-${{ matrix.label }}.txt
           if-no-files-found: error
