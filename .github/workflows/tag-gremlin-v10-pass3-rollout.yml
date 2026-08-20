@@ -1,4 +1,4 @@
-name: Tag Gremlin real-scale period structure probe
+name: Tag Gremlin calibrated 330k boundary-depth model
 
 on:
   pull_request:
@@ -11,41 +11,36 @@ permissions:
   contents: read
 
 jobs:
-  scale-structure:
+  real-scale-model:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Same balanced family at increasing vocabulary sizes to expose the
-          # point where rare post-period initials cross K=40 saturation.
-          - { label: balanced-10k,  archetype: balanced,   n: 10000,  seed: 85001 }
-          - { label: balanced-30k,  archetype: balanced,   n: 30000,  seed: 85001 }
-          - { label: balanced-100k, archetype: balanced,   n: 100000, seed: 85001 }
-          - { label: balanced-330k, archetype: balanced,   n: 330000, seed: 85001 }
-
-          # Real-site vocabulary scale across all spelling archetypes.  These
-          # jobs generate spellings only: score/reachability work is omitted
-          # because it cannot change whether `.x` contains <40 or >=40 tags.
-          - { label: linguistic-330k, archetype: linguistic, n: 330000, seed: 85101 }
-          - { label: names-330k,      archetype: names,      n: 330000, seed: 85201 }
-          - { label: weird-330k,      archetype: weird,      n: 330000, seed: 85301 }
-          - { label: shortheavy-330k, archetype: shortheavy, n: 330000, seed: 85401 }
-          - { label: compound-330k,   archetype: compound,   n: 330000, seed: 85501 }
+          - { archetype: balanced,   seed: 86000 }
+          - { archetype: linguistic, seed: 86100 }
+          - { archetype: names,      seed: 86200 }
+          - { archetype: weird,      seed: 86300 }
+          - { archetype: shortheavy, seed: 86400 }
+          - { archetype: compound,   seed: 86500 }
     steps:
       - uses: actions/checkout@v4
-      - name: Measure period boundary buckets at scale
+      - name: Model 330k period boundary trie from 33 independent 10k shards
         working-directory: research/tag-gremlin-v10
         run: >-
-          python3 period_scale_probe.py
-          --n ${{ matrix.n }}
-          --seed ${{ matrix.seed }}
+          python3 period_real_scale_model.py
           --archetype ${{ matrix.archetype }}
-          | tee scale-${{ matrix.label }}.txt
-      - name: Upload scale result
+          --shards 33
+          --shard-n 10000
+          --seed-base ${{ matrix.seed }}
+          --target-total 330000
+          --target-dotted 229000
+          --max-after 3
+          | tee real-scale-${{ matrix.archetype }}.txt
+      - name: Upload calibrated scale model
         uses: actions/upload-artifact@v4
         with:
-          name: period-scale-${{ matrix.label }}
-          path: research/tag-gremlin-v10/scale-${{ matrix.label }}.txt
+          name: real-scale-period-${{ matrix.archetype }}
+          path: research/tag-gremlin-v10/real-scale-${{ matrix.archetype }}.txt
           if-no-files-found: error
