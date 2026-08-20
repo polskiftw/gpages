@@ -1,4 +1,4 @@
-name: Tag Gremlin period-child ablation
+name: Tag Gremlin semantic period-boundary revalidation
 
 on:
   pull_request:
@@ -11,46 +11,55 @@ permissions:
   contents: read
 
 jobs:
-  child-ablation:
+  semantic-period-matrix:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { archetype: balanced,   n: 10000, seed: 81001 }
-          - { archetype: linguistic, n: 10000, seed: 81101 }
-          - { archetype: names,      n: 10000, seed: 81201 }
-          - { archetype: weird,      n: 10000, seed: 81301 }
-          - { archetype: shortheavy, n: 10000, seed: 81401 }
-          - { archetype: compound,   n: 10000, seed: 81501 }
+          - { archetype: balanced,   n: 10000, seed: 82001 }
+          - { archetype: linguistic, n: 10000, seed: 82101 }
+          - { archetype: names,      n: 10000, seed: 82201 }
+          - { archetype: weird,      n: 10000, seed: 82301 }
+          - { archetype: shortheavy, n: 10000, seed: 82401 }
+          - { archetype: compound,   n: 10000, seed: 82501 }
     steps:
       - uses: actions/checkout@v4
       - name: Build period-only simulator source
         working-directory: research/tag-gremlin-v10
         run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
-      - name: Compile child ablation probe
+      - name: Compile semantic period probe
         working-directory: research/tag-gremlin-v10
-        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_child_ablation.cpp -o period_child_ablation
-      - name: Generate period-only training world
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 punctuation_probe.cpp -o period_probe
+      - name: Generate semantic period-boundary world
         working-directory: research/tag-gremlin-v10
         run: python3 worldgen.py --n ${{ matrix.n }} --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
-      - name: Assert site alphabet
+      - name: Assert site alphabet and boundary semantics
         working-directory: research/tag-gremlin-v10
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          tags=[]
           for line in Path('world.tsv').read_text().splitlines():
               tag=line.split('\t',1)[1]
-              assert '-' not in tag
-              assert all(c.islower() or c.isdigit() or c=='.' for c in tag)
+              tags.append(tag)
+              assert '-' not in tag, tag
+              assert all(c.islower() or c.isdigit() or c=='.' for c in tag), tag
+              assert not tag.startswith('.') and not tag.endswith('.'), tag
+              assert '..' not in tag, tag
+              assert all(part for part in tag.split('.')), tag
+          bearing=sum('.' in t for t in tags)
+          periods=sum(t.count('.') for t in tags)
+          print(f'period-bearing tags: {bearing}/{len(tags)} ({bearing/len(tags):.3%})')
+          print(f'total word boundaries: {periods}')
           PY
-      - name: Measure period-child marginals
+      - name: Compare period-root depths
         working-directory: research/tag-gremlin-v10
-        run: ./period_child_ablation world.tsv | tee ablation-${{ matrix.archetype }}-${{ matrix.seed }}.txt
-      - name: Upload ablation result
+        run: ./period_probe world.tsv | tee semantic-period-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+      - name: Upload semantic period result
         uses: actions/upload-artifact@v4
         with:
-          name: period-ablation-${{ matrix.archetype }}-${{ matrix.seed }}
-          path: research/tag-gremlin-v10/ablation-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+          name: semantic-period-${{ matrix.archetype }}-${{ matrix.seed }}
+          path: research/tag-gremlin-v10/semantic-period-${{ matrix.archetype }}-${{ matrix.seed }}.txt
           if-no-files-found: error
