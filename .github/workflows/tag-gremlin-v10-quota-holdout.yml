@@ -1,17 +1,10 @@
 name: Tag Gremlin quota-calibrated 100k holdout
 
+# The tracked quota-calibrated matrix was launched from PR run 32429734718.
+# Keep this workflow manual-only afterward so unrelated research commits do not
+# rerun the expensive 100k matrix simply because the PR still contains its files.
 on:
   workflow_dispatch:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'research/tag-gremlin-v10/period_quota_worldgen.py'
-      - 'research/tag-gremlin-v10/period_dynamic_certificate.cpp'
-      - 'research/tag-gremlin-v10/period_dynamic_holdout.cpp'
-      - 'research/tag-gremlin-v10/period_only_sim.py'
-      - 'research/tag-gremlin-v10/native_sim.cpp'
-      - '.github/workflows/tag-gremlin-v10-quota-holdout.yml'
 
 permissions:
   contents: read
