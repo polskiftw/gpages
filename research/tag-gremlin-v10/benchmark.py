@@ -7,7 +7,7 @@ from typing import Dict, List, Tuple, Set, Optional
 
 K=40
 ROOT='abcdefghijklmnopqrstuvwxyz0123456789'
-NEXT='abcdefghijklmnopqrstuvwxyz0123456789.-'
+NEXT='abcdefghijklmnopqrstuvwxyz0123456789.'
 MAX_SUB=4
 
 COLORS='black white red blue green pink purple orange yellow brown gray silver gold blonde cyan teal violet'.split()
@@ -35,8 +35,8 @@ ARCHETYPES={
 }
 
 def clean(s:str)->str:
-    s=''.join(ch for ch in s.lower() if ch.isalnum() or ch in '.-')
-    while s and s[0] in '.-': s=s[1:]
+    s=''.join(ch for ch in s.lower() if ch.isalnum() or ch=='.')
+    while s and s[0]=='.': s=s[1:]
     return s or 'aa'
 
 def rand_weird(r:random.Random)->str:
@@ -44,7 +44,7 @@ def rand_weird(r:random.Random)->str:
     alpha='abcdefghijklmnopqrstuvwxyz0123456789'
     s=''.join(r.choice(alpha) for _ in range(n))
     if n>5 and r.random()<.25:
-        i=r.randint(1,n-2); s=s[:i]+r.choice('.-')+s[i:]
+        i=r.randint(1,n-2); s=s[:i]+'.'+s[i:]
     return s
 
 def make_linguistic(r:random.Random, cfg)->str:
@@ -53,7 +53,9 @@ def make_linguistic(r:random.Random, cfg)->str:
     if r.random()<cfg['compound']:
         b=r.choice(r.choice(pools))
         if b==a: b=r.choice(MORPH)
-        sep=r.choices(['','-','.'],[.72,.20,.08])[0] if r.random()<cfg['punct']*2.5 else ''
+        # Preserve the old total separator probability, but map every supported
+        # punctuation opportunity to the site's only punctuation character: '.'.
+        sep=r.choices(['','.'],[.72,.28])[0] if r.random()<cfg['punct']*2.5 else ''
         if r.random()<.35: return clean(a+sep+b)
         return clean(b+sep+a)
     if r.random()<.18: a=r.choice(MORPH)+a
@@ -63,7 +65,9 @@ def make_proper(r:random.Random,cfg)->str:
     a=r.choice(NAMES+TRANS)
     if r.random()<.6:
         b=r.choice(FRANCH+NAMES+MORPH)
-        sep=r.choice(['','-','.']) if r.random()<cfg['punct']*3 else ''
+        # Old generator chose '', '-' or '.' uniformly after this gate. With '-'
+        # unsupported, both punctuation branches become '.'.
+        sep=r.choice(['','.','.']) if r.random()<cfg['punct']*3 else ''
         return clean(a+sep+b)
     return a
 
@@ -79,4 +83,4 @@ def mutate(base:str,r:random.Random)->str:
     if mode==2: return clean(base+str(r.randint(1,999)))
     if mode==3 and len(base)>3:
         i=r.randint(1,len(base)-1); return clean(base[:i]+r.choice('aeiouy')+base[i:])
-    return clean(base+r.choice(['-','.'])+r.choice(MORPH+NAMES))
+    return clean(base+'.'+r.choice(MORPH+NAMES))
