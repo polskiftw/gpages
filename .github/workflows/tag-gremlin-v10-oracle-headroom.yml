@@ -1,13 +1,10 @@
 name: Tag Gremlin direct-certificate oracle headroom
 
+# The oracle matrix was launched from PR run 32430067858. Retain it as a
+# manual-only reproducibility workflow after launch so later PR commits do not
+# repeat the full matrix.
 on:
   workflow_dispatch:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'research/tag-gremlin-v10/period_dynamic_oracle.cpp'
-      - '.github/workflows/tag-gremlin-v10-oracle-headroom.yml'
 
 permissions:
   contents: read
