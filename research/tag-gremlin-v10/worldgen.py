@@ -8,10 +8,10 @@ K=b.K
 def thin_boundaries(s:str, r:random.Random, keep:float)->str:
     """Optionally collapse some explicit word boundaries for robustness sweeps.
 
-    keep=1.0 is the normal generator and consumes no extra RNG, preserving the
-    established corrected worlds exactly.  Lower values turn some `red.hair`
-    style spellings into lexical compounds such as `redhair`; they never create
-    malformed period syntax.
+    keep=1.0 is the normal generator. Lower values turn some `red.hair` style
+    spellings into lexical compounds such as `redhair`; they never create
+    malformed period syntax. A dedicated RNG is used by build_tag_table so this
+    experiment does not perturb the main world-generation random stream.
     """
     if keep >= 1.0 or '.' not in s:
         return s
@@ -26,6 +26,11 @@ def build_tag_table(n:int, seed:int, archetype:str, boundary_keep:float=1.0):
     if not 0.0 <= boundary_keep <= 1.0:
         raise ValueError('boundary_keep must be in [0,1]')
     r=random.Random(seed)
+    # Boundary thinning is an experimental dimension, not part of the base
+    # generator RNG. Keeping it separate makes prevalence sweeps substantially
+    # more counterfactual: changing keep does not itself reshuffle every later
+    # random choice in the world generator.
+    rb=random.Random(seed ^ 0x9E3779B97F4A7C15)
     cfg=b.ARCHETYPES[archetype]
     tags=[]; seen=set(); cluster=[]; attempts=0
     while len(tags)<n and attempts<n*150:
@@ -41,13 +46,13 @@ def build_tag_table(n:int, seed:int, archetype:str, boundary_keep:float=1.0):
             s=b.rand_weird(r)
         else:
             s=b.make_linguistic(r,cfg)
-        s=thin_boundaries(s,r,boundary_keep)
+        s=thin_boundaries(s,rb,boundary_keep)
         if len(s)<2 or s in seen: continue
         seen.add(s); tags.append(s)
         if len(s)>=4 and r.random()<.4: cluster.append(s)
     while len(tags)<n:
         s=b.clean(b.rand_weird(r)+str(len(tags)))
-        s=thin_boundaries(s,r,boundary_keep)
+        s=thin_boundaries(s,rb,boundary_keep)
         if s not in seen:
             seen.add(s); tags.append(s)
 
