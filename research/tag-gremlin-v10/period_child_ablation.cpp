@@ -65,14 +65,14 @@ static Result finishFrom(Sim sm,const vector<string> &probes,vector<ProbeObs> *o
 
 static vector<string> allChildren(){
     vector<string> v;
-    for(char c:NEXT) v.push_back(string(".")+c);
+    for(char c:NEXT){
+        if(c=='.') continue; // '..' is impossible when period is a word boundary.
+        v.push_back(string(".")+c);
+    }
     return v;
 }
 
-static string printableChild(const string &q){
-    if(q=="..") return "dot";
-    return string(1,q[1]);
-}
+static string printableChild(const string &q){return string(1,q[1]);}
 
 int main(int argc,char **argv){
     if(argc<2){cerr<<"usage: period_child_ablation WORLD.tsv\n";return 2;}
@@ -96,8 +96,6 @@ int main(int argc,char **argv){
 
     vector<string> children=allChildren();
 
-    // Runtime-observable predictor from the 40 tags returned by the root '.' query:
-    // count which characters immediately follow a period in those visible tags.
     array<int,256> after{};
     for(int id:rootObs.ids){
         const string &t=w.tags[id];
@@ -145,7 +143,6 @@ int main(int argc,char **argv){
     unordered_map<string,ProbeObs> obsByQ;
     for(auto &o:fullObs) obsByQ[o.q]=o;
 
-    // Leave-one-out marginal value around the successful all-children policy.
     for(const string &drop:children){
         vector<string> keep; keep.reserve(children.size()-1);
         for(const string &q:children) if(q!=drop) keep.push_back(q);
