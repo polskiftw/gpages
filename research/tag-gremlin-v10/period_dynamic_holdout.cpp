@@ -1,6 +1,6 @@
-#define main tag_gremlin_dynamic_training_main
+#define TAG_GREMLIN_DYNAMIC_NO_MAIN
 #include "period_dynamic_certificate.cpp"
-#undef main
+#undef TAG_GREMLIN_DYNAMIC_NO_MAIN
 
 int main(int argc,char**argv){
     if(argc<2){cerr<<"usage: period_dynamic_holdout WORLD.tsv\n";return 2;}
