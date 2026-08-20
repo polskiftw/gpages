@@ -1,4 +1,4 @@
-name: Tag Gremlin semantic period-child ablation
+name: Tag Gremlin grammar-corrected semantic period revalidation
 
 on:
   pull_request:
@@ -11,9 +11,9 @@ permissions:
   contents: read
 
 jobs:
-  semantic-child-ablation:
+  grammar-corrected-period:
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -26,16 +26,16 @@ jobs:
           - { archetype: compound,   n: 10000, seed: 82501 }
     steps:
       - uses: actions/checkout@v4
-      - name: Build period-only simulator source
+      - name: Build grammar-corrected period-only simulator
         working-directory: research/tag-gremlin-v10
         run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
-      - name: Compile semantic child ablation
+      - name: Compile period probe
         working-directory: research/tag-gremlin-v10
-        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_child_ablation.cpp -o period_child_ablation
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 punctuation_probe.cpp -o period_probe
       - name: Generate semantic period-boundary world
         working-directory: research/tag-gremlin-v10
         run: python3 worldgen.py --n ${{ matrix.n }} --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
-      - name: Assert period is a canonical word boundary
+      - name: Assert site grammar
         working-directory: research/tag-gremlin-v10
         run: |
           python3 - <<'PY'
@@ -48,12 +48,12 @@ jobs:
               assert '..' not in tag
               assert all(tag.split('.'))
           PY
-      - name: Measure semantic period-child marginals
+      - name: Recompare period-root depths with known grammar
         working-directory: research/tag-gremlin-v10
-        run: ./period_child_ablation world.tsv | tee semantic-ablation-${{ matrix.archetype }}-${{ matrix.seed }}.txt
-      - name: Upload semantic ablation
+        run: ./period_probe world.tsv | tee grammar-period-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+      - name: Upload grammar-corrected result
         uses: actions/upload-artifact@v4
         with:
-          name: semantic-ablation-${{ matrix.archetype }}-${{ matrix.seed }}
-          path: research/tag-gremlin-v10/semantic-ablation-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+          name: grammar-period-${{ matrix.archetype }}-${{ matrix.seed }}
+          path: research/tag-gremlin-v10/grammar-period-${{ matrix.archetype }}-${{ matrix.seed }}.txt
           if-no-files-found: error
