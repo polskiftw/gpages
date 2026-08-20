@@ -1,4 +1,4 @@
-name: Tag Gremlin dynamic direct period certificates
+name: Tag Gremlin frozen dynamic certificate 30k holdout
 
 on:
   pull_request:
@@ -11,30 +11,30 @@ permissions:
   contents: read
 
 jobs:
-  dynamic-certificate-training:
+  holdout-30k:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { archetype: balanced,   seed: 90001 }
-          - { archetype: linguistic, seed: 90101 }
-          - { archetype: names,      seed: 90201 }
-          - { archetype: weird,      seed: 90301 }
-          - { archetype: shortheavy, seed: 90401 }
-          - { archetype: compound,   seed: 90501 }
+          - { archetype: balanced,   seed: 91001 }
+          - { archetype: linguistic, seed: 91101 }
+          - { archetype: names,      seed: 91201 }
+          - { archetype: weird,      seed: 91301 }
+          - { archetype: shortheavy, seed: 91401 }
+          - { archetype: compound,   seed: 91501 }
     steps:
       - uses: actions/checkout@v4
       - name: Build grammar-corrected period-only simulator
         working-directory: research/tag-gremlin-v10
         run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
-      - name: Compile dynamic direct-certificate scheduler
+      - name: Compile frozen dynamic-certificate holdout harness
         working-directory: research/tag-gremlin-v10
-        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_dynamic_certificate.cpp -o period_dynamic_certificate
-      - name: Generate fresh semantic training world
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_dynamic_holdout.cpp -o period_dynamic_holdout
+      - name: Generate untouched 30k semantic holdout
         working-directory: research/tag-gremlin-v10
-        run: python3 worldgen.py --n 10000 --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
+        run: python3 worldgen.py --n 30000 --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
       - name: Assert real-site grammar
         working-directory: research/tag-gremlin-v10
         run: |
@@ -47,43 +47,16 @@ jobs:
               assert not tag.startswith('.') and not tag.endswith('.')
               assert '..' not in tag and all(tag.split('.'))
           PY
-      - name: Sweep runtime-observable dynamic certificate policies
+      - name: Validate frozen cov8_s4 policy without retuning
         shell: bash
         working-directory: research/tag-gremlin-v10
         run: |
           set -euo pipefail
-          ./period_dynamic_certificate world.tsv | tee dynamic-${{ matrix.archetype }}.txt
-      - name: Upload dynamic result
+          ./period_dynamic_holdout world.tsv | tee holdout-${{ matrix.archetype }}.txt
+          grep -q 'complete=1' holdout-${{ matrix.archetype }}.txt
+      - name: Upload holdout result
         uses: actions/upload-artifact@v4
         with:
-          name: dynamic-period-cert-${{ matrix.archetype }}
-          path: research/tag-gremlin-v10/dynamic-${{ matrix.archetype }}.txt
-          if-no-files-found: error
-
-  repair-weird-unique-scale:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - name: Re-run exact 330k weird quota with sufficient shard budget
-        shell: bash
-        working-directory: research/tag-gremlin-v10
-        run: |
-          set -euo pipefail
-          python3 period_unique_scale_model.py \
-            --archetype weird \
-            --seed-base 89300 \
-            --shard-n 10000 \
-            --target-total 330000 \
-            --target-dotted 229000 \
-            --max-shards 300 \
-            --max-after 3 \
-            | tee unique-scale-weird-repair.txt
-          grep -q 'UNIQUE_SCALE archetype=weird' unique-scale-weird-repair.txt
-          grep -q 'total=330000 dotted=229000 plain=101000' unique-scale-weird-repair.txt
-      - name: Upload repaired weird unique-scale result
-        uses: actions/upload-artifact@v4
-        with:
-          name: unique-period-scale-weird-repair
-          path: research/tag-gremlin-v10/unique-scale-weird-repair.txt
+          name: dynamic-period-holdout-30k-${{ matrix.archetype }}
+          path: research/tag-gremlin-v10/holdout-${{ matrix.archetype }}.txt
           if-no-files-found: error
