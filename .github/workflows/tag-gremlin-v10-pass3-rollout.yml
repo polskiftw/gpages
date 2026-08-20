@@ -1,4 +1,4 @@
-name: Tag Gremlin sparse period certificate probe
+name: Tag Gremlin sparse period robustness matrix
 
 on:
   pull_request:
@@ -11,19 +11,37 @@ permissions:
   contents: read
 
 jobs:
-  sparse-period:
+  sparse-robustness:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { archetype: balanced,   n: 10000, seed: 82001 }
-          - { archetype: linguistic, n: 10000, seed: 82101 }
-          - { archetype: names,      n: 10000, seed: 82201 }
-          - { archetype: weird,      n: 10000, seed: 82301 }
-          - { archetype: shortheavy, n: 10000, seed: 82401 }
-          - { archetype: compound,   n: 10000, seed: 82501 }
+          # Controlled prevalence sweep on one balanced latent world.
+          - { label: prev-0000, archetype: balanced, n: 10000, seed: 83001, keep: 0,      bias: 0 }
+          - { label: prev-0025, archetype: balanced, n: 10000, seed: 83001, keep: 0.0025, bias: 0 }
+          - { label: prev-0050, archetype: balanced, n: 10000, seed: 83001, keep: 0.005,  bias: 0 }
+          - { label: prev-0100, archetype: balanced, n: 10000, seed: 83001, keep: 0.01,   bias: 0 }
+          - { label: prev-0250, archetype: balanced, n: 10000, seed: 83001, keep: 0.025,  bias: 0 }
+          - { label: prev-0500, archetype: balanced, n: 10000, seed: 83001, keep: 0.05,   bias: 0 }
+          - { label: prev-1000, archetype: balanced, n: 10000, seed: 83001, keep: 0.10,   bias: 0 }
+          - { label: prev-2500, archetype: balanced, n: 10000, seed: 83001, keep: 0.25,   bias: 0 }
+          - { label: prev-5000, archetype: balanced, n: 10000, seed: 83001, keep: 0.50,   bias: 0 }
+          - { label: prev-10000, archetype: balanced, n: 10000, seed: 83001, keep: 1.0,  bias: 0 }
+
+          # Gradually make q/v/x/z/digit word starts common rather than rare.
+          - { label: hostile-balanced-25,  archetype: balanced, n: 10000, seed: 84001, keep: 1.0, bias: 0.25 }
+          - { label: hostile-balanced-50,  archetype: balanced, n: 10000, seed: 84001, keep: 1.0, bias: 0.50 }
+          - { label: hostile-balanced-100, archetype: balanced, n: 10000, seed: 84001, keep: 1.0, bias: 1.0 }
+
+          # Full hostile stress across every archetype. These are deliberately
+          # unnatural but site-valid worlds designed to punish the sparse set.
+          - { label: hostile-linguistic, archetype: linguistic, n: 10000, seed: 84101, keep: 1.0, bias: 1.0 }
+          - { label: hostile-names,      archetype: names,      n: 10000, seed: 84201, keep: 1.0, bias: 1.0 }
+          - { label: hostile-weird,      archetype: weird,      n: 10000, seed: 84301, keep: 1.0, bias: 1.0 }
+          - { label: hostile-shortheavy, archetype: shortheavy, n: 10000, seed: 84401, keep: 1.0, bias: 1.0 }
+          - { label: hostile-compound,   archetype: compound,   n: 10000, seed: 84501, keep: 1.0, bias: 1.0 }
     steps:
       - uses: actions/checkout@v4
       - name: Build grammar-corrected simulator
@@ -32,15 +50,34 @@ jobs:
       - name: Compile sparse certificate probe
         working-directory: research/tag-gremlin-v10
         run: g++ -O3 -std=c++20 -march=x86-64-v3 period_sparse_cert_probe.cpp -o period_sparse_cert_probe
-      - name: Generate semantic boundary world
+      - name: Generate robustness world
         working-directory: research/tag-gremlin-v10
-        run: python3 worldgen.py --n ${{ matrix.n }} --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
-      - name: Compare sparse word-start certificates
+        run: >-
+          python3 worldgen.py
+          --n ${{ matrix.n }}
+          --seed ${{ matrix.seed }}
+          --archetype ${{ matrix.archetype }}
+          --boundary-keep ${{ matrix.keep }}
+          --boundary-start-bias ${{ matrix.bias }}
+          --out world.tsv
+      - name: Assert site grammar
         working-directory: research/tag-gremlin-v10
-        run: ./period_sparse_cert_probe world.tsv | tee sparse-${{ matrix.archetype }}-${{ matrix.seed }}.txt
-      - name: Upload sparse result
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for line in Path('world.tsv').read_text().splitlines():
+              tag=line.split('\t',1)[1]
+              assert '-' not in tag
+              assert all(c.islower() or c.isdigit() or c=='.' for c in tag)
+              assert not tag.startswith('.') and not tag.endswith('.')
+              assert '..' not in tag and all(tag.split('.'))
+          PY
+      - name: Compare sparse certificates
+        working-directory: research/tag-gremlin-v10
+        run: ./period_sparse_cert_probe world.tsv | tee sparse-${{ matrix.label }}.txt
+      - name: Upload robustness result
         uses: actions/upload-artifact@v4
         with:
-          name: sparse-period-${{ matrix.archetype }}-${{ matrix.seed }}
-          path: research/tag-gremlin-v10/sparse-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+          name: sparse-robustness-${{ matrix.label }}
+          path: research/tag-gremlin-v10/sparse-${{ matrix.label }}.txt
           if-no-files-found: error
