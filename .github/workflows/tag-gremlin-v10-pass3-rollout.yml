@@ -1,4 +1,4 @@
-name: Tag Gremlin semantic period-boundary revalidation
+name: Tag Gremlin semantic period-child ablation
 
 on:
   pull_request:
@@ -11,9 +11,9 @@ permissions:
   contents: read
 
 jobs:
-  semantic-period-matrix:
+  semantic-child-ablation:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
@@ -29,37 +29,31 @@ jobs:
       - name: Build period-only simulator source
         working-directory: research/tag-gremlin-v10
         run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
-      - name: Compile semantic period probe
+      - name: Compile semantic child ablation
         working-directory: research/tag-gremlin-v10
-        run: g++ -O3 -std=c++20 -march=x86-64-v3 punctuation_probe.cpp -o period_probe
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_child_ablation.cpp -o period_child_ablation
       - name: Generate semantic period-boundary world
         working-directory: research/tag-gremlin-v10
         run: python3 worldgen.py --n ${{ matrix.n }} --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
-      - name: Assert site alphabet and boundary semantics
+      - name: Assert period is a canonical word boundary
         working-directory: research/tag-gremlin-v10
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          tags=[]
           for line in Path('world.tsv').read_text().splitlines():
               tag=line.split('\t',1)[1]
-              tags.append(tag)
-              assert '-' not in tag, tag
-              assert all(c.islower() or c.isdigit() or c=='.' for c in tag), tag
-              assert not tag.startswith('.') and not tag.endswith('.'), tag
-              assert '..' not in tag, tag
-              assert all(part for part in tag.split('.')), tag
-          bearing=sum('.' in t for t in tags)
-          periods=sum(t.count('.') for t in tags)
-          print(f'period-bearing tags: {bearing}/{len(tags)} ({bearing/len(tags):.3%})')
-          print(f'total word boundaries: {periods}')
+              assert '-' not in tag
+              assert all(c.islower() or c.isdigit() or c=='.' for c in tag)
+              assert not tag.startswith('.') and not tag.endswith('.')
+              assert '..' not in tag
+              assert all(tag.split('.'))
           PY
-      - name: Compare period-root depths
+      - name: Measure semantic period-child marginals
         working-directory: research/tag-gremlin-v10
-        run: ./period_probe world.tsv | tee semantic-period-${{ matrix.archetype }}-${{ matrix.seed }}.txt
-      - name: Upload semantic period result
+        run: ./period_child_ablation world.tsv | tee semantic-ablation-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+      - name: Upload semantic ablation
         uses: actions/upload-artifact@v4
         with:
-          name: semantic-period-${{ matrix.archetype }}-${{ matrix.seed }}
-          path: research/tag-gremlin-v10/semantic-period-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+          name: semantic-ablation-${{ matrix.archetype }}-${{ matrix.seed }}
+          path: research/tag-gremlin-v10/semantic-ablation-${{ matrix.archetype }}-${{ matrix.seed }}.txt
           if-no-files-found: error
