@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""Generate a period-only simulator source from the preserved v10 native source.
+"""Generate a site-faithful period-only simulator from the preserved v10 source.
 
-The public v10 source historically modeled '-' as a supported continuation.
-The real site does not support hyphen. This transformer is deliberately strict:
-it only succeeds if the expected legacy fragments are present, then removes the
-hyphen continuation/codepoint and makes the learned punctuation feature period-only.
+The preserved public v10 source historically modeled '-' as supported.  The real
+site accepts only letters, digits, and period, and period is the tag-space/word
+separator (for example ``red.hair``), not arbitrary punctuation.
+
+This transformer is deliberately strict: it only succeeds if the expected
+legacy fragments are present.  It removes hyphen support and teaches the normal
+frontier the separator grammar so it never spends requests on impossible
+leading-period or consecutive-period tag prefixes.  External substring probes
+such as ``.hair`` remain valid and are handled outside addFrontier().
 """
 from __future__ import annotations
 import argparse
@@ -23,6 +28,10 @@ REPLACEMENTS = [
         "punc+=(ch=='.'||ch=='-');",
         "punc+=(ch=='.');",
     ),
+    (
+        ' bool addFrontier(const string&q,int cr){auto gg=gramCnt.find(q);',
+        ' bool addFrontier(const string&q,int cr){if(q.empty()||q[0]==\'.\'||q.find("..")!=string::npos)return false;auto gg=gramCnt.find(q);',
+    ),
 ]
 
 
@@ -39,16 +48,17 @@ def main() -> None:
             raise RuntimeError(f'expected exactly one legacy fragment, got {count}: {old!r}')
         src = src.replace(old, new)
 
-    # Explicit guardrails for the three semantic hyphen hooks that mattered.
     if 'abcdefghijklmnopqrstuvwxyz0123456789.-' in src:
         raise RuntimeError('hyphen still present in continuation alphabet')
     if "if(c=='-')" in src:
         raise RuntimeError('hyphen still present in query codepoint mapping')
     if "ch=='-'" in src:
         raise RuntimeError('hyphen still present in punctuation feature')
+    if 'q.find("..")!=string::npos' not in src:
+        raise RuntimeError('separator grammar guard was not installed')
 
     Path(args.out).write_text(src, encoding='utf-8', newline='\n')
-    print(f'generated period-only simulator: {args.out}')
+    print(f'generated site-faithful period-only simulator: {args.out}')
 
 
 if __name__ == '__main__':
