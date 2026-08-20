@@ -1,4 +1,4 @@
-name: Tag Gremlin period boundary side probe
+name: Tag Gremlin sparse period certificate probe
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  period-side:
+  sparse-period:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -29,18 +29,18 @@ jobs:
       - name: Build grammar-corrected simulator
         working-directory: research/tag-gremlin-v10
         run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
-      - name: Compile boundary side probe
+      - name: Compile sparse certificate probe
         working-directory: research/tag-gremlin-v10
-        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_side_probe.cpp -o period_side_probe
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_sparse_cert_probe.cpp -o period_sparse_cert_probe
       - name: Generate semantic boundary world
         working-directory: research/tag-gremlin-v10
         run: python3 worldgen.py --n ${{ matrix.n }} --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
-      - name: Compare left/right separator partitions
+      - name: Compare sparse word-start certificates
         working-directory: research/tag-gremlin-v10
-        run: ./period_side_probe world.tsv | tee side-${{ matrix.archetype }}-${{ matrix.seed }}.txt
-      - name: Upload side result
+        run: ./period_sparse_cert_probe world.tsv | tee sparse-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+      - name: Upload sparse result
         uses: actions/upload-artifact@v4
         with:
-          name: period-side-${{ matrix.archetype }}-${{ matrix.seed }}
-          path: research/tag-gremlin-v10/side-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+          name: sparse-period-${{ matrix.archetype }}-${{ matrix.seed }}
+          path: research/tag-gremlin-v10/sparse-${{ matrix.archetype }}-${{ matrix.seed }}.txt
           if-no-files-found: error
