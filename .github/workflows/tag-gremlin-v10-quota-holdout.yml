@@ -2,9 +2,9 @@ name: Tag Gremlin quota-calibrated 100k holdout
 
 on:
   workflow_dispatch:
-  push:
+  pull_request:
     branches:
-      - research/tag-gremlin-pass3-rollouts
+      - main
     paths:
       - 'research/tag-gremlin-v10/period_quota_worldgen.py'
       - 'research/tag-gremlin-v10/period_dynamic_certificate.cpp'
