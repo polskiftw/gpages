@@ -73,7 +73,10 @@ int main(int argc,char**argv){
     int closedCandidates=0,satCandidates=0;
     for(auto &kv:cov){
         auto qr=w.query(kv.first);
-        CandCov c{kv.first,qr.first,move(kv.second)};
+        // Keep cov intact because the fixed-set evaluations below use the same
+        // exact coverage map.  Moving kv.second here would silently zero those
+        // vectors and make the later coverage accounting wrong.
+        CandCov c{kv.first,qr.first,kv.second};
         if(c.truth<K)closedCandidates++;else satCandidates++;
         cc.push_back(move(c));
     }
