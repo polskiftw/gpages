@@ -1,4 +1,4 @@
-name: Tag Gremlin period-only correction matrix
+name: Tag Gremlin period-child ablation
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  corrected-matrix:
+  child-ablation:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -29,12 +29,10 @@ jobs:
       - name: Build period-only simulator source
         working-directory: research/tag-gremlin-v10
         run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
-      - name: Compile corrected simulator and period probe
+      - name: Compile child ablation probe
         working-directory: research/tag-gremlin-v10
-        run: |
-          g++ -O3 -std=c++20 -march=x86-64-v3 native_sim_period_only.cpp -o native_sim_period_only
-          g++ -O3 -std=c++20 -march=x86-64-v3 punctuation_probe.cpp -o period_probe
-      - name: Generate fresh period-only world
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_child_ablation.cpp -o period_child_ablation
+      - name: Generate period-only training world
         working-directory: research/tag-gremlin-v10
         run: python3 worldgen.py --n ${{ matrix.n }} --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
       - name: Assert site alphabet
@@ -42,38 +40,17 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          bad=[]
-          periods=0
           for line in Path('world.tsv').read_text().splitlines():
               tag=line.split('\t',1)[1]
-              if '-' in tag or any(not (c.islower() or c.isdigit() or c=='.') for c in tag):
-                  bad.append(tag)
-              periods += ('.' in tag)
-          assert not bad, bad[:3]
-          print('period-bearing tags:', periods)
+              assert '-' not in tag
+              assert all(c.islower() or c.isdigit() or c=='.' for c in tag)
           PY
-      - name: Run corrected controls
+      - name: Measure period-child marginals
         working-directory: research/tag-gremlin-v10
-        run: |
-          ./native_sim_period_only world.tsv v9 | tee v9.json
-          ./native_sim_period_only world.tsv v1 | tee v1.json
-          ./native_sim_period_only world.tsv learnedprune 3 1 | tee learned.json
-          python3 - <<'PY'
-          import json
-          for p in ('v9.json','v1.json','learned.json'):
-              r=json.loads(open(p).read().strip().splitlines()[-1])
-              assert r['complete'], (p,r)
-          PY
-      - name: Test period-root architecture
-        working-directory: research/tag-gremlin-v10
-        run: ./period_probe world.tsv | tee period-${{ matrix.archetype }}-${{ matrix.seed }}.txt
-      - name: Upload corrected results
+        run: ./period_child_ablation world.tsv | tee ablation-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+      - name: Upload ablation result
         uses: actions/upload-artifact@v4
         with:
-          name: period-only-${{ matrix.archetype }}-${{ matrix.seed }}
-          path: |
-            research/tag-gremlin-v10/v9.json
-            research/tag-gremlin-v10/v1.json
-            research/tag-gremlin-v10/learned.json
-            research/tag-gremlin-v10/period-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+          name: period-ablation-${{ matrix.archetype }}-${{ matrix.seed }}
+          path: research/tag-gremlin-v10/ablation-${{ matrix.archetype }}-${{ matrix.seed }}.txt
           if-no-files-found: error
