@@ -1,3 +1,9 @@
+# ⚠️ Site-alphabet correction (2026-08-20)
+
+The historical results below were produced under an earlier synthetic alphabet that incorrectly allowed hyphen (`-`). The real site supports only `a-z`, `0-9`, and period (`.`). Therefore the old query counts, parity values, debt conclusions, proof bounds, and punctuation experiments are retained **for provenance only** and are superseded for real-site conclusions until reproduced by the period-only correction matrix. See `SITE_ALPHABET_CORRECTION.md`.
+
+---
+
 # Tag Gremlin v10 corrected matrix provenance
 
 This public lab was promoted from the private `polskiftw/gdlp` staging lab after the corrected research matrix completed successfully on 2026-08-20.
