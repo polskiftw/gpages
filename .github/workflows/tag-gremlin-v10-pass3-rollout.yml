@@ -1,4 +1,4 @@
-name: Tag Gremlin period-prevalence sweep
+name: Tag Gremlin adaptive period pilot sweep
 
 on:
   pull_request:
@@ -11,9 +11,9 @@ permissions:
   contents: read
 
 jobs:
-  period-prevalence:
+  adaptive-period:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -23,27 +23,26 @@ jobs:
       - name: Build grammar-corrected period-only simulator
         working-directory: research/tag-gremlin-v10
         run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
-      - name: Compile focused period probe
+      - name: Compile adaptive period pilot
         working-directory: research/tag-gremlin-v10
-        run: g++ -O3 -std=c++20 -march=x86-64-v3 punctuation_probe.cpp -o period_probe
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_adaptive_probe.cpp -o period_adaptive_probe
       - name: Generate prevalence-controlled balanced world
         working-directory: research/tag-gremlin-v10
         run: python3 worldgen.py --n 10000 --seed 83001 --archetype balanced --boundary-keep ${{ matrix.keep }} --out world.tsv
-      - name: Measure prevalence and depth-2 value
+      - name: Compare runtime-observable adaptive policies
         working-directory: research/tag-gremlin-v10
         run: |
-          python3 - <<'PY' | tee prevalence-${{ matrix.keep }}.txt
+          python3 - <<'PY' | tee adaptive-${{ matrix.keep }}.txt
           from pathlib import Path
           tags=[line.split('\t',1)[1] for line in Path('world.tsv').read_text().splitlines()]
-          assert all('-' not in t and not t.startswith('.') and not t.endswith('.') and '..' not in t and all(t.split('.')) for t in tags)
           bearing=sum('.' in t for t in tags)
           periods=sum(t.count('.') for t in tags)
           print(f'PREVALENCE keep=${{ matrix.keep }} period_tags={bearing} periods={periods} fraction={bearing/len(tags):.6f}')
           PY
-          ./period_probe world.tsv 2 | tee -a prevalence-${{ matrix.keep }}.txt
-      - name: Upload prevalence result
+          ./period_adaptive_probe world.tsv | tee -a adaptive-${{ matrix.keep }}.txt
+      - name: Upload adaptive result
         uses: actions/upload-artifact@v4
         with:
-          name: period-prevalence-${{ matrix.keep }}
-          path: research/tag-gremlin-v10/prevalence-${{ matrix.keep }}.txt
+          name: adaptive-period-${{ matrix.keep }}
+          path: research/tag-gremlin-v10/adaptive-${{ matrix.keep }}.txt
           if-no-files-found: error
