@@ -1,4 +1,4 @@
-name: Tag Gremlin grammar-corrected period-child ablation
+name: Tag Gremlin period-prevalence sweep
 
 on:
   pull_request:
@@ -11,49 +11,39 @@ permissions:
   contents: read
 
 jobs:
-  grammar-child-ablation:
+  period-prevalence:
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { archetype: balanced,   n: 10000, seed: 82001 }
-          - { archetype: linguistic, n: 10000, seed: 82101 }
-          - { archetype: names,      n: 10000, seed: 82201 }
-          - { archetype: weird,      n: 10000, seed: 82301 }
-          - { archetype: shortheavy, n: 10000, seed: 82401 }
-          - { archetype: compound,   n: 10000, seed: 82501 }
+        keep: ['0', '0.0025', '0.005', '0.01', '0.025', '0.05', '0.10', '0.25', '0.50', '1.0']
     steps:
       - uses: actions/checkout@v4
       - name: Build grammar-corrected period-only simulator
         working-directory: research/tag-gremlin-v10
         run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
-      - name: Compile period-child ablation
+      - name: Compile focused period probe
         working-directory: research/tag-gremlin-v10
-        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_child_ablation.cpp -o period_child_ablation
-      - name: Generate semantic period-boundary world
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 punctuation_probe.cpp -o period_probe
+      - name: Generate prevalence-controlled balanced world
         working-directory: research/tag-gremlin-v10
-        run: python3 worldgen.py --n ${{ matrix.n }} --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
-      - name: Assert site grammar
+        run: python3 worldgen.py --n 10000 --seed 83001 --archetype balanced --boundary-keep ${{ matrix.keep }} --out world.tsv
+      - name: Measure prevalence and depth-2 value
         working-directory: research/tag-gremlin-v10
         run: |
-          python3 - <<'PY'
+          python3 - <<'PY' | tee prevalence-${{ matrix.keep }}.txt
           from pathlib import Path
-          for line in Path('world.tsv').read_text().splitlines():
-              tag=line.split('\t',1)[1]
-              assert '-' not in tag
-              assert all(c.islower() or c.isdigit() or c=='.' for c in tag)
-              assert not tag.startswith('.') and not tag.endswith('.')
-              assert '..' not in tag
-              assert all(tag.split('.'))
+          tags=[line.split('\t',1)[1] for line in Path('world.tsv').read_text().splitlines()]
+          assert all('-' not in t and not t.startswith('.') and not t.endswith('.') and '..' not in t and all(t.split('.')) for t in tags)
+          bearing=sum('.' in t for t in tags)
+          periods=sum(t.count('.') for t in tags)
+          print(f'PREVALENCE keep=${{ matrix.keep }} period_tags={bearing} periods={periods} fraction={bearing/len(tags):.6f}')
           PY
-      - name: Measure legal period-child marginals
-        working-directory: research/tag-gremlin-v10
-        run: ./period_child_ablation world.tsv | tee grammar-ablation-${{ matrix.archetype }}-${{ matrix.seed }}.txt
-      - name: Upload grammar-corrected ablation
+          ./period_probe world.tsv 2 | tee -a prevalence-${{ matrix.keep }}.txt
+      - name: Upload prevalence result
         uses: actions/upload-artifact@v4
         with:
-          name: grammar-ablation-${{ matrix.archetype }}-${{ matrix.seed }}
-          path: research/tag-gremlin-v10/grammar-ablation-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+          name: period-prevalence-${{ matrix.keep }}
+          path: research/tag-gremlin-v10/prevalence-${{ matrix.keep }}.txt
           if-no-files-found: error
