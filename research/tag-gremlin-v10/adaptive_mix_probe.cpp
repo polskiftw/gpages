@@ -4,10 +4,16 @@
 
 #include <iomanip>
 
-static Result runAdaptive(World &w,double threshold,int harvestN,int proofN){
+struct AdaptiveResult{
+    int queries=0;
+    bool complete=false;
+    int harvest=0,prune=0,inferred=0;
+};
+
+static AdaptiveResult runAdaptive(World &w,double threshold,int harvestN,int proofN){
     Policy p=v1(); p.name="adaptive";
     Sim sm(w,p,"learnedprune");
-    int phase=0;
+    int phase=0,harvest=0,prune=0;
     const int cycle=max(1,harvestN+proofN);
     while(!sm.active.empty() && sm.req<1000000){
         while(sm.inferSweep()){}
@@ -25,13 +31,10 @@ static Result runAdaptive(World &w,double threshold,int harvestN,int proofN){
             id=h?sm.choose(true):sm.chooseLearnedPrune();
         }
         if(id<0) break;
+        if(h) harvest++; else prune++;
         sm.processQ(id,h); sm.turn++;
     }
-    Result r;
-    r.policy="adaptive"; r.queries=sm.req; r.complete=sm.knownNames.size()==w.tags.size();
-    r.harvest=sm.hq; r.prune=sm.pq; r.sat=sm.satq; r.closed=sm.closedq; r.inferred=sm.inferred;
-    r.frontPeak=sm.frontPeak; r.pruneEff=sm.pruneEff;
-    return r;
+    return {sm.req,sm.knownNames.size()==w.tags.size(),harvest,prune,sm.inferred};
 }
 
 int main(int argc,char **argv){
@@ -50,7 +53,7 @@ int main(int argc,char **argv){
         {1.10,1,1,"diag-t1.10-h1p1"}
     };
     for(auto v:vars){
-        Result r=runAdaptive(w,v.t,v.h,v.p);
+        AdaptiveResult r=runAdaptive(w,v.t,v.h,v.p);
         cout<<fixed<<setprecision(2)
             <<"ADAPTIVE name="<<v.name
             <<" threshold="<<v.t
