@@ -11,33 +11,33 @@ permissions:
   contents: read
 
 jobs:
-  oracle-ceiling:
+  certificate-bound:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { archetype: balanced,   n: 10000, seed: 75001 }
-          - { archetype: linguistic, n: 10000, seed: 75101 }
-          - { archetype: names,      n: 10000, seed: 75201 }
-          - { archetype: weird,      n: 10000, seed: 75301 }
-          - { archetype: shortheavy, n: 10000, seed: 75401 }
-          - { archetype: compound,   n: 10000, seed: 75501 }
+          - { archetype: balanced,   n: 10000, seed: 76001 }
+          - { archetype: linguistic, n: 10000, seed: 76101 }
+          - { archetype: names,      n: 10000, seed: 76201 }
+          - { archetype: weird,      n: 10000, seed: 76301 }
+          - { archetype: shortheavy, n: 10000, seed: 76401 }
+          - { archetype: compound,   n: 10000, seed: 76501 }
     steps:
       - uses: actions/checkout@v4
-      - name: Compile hidden-outcome ranking probe
+      - name: Compile certificate bound probe
         working-directory: research/tag-gremlin-v10
-        run: g++ -O3 -std=c++20 -march=x86-64-v3 oracle_ceiling.cpp -o oracle_ceiling
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 certificate_bound.cpp -o certificate_bound
       - name: Generate fresh corrected 10k world
         working-directory: research/tag-gremlin-v10
         run: python3 worldgen.py --n ${{ matrix.n }} --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
-      - name: Compare runtime rankers with hidden-outcome rankers
+      - name: Compute exact closed-certificate floor
         working-directory: research/tag-gremlin-v10
-        run: ./oracle_ceiling world.tsv | tee oracle-${{ matrix.archetype }}-${{ matrix.seed }}.txt
-      - name: Upload oracle result
+        run: ./certificate_bound world.tsv | tee cert-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+      - name: Upload certificate analysis
         uses: actions/upload-artifact@v4
         with:
-          name: oracle-${{ matrix.archetype }}-${{ matrix.seed }}
-          path: research/tag-gremlin-v10/oracle-${{ matrix.archetype }}-${{ matrix.seed }}.txt
+          name: cert-${{ matrix.archetype }}-${{ matrix.seed }}
+          path: research/tag-gremlin-v10/cert-${{ matrix.archetype }}-${{ matrix.seed }}.txt
           if-no-files-found: error
