@@ -42,9 +42,6 @@ static int processProbe(Sim &sm,const string &q,int &closedN,int &satN,int &fres
 }
 
 static bool legalSeparatorProbe(const string &q){
-    // Period is a space surrogate.  A substring query may begin/end at a word
-    // boundary, but consecutive periods would mean an empty word and are
-    // syntactically impossible on the target site.
     return q.find("..") == string::npos;
 }
 
@@ -71,14 +68,20 @@ static PunctResult runPunct(World &w,int maxDepth){
 }
 
 int main(int argc,char **argv){
-    if(argc<2){cerr<<"usage: punctuation_probe WORLD.tsv\n";return 2;}
+    if(argc<2){cerr<<"usage: punctuation_probe WORLD.tsv [DEPTH]\n";return 2;}
     World w=loadWorld(argv[1]);
     Policy p=v1(); p.name="learnedprune";
     Sim base(w,p,"learnedprune");
     Result br=base.run();
     if(!br.complete){cerr<<"baseline incomplete\n";return 3;}
     cout<<"PERIOD_BASE queries="<<br.queries<<" closed="<<br.closedq<<" sat="<<br.satq<<" inferred="<<br.inferred<<" complete=1\n";
-    for(int d: {1,2,3,4}){
+    vector<int> depths;
+    if(argc>=3){
+        int d=stoi(argv[2]);
+        if(d<1||d>8){cerr<<"invalid depth\n";return 2;}
+        depths.push_back(d);
+    }else depths={1,2,3,4};
+    for(int d: depths){
         auto x=runPunct(w,d);
         auto &r=x.result;
         cout<<"PERIOD depth="<<d
