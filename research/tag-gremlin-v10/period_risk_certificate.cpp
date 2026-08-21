@@ -79,7 +79,7 @@ static void processRiskCert(Sim &sm,const string&q,int cov,int support,RiskStats
 
 static pair<Result,RiskStats> runRisk(World&w,const RiskPolicy&pol,const vector<string>&cands){
     Policy p=v1(); p.name="risk-period-cert";
-    // Debt thresholds stay frozen.  This experiment changes only certificate
+    // Debt thresholds stay frozen. This experiment changes only certificate
     // eligibility/ranking; it does not retune the ordinary scheduler.
     p.debt_enter_ratio=.35;
     p.debt_exit_ratio=.18;
@@ -160,6 +160,9 @@ int main(int argc,char**argv){
     const array<int,5> u8={8,8,8,8,8};
     const vector<RiskPolicy> policies={
         {"uniform8_control",u8,u8,false},
+
+        // First-pass ablations retained for provenance.  The xy-only rows are
+        // intentionally missing len2 certificates and diagnose the interaction.
         {"xy_s0_2",off,{2,8,8,8,8},false},
         {"xy_24888",off,{2,4,8,8,8},false},
         {"xy_246810",off,{2,4,6,8,10},false},
@@ -169,7 +172,20 @@ int main(int argc,char**argv){
         {"xy_22346",off,{2,2,3,4,6},false},
         {"mixed_safe",{16,16,20,24,32},{2,3,4,6,8},false},
         {"mixed_mid",{12,16,20,24,32},{2,4,6,8,10},false},
-        {"xy_23468_margin",off,{2,3,4,6,8},true}
+        {"xy_23468_margin",off,{2,3,4,6,8},true},
+
+        // Layered policies are the key second-pass test: preserve the exact
+        // proven cov8_s4 behavior for .x while allowing only .xy to become
+        // more aggressive.  This avoids confounding low-coverage .xy value
+        // with the loss of useful 10k-scale .x certificates.
+        {"layer_s0_2",u8,{2,8,8,8,8},false},
+        {"layer_24888",u8,{2,4,8,8,8},false},
+        {"layer_246810",u8,{2,4,6,8,10},false},
+        {"layer_23468",u8,{2,3,4,6,8},false},
+        {"layer_34468",u8,{3,4,4,6,8},false},
+        {"layer_flat4",u8,{4,4,4,4,4},false},
+        {"layer_22346",u8,{2,2,3,4,6},false},
+        {"layer_23468_margin",u8,{2,3,4,6,8},true}
     };
 
     for(const auto &pol:policies){
