@@ -1,0 +1,7 @@
+build/
+*.tsv
+*.db
+*.sqlite
+*.sqlite3
+results/
+private/
