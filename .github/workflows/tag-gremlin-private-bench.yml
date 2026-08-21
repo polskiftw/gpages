@@ -1,0 +1,52 @@
+name: Tag Gremlin private-bench phase 1
+
+on:
+  pull_request:
+    paths:
+      - 'research/tag-gremlin-private-bench/**'
+      - '.github/workflows/tag-gremlin-private-bench.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        working-directory: research/tag-gremlin-private-bench
+        run: cmake -S . -B build
+      - name: Build
+        working-directory: research/tag-gremlin-private-bench
+        run: cmake --build build --config Release
+      - name: Self-test
+        working-directory: research/tag-gremlin-private-bench
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Generate fake database
+        working-directory: research/tag-gremlin-private-bench
+        run: python make_fake_db.py fake.tsv --count 800 --seed 90210
+      - name: Smoke benchmark (Windows)
+        if: runner.os == 'Windows'
+        working-directory: research/tag-gremlin-private-bench
+        shell: pwsh
+        run: |
+          .\build\Release\tagbench.exe fake.tsv exhaustive-prefix 500000 | Tee-Object -FilePath smoke.json
+          $j = Get-Content smoke.json -Raw | ConvertFrom-Json
+          if (-not $j.complete) { throw 'benchmark did not complete' }
+          if ($j.discovered -ne 800) { throw 'wrong discovered count' }
+      - name: Smoke benchmark (Unix)
+        if: runner.os != 'Windows'
+        working-directory: research/tag-gremlin-private-bench
+        shell: bash
+        run: |
+          ./build/tagbench fake.tsv exhaustive-prefix 500000 > smoke.json
+          python - <<'PY'
+          import json
+          with open('smoke.json', encoding='utf-8') as f:
+              j=json.load(f)
+          assert j['complete'] is True
+          assert j['discovered'] == 800
+          PY
