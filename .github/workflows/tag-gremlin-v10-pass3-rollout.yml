@@ -1,0 +1,59 @@
+name: Tag Gremlin frozen dynamic certificate 100k holdout
+
+# The raw 100k holdout completed successfully and is retained for provenance.
+# It is manual-only now so later research commits do not rerun the expensive
+# superseded matrix.  The quota-calibrated holdout is the active scale test.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  holdout-100k:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { archetype: balanced,   seed: 92001 }
+          - { archetype: linguistic, seed: 92101 }
+          - { archetype: weird,      seed: 92301 }
+          - { archetype: compound,   seed: 92501 }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build grammar-corrected period-only simulator
+        working-directory: research/tag-gremlin-v10
+        run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
+      - name: Compile frozen dynamic-certificate holdout harness
+        working-directory: research/tag-gremlin-v10
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_dynamic_holdout.cpp -o period_dynamic_holdout
+      - name: Generate untouched 100k semantic holdout
+        working-directory: research/tag-gremlin-v10
+        run: python3 worldgen.py --n 100000 --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
+      - name: Assert real-site grammar
+        working-directory: research/tag-gremlin-v10
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for line in Path('world.tsv').read_text().splitlines():
+              tag=line.split('\t',1)[1]
+              assert '-' not in tag
+              assert all(c.islower() or c.isdigit() or c=='.' for c in tag)
+              assert not tag.startswith('.') and not tag.endswith('.')
+              assert '..' not in tag and all(tag.split('.'))
+          PY
+      - name: Validate frozen cov8_s4 policy without retuning
+        shell: bash
+        working-directory: research/tag-gremlin-v10
+        run: |
+          set -euo pipefail
+          ./period_dynamic_holdout world.tsv | tee holdout-${{ matrix.archetype }}.txt
+          grep -q 'complete=1' holdout-${{ matrix.archetype }}.txt
+      - name: Upload holdout result
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-period-holdout-100k-${{ matrix.archetype }}
+          path: research/tag-gremlin-v10/holdout-${{ matrix.archetype }}.txt
+          if-no-files-found: error

@@ -1,0 +1,82 @@
+name: Tag Gremlin quota-calibrated 100k holdout
+
+# The tracked quota-calibrated matrix was launched from PR run 32429734718.
+# Keep this workflow manual-only afterward so unrelated research commits do not
+# rerun the expensive 100k matrix simply because the PR still contains its files.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quota-holdout-100k:
+    timeout-minutes: 210
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - archetype: balanced
+            seed: 93001
+          - archetype: linguistic
+            seed: 93101
+          - archetype: weird
+            seed: 93301
+          - archetype: compound
+            seed: 93501
+    defaults:
+      run:
+        working-directory: research/tag-gremlin-v10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build grammar-corrected period-only simulator
+        run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
+
+      - name: Compile frozen dynamic-certificate holdout harness
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_dynamic_holdout.cpp -o period_dynamic_holdout
+
+      - name: Generate exact-quota 100k semantic holdout
+        run: |
+          set -euo pipefail
+          python3 period_quota_worldgen.py \
+            --target-total 100000 \
+            --target-dotted 69394 \
+            --seed-base ${{ matrix.seed }} \
+            --archetype ${{ matrix.archetype }} \
+            --shard-n 10000 \
+            --max-shards 150 \
+            --out world.tsv | tee quota-${{ matrix.archetype }}.txt
+          grep -q 'total=100000 dotted=69394 plain=30606 dotted_fraction=0.693940' quota-${{ matrix.archetype }}.txt
+
+      - name: Assert exact aggregate and real-site grammar
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          lines=Path('world.tsv').read_text().splitlines()
+          assert len(lines)==100000
+          tags=[line.split('\t',1)[1] for line in lines]
+          assert sum('.' in t for t in tags)==69394
+          assert len(set(tags))==100000
+          for tag in tags:
+              assert '-' not in tag
+              assert all(c.islower() or c.isdigit() or c=='.' for c in tag)
+              assert not tag.startswith('.') and not tag.endswith('.')
+              assert '..' not in tag and all(tag.split('.'))
+          PY
+
+      - name: Validate frozen cov8_s4 policy without retuning
+        run: |
+          set -euo pipefail
+          ./period_dynamic_holdout world.tsv | tee holdout-${{ matrix.archetype }}.txt
+          grep -q 'complete=1' holdout-${{ matrix.archetype }}.txt
+
+      - name: Upload quota holdout result
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-period-quota-holdout-100k-${{ matrix.archetype }}
+          path: |
+            research/tag-gremlin-v10/quota-${{ matrix.archetype }}.txt
+            research/tag-gremlin-v10/holdout-${{ matrix.archetype }}.txt
+          if-no-files-found: error
