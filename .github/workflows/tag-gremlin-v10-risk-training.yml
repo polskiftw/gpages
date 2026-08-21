@@ -1,7 +1,13 @@
-name: Tag Gremlin risk-aware direct certificate training
+name: Tag Gremlin layered xy risk training pass 2
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'research/tag-gremlin-v10/period_risk_certificate.cpp'
+      - '.github/workflows/tag-gremlin-v10-risk-training.yml'
 
 permissions:
   contents: read
@@ -14,12 +20,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { archetype: balanced,   seed: 96001 }
-          - { archetype: linguistic, seed: 96101 }
-          - { archetype: names,      seed: 96201 }
-          - { archetype: weird,      seed: 96301 }
-          - { archetype: shortheavy, seed: 96401 }
-          - { archetype: compound,   seed: 96501 }
+          - { archetype: balanced,   seed: 97001 }
+          - { archetype: linguistic, seed: 97101 }
+          - { archetype: names,      seed: 97201 }
+          - { archetype: weird,      seed: 97301 }
+          - { archetype: shortheavy, seed: 97401 }
+          - { archetype: compound,   seed: 97501 }
     defaults:
       run:
         working-directory: research/tag-gremlin-v10
@@ -29,10 +35,10 @@ jobs:
       - name: Build grammar-corrected period-only simulator
         run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
 
-      - name: Compile risk-aware direct-certificate harness
+      - name: Compile layered risk harness
         run: g++ -O3 -std=c++20 -march=x86-64-v3 period_risk_certificate.cpp -o period_risk_certificate
 
-      - name: Generate exact-prevalence 10k training world
+      - name: Generate fresh exact-prevalence 10k world
         run: |
           set -euo pipefail
           python3 period_quota_worldgen.py \
@@ -45,17 +51,18 @@ jobs:
             --out world.tsv | tee risk-world-${{ matrix.archetype }}.txt
           grep -q 'total=10000 dotted=6939 plain=3061 dotted_fraction=0.693900' risk-world-${{ matrix.archetype }}.txt
 
-      - name: Sweep runtime-observable low-coverage risk policies
+      - name: Compare layered xy risk policies
         run: |
           set -euo pipefail
           ./period_risk_certificate world.tsv | tee risk-${{ matrix.archetype }}.txt
           grep -q 'RISK_REF policy=cov8_s4' risk-${{ matrix.archetype }}.txt
-          test "$(grep -c 'complete=1' risk-${{ matrix.archetype }}.txt)" -ge 12
+          grep -q 'RISK policy=layer_23468' risk-${{ matrix.archetype }}.txt
+          test "$(grep -c 'complete=1' risk-${{ matrix.archetype }}.txt)" -ge 20
 
-      - name: Upload risk training result
+      - name: Upload layered risk result
         uses: actions/upload-artifact@v4
         with:
-          name: dynamic-period-risk-training-${{ matrix.archetype }}
+          name: dynamic-period-layered-risk-pass2-${{ matrix.archetype }}
           path: |
             research/tag-gremlin-v10/risk-world-${{ matrix.archetype }}.txt
             research/tag-gremlin-v10/risk-${{ matrix.archetype }}.txt
