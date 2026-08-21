@@ -17,7 +17,9 @@ For otherwise equal popularity the phase-1 benchmark uses tag name ascending as 
 
 ## What exists now
 
-`tagbench.cpp` contains an indexed oracle, a deliberately stupid but complete exhaustive-prefix baseline, a numeric-only result printer, and differential self-tests against a naive reference oracle. The optimized oracle indexes 1–4 character substring postings and uses a lexical range + segment tree for prefix top-k selection; long substring searches filter the rarest 4-gram posting list.
+`tagbench.cpp` contains an indexed oracle, a deliberately stupid exhaustive-query-tree baseline, a numeric-only result printer, and differential self-tests against a naive reference oracle. The optimized oracle indexes 1–4 character substring postings and uses a lexical range + segment tree for prefix top-k selection; long substring searches filter the rarest 4-gram posting list.
+
+`tagbench-audit` is a reachability preflight. It checks whether every tag in a database can appear in at least one legal autocomplete response at all. This matters because the 40-result prefix-first ranking can make a very short, low-popularity tag mathematically unobservable: if its only possible queries always bury it below the cap, no scheduler can discover it. The private DB will be audited numerically before it is ever used as a win state. An unreachable count of zero means the whole DB is a valid completeness target. A nonzero count means we stop and resolve the definition before benchmarking; we do not silently weaken completeness.
 
 `make_fake_db.py` generates synthetic *fake* data specifically for CI and development. It intentionally includes leading/trailing/repeated periods and lots of popularity ties.
 
@@ -36,6 +38,7 @@ cmake -S . -B build
 cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 python make_fake_db.py fake.tsv --count 800
+.\build\Release\tagbench-audit.exe fake.tsv
 .\build\Release\tagbench.exe fake.tsv exhaustive-prefix 500000
 ```
 
