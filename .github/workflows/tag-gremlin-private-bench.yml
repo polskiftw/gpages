@@ -28,6 +28,28 @@ jobs:
       - name: Generate fake database
         working-directory: research/tag-gremlin-private-bench
         run: python make_fake_db.py fake.tsv --count 800 --seed 90210
+      - name: Reachability audit (Windows)
+        if: runner.os == 'Windows'
+        working-directory: research/tag-gremlin-private-bench
+        shell: pwsh
+        run: |
+          .\build\Release\tagbench-audit.exe fake.tsv | Tee-Object -FilePath audit.json
+          $j = Get-Content audit.json -Raw | ConvertFrom-Json
+          if ($j.reachable -ne 800) { throw 'wrong reachable count' }
+          if ($j.unreachable -ne 0) { throw 'fake database unexpectedly contains unreachable tags' }
+      - name: Reachability audit (Unix)
+        if: runner.os != 'Windows'
+        working-directory: research/tag-gremlin-private-bench
+        shell: bash
+        run: |
+          ./build/tagbench-audit fake.tsv > audit.json
+          python - <<'PY'
+          import json
+          with open('audit.json', encoding='utf-8') as f:
+              j=json.load(f)
+          assert j['reachable'] == 800
+          assert j['unreachable'] == 0
+          PY
       - name: Smoke benchmark (Windows)
         if: runner.os == 'Windows'
         working-directory: research/tag-gremlin-private-bench
