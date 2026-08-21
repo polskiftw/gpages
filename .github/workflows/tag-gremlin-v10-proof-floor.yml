@@ -1,13 +1,8 @@
 name: Tag Gremlin corrected direct-certificate proof floor
 
+# Expensive structural matrix: manual reproduction only after initial launch.
 on:
   workflow_dispatch:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'research/tag-gremlin-v10/period_certificate_floor.cpp'
-      - '.github/workflows/tag-gremlin-v10-proof-floor.yml'
 
 permissions:
   contents: read
