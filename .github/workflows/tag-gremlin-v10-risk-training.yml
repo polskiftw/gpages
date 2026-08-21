@@ -1,15 +1,8 @@
 name: Tag Gremlin layered xy risk training pass 2
 
-# Second-pass training keeps the proven .x rule fixed and layers lower-coverage
-# .xy candidates onto it, using fresh exact-prevalence worlds.
+# Expensive second-pass matrix: manual reproduction only after launch.
 on:
   workflow_dispatch:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'research/tag-gremlin-v10/period_risk_certificate.cpp'
-      - '.github/workflows/tag-gremlin-v10-risk-training.yml'
 
 permissions:
   contents: read
