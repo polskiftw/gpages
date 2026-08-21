@@ -1,15 +1,8 @@
 name: Tag Gremlin layered xy risk training
 
-# Fresh second-pass worlds: keep the proven .x threshold fixed while testing
-# whether lower-coverage .xy certificates add value instead of replacing .x.
+# Expensive matrix: manual reproduction only after the initial research launch.
 on:
   workflow_dispatch:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'research/tag-gremlin-v10/period_risk_certificate.cpp'
-      - '.github/workflows/tag-gremlin-v10-risk-layer-training.yml'
 
 permissions:
   contents: read
