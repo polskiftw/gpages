@@ -8,7 +8,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
-from .chronology import selected_steps, step_range
+from .calibration import resolved_step_range
+from .certification import certification_summary
+from .chronology import selected_steps
 from .project import fingerprint_matches, mapping_snapshot
 from .timecode import format_timecode
 
@@ -42,7 +44,7 @@ def active_resolved_steps(project: dict, steps: list[dict], allow_unresolved: bo
         if not media:
             missing.append(f"{step['work_id']} ({step['parent_title']})")
             continue
-        start, end = step_range(step, overrides)
+        start, end = resolved_step_range(project, step)
         override = overrides.get(str(step["watch_step"]), {})
         if override and override.get("media_fingerprint") and not fingerprint_matches(media, override["media_fingerprint"]):
             unresolved.append(f"{step['watch_step']} (mapped edition changed; reverify)")
@@ -63,6 +65,10 @@ def active_resolved_steps(project: dict, steps: list[dict], allow_unresolved: bo
             errors.append(f"unresolved manual boundaries at source steps {', '.join(unresolved)}")
         if errors:
             raise ValueError("; ".join(errors))
+        if project.get("preferences", {}).get("strict_boundary_certification", True):
+            certification = certification_summary(project, steps)
+            if certification["unverified"]:
+                raise ValueError(f"{certification['unverified']} unique boundaries remain unverified; complete boundary certification or explicitly disable strict certification")
     return output
 
 

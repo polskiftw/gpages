@@ -4,7 +4,9 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, asdict
 from pathlib import Path
 
-from .chronology import selected_steps, step_range
+from .calibration import resolved_step_range
+from .certification import certification_summary
+from .chronology import selected_steps
 from .media import probe_with_cache
 from .project import fingerprint_matches
 
@@ -47,7 +49,7 @@ def validate_project(project: dict, steps: list[dict], catalog: list[dict], prob
                 issues.append(Issue("red", "probe_failed", str(exc), work_id))
     for step in active:
         work_id = step["work_id"]
-        start, end = step_range(step, overrides)
+        start, end = resolved_step_range(project, step)
         override = overrides.get(str(step["watch_step"]), {})
         mapped_path = mapping.get(work_id)
         if override and override.get("media_fingerprint") and mapped_path and not fingerprint_matches(mapped_path, override["media_fingerprint"]):
@@ -69,6 +71,9 @@ def validate_project(project: dict, steps: list[dict], catalog: list[dict], prob
     for path, ids in reverse.items():
         if len(ids) > 1:
             issues.append(Issue("yellow", "duplicate_mapping", f"One file is mapped to multiple works: {', '.join(ids)} ({path})"))
+    boundary_summary = certification_summary(project, active, probes)
+    if project.get("preferences", {}).get("strict_boundary_certification", True) and boundary_summary["unverified"]:
+        issues.append(Issue("red", "uncertified_boundaries", f"{boundary_summary['unverified']} of {boundary_summary['required']} unique boundaries are not certified against the mapped file"))
     counts = Counter(issue.severity for issue in issues)
     return {
         "certified": counts["red"] == 0,
@@ -77,4 +82,5 @@ def validate_project(project: dict, steps: list[dict], catalog: list[dict], prob
         "issues": [asdict(i) for i in issues],
         "counts": {"red": counts["red"], "yellow": counts["yellow"], "green": max(0, len(needed_work_ids) - counts["red"] - counts["yellow"])},
         "probes": probes,
+        "boundary_certification": boundary_summary,
     }

@@ -11,6 +11,9 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from .build import MonsterBuilder, estimate_build
+from .calibration import resolved_step_range
+from .certification import certification_summary
+from .certification_ui import CalibrationDialog, CertificationResolver
 from .chronology import load_catalog, load_steps, selected_steps, step_range
 from .media import find_executable, match_catalog, probe_paths, scan_media
 from .playlist import active_resolved_steps, write_companion_csv, write_ffconcat, write_xspf
@@ -192,9 +195,11 @@ class App:
         tk.Button(mapbar, text="REVEAL", command=self.reveal_selected, padx=10, pady=7).pack(side="left")
         tk.Button(mapbar, text="OPEN IN VLC", command=self.preview_selected, padx=10, pady=7).pack(side="left", padx=5)
         tk.Button(mapbar, text="TOGGLE WORK SCOPE", command=self.toggle_work, padx=10, pady=7).pack(side="left")
-        tk.Button(mapbar, text="RESOLVE 9 BOUNDARIES", command=lambda: BoundaryResolver(self), bg=GOLD, fg="#1c1604", padx=10, pady=7).pack(side="right")
+        tk.Button(mapbar, text="RESOLVE 9", command=lambda: BoundaryResolver(self), bg=GOLD, fg="#1c1604", padx=8, pady=7).pack(side="right")
+        tk.Button(mapbar, text="CALIBRATE WORK", command=self.calibrate_selected, bg="#335a47", fg=TEXT, padx=8, pady=7).pack(side="right", padx=5)
         tk.Label(build, text="BUILD THE THING", bg=PANEL, fg=GOLD, font=("Segoe UI", 13, "bold")).pack(anchor="w", padx=14, pady=(14, 4))
         self.runtime_label = tk.Label(build, text="", bg=PANEL, fg=MUTED, justify="left", wraplength=350); self.runtime_label.pack(anchor="w", padx=14, pady=(0, 10))
+        tk.Button(build, text="BOUNDARY CERTIFICATION", command=lambda: CertificationResolver(self), bg=GOLD, fg="#1c1604", font=("Segoe UI", 10, "bold"), padx=12, pady=10).pack(fill="x", padx=14, pady=4)
         tk.Button(build, text="VALIDATE EVERYTHING", command=self.validate, bg="#335a47", fg=TEXT, font=("Segoe UI", 10, "bold"), padx=12, pady=10).pack(fill="x", padx=14, pady=4)
         tk.Button(build, text="BUILD VLC PLAYLIST", command=self.build_xspf, bg=GREEN, fg="#07120b", font=("Segoe UI", 11, "bold"), padx=12, pady=13).pack(fill="x", padx=14, pady=4)
         tk.Button(build, text="EXPERIMENTAL STREAM-COPY PLAN", command=self.build_ffconcat, padx=12, pady=7).pack(fill="x", padx=14, pady=4)
@@ -273,6 +278,8 @@ class App:
                 raise ValueError("Mapping chronology hash differs from this project; import was stopped instead of guessing")
             self.project["work_map"] = data.get("work_map", {})
             self.project["manual_overrides"] = data.get("manual_overrides", {})
+            for key in ("edition_calibration", "boundary_nudges", "boundary_certifications", "subtitle_match_runs", "subtitle_proposals"):
+                self.project[key] = data.get(key, {})
             self.project["disabled_steps"] = data.get("disabled_steps", [])
             self.dirty = True; self.refresh(); self.log_line(f"Imported mapping manifest from {path}")
         except Exception as exc: messagebox.showerror("Mapping import blocked", str(exc))
@@ -283,7 +290,7 @@ class App:
         self.root.destroy()
 
     def settings(self):
-        dialog = tk.Toplevel(self.root); dialog.title("Executable settings"); dialog.configure(bg=BG); dialog.geometry("700x260")
+        dialog = tk.Toplevel(self.root); dialog.title("Executable settings"); dialog.configure(bg=BG); dialog.geometry("700x330")
         entries = {}
         for row, key in enumerate(("ffmpeg", "ffprobe", "vlc")):
             tk.Label(dialog, text=key.upper(), bg=BG, fg=TEXT, width=10).grid(row=row, column=0, padx=10, pady=12)
@@ -293,8 +300,11 @@ class App:
                 path = filedialog.askopenfilename(parent=dialog, filetypes=[("Executable", "*.exe"), ("All files", "*")]);
                 if path: v.set(path)
             tk.Button(dialog, text="BROWSE", command=browse).grid(row=row, column=2, padx=8)
+        strict = tk.BooleanVar(value=self.project.get("preferences", {}).get("strict_boundary_certification", True))
+        tk.Checkbutton(dialog, text="Require zero unverified boundaries for certified playlists/builds", variable=strict, bg=BG, fg=TEXT, selectcolor=PANEL, activebackground=BG, activeforeground=TEXT).grid(row=3, column=1, sticky="w", padx=4, pady=8)
         def done():
             for key, value in entries.items(): self.project["executables"][key] = value.get().strip()
+            self.project.setdefault("preferences", {})["strict_boundary_certification"] = strict.get()
             self.dirty = True; dialog.destroy()
         tk.Button(dialog, text="SAVE", command=done, bg=GREEN, padx=18, pady=8).grid(row=4, column=2, pady=16)
 
@@ -366,10 +376,16 @@ class App:
         step = next((s for s in selected_steps(self.steps, self.project.get("scope", "all"), self.project.get("disabled_steps", [])) if s["work_id"] == work_id), None)
         command = [vlc]
         if step:
-            start, end = step_range(step, self.project.get("manual_overrides", {}))
+            start, end = resolved_step_range(self.project, step)
             if start is not None: command.append(f"--start-time={start:g}")
             if end is not None: command += [f"--stop-time={min(end, start + 10):g}", "--play-and-exit"]
         subprocess.Popen(command + [path])
+
+    def calibrate_selected(self):
+        work_id = self._selected_work()
+        if not work_id:
+            return messagebox.showerror("Choose a work", "Select a mapped work in the table first.")
+        CalibrationDialog(self, work_id)
 
     def toggle_work(self):
         work_id = self._selected_work()
@@ -459,8 +475,9 @@ class App:
         self.summary_label.config(text=f"{len(active_ids)} works / {len(active):,} steps     ✓ {mapped} mapped     ⚠ {yellow} review     ✕ {missing} missing     ⏱ {unresolved} boundaries")
         known = sum((s.get("duration_seconds") or 0) for s in active)
         whole = sum(1 for s in active if s["playback_mode"] == "whole_file")
+        cert = certification_summary(self.project, self.steps)
         finish = datetime.now() + timedelta(weeks=known / 3600 / 10)
-        self.runtime_label.config(text=f"Known timed runtime: {format_timecode(known)}\nPlus {whole} whole files and unresolved enabled tags.\nAt 10 hours/week: roughly {finish:%B %Y} (before whole files).")
+        self.runtime_label.config(text=f"Known timed runtime: {format_timecode(known)}\nPlus {whole} whole files and unresolved enabled tags.\nBoundary ledger: {cert['verified']:,} verified / {cert['unverified']:,} unverified.\nAt 10 hours/week: roughly {finish:%B %Y} (before whole files).")
         self.refresh_table()
 
     def refresh_table(self):

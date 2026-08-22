@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from chronomonster.build import MonsterBuilder
+from chronomonster.certification import boundary_descriptors, certify_boundary
 from chronomonster.media import probe_media
 from chronomonster.playlist import write_xspf
 from chronomonster.project import new_project
@@ -42,6 +43,8 @@ def test_exact_a_b_a_build_chapters_and_resume(tmp_path):
     project = new_project(); project["chronology"]["sha256"] = "synthetic-demo"
     project["work_map"] = {"A": str(a), "B": str(b)}
     project["monster_profile"].update({"name": "test", "width": 320, "height": 180, "fps": 10, "crf": 28, "preset": "ultrafast", "audio_bitrate": "96k"})
+    for boundary in boundary_descriptors(project, steps):
+        certify_boundary(project, boundary, "human", {"workflow": "synthetic_test"})
     xspf = tmp_path / "demo.xspf"
     assert write_xspf(project, steps, xspf)["entry_count"] == 3
     out = tmp_path / "monster.mkv"
@@ -58,4 +61,3 @@ def test_exact_a_b_a_build_chapters_and_resume(tmp_path):
     assert second.cache_hits == 3
     volumes = MonsterBuilder(project, steps, tmp_path / "volumes.mkv", tmp_path / "cache").build(volumes=True, max_volume_seconds=1.5)
     assert len(volumes.output_files) == 3 and Path(volumes.volume_index).is_file()
-

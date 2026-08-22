@@ -5,11 +5,14 @@ import json
 import sys
 from pathlib import Path
 
+from .audit import write_audit_xspf
 from .build import MonsterBuilder, estimate_build
+from .certification import certification_summary, certify_batch
 from .chronology import assert_default_invariants, load_catalog, load_steps
 from .media import match_catalog, probe_paths, scan_media
 from .playlist import active_resolved_steps, write_companion_csv, write_ffconcat, write_xspf
 from .project import load_project, new_project, save_project
+from .subtitles import propose_subtitle_matches
 from .validation import validate_project
 
 
@@ -109,6 +112,42 @@ def cmd_monster(args) -> int:
     return 0
 
 
+def cmd_audit(args) -> int:
+    project, steps, _ = _load(args.project)
+    report = write_audit_xspf(project, steps, args.output, args.context, args.include_verified)
+    save_project(project, args.project)
+    print(f"Wrote {report['boundary_count']} exhaustive boundary previews to {args.output}")
+    return 0
+
+
+def cmd_certification(args) -> int:
+    project, steps, _ = _load(args.project)
+    summary = certification_summary(project, steps)
+    print(json.dumps({k: v for k, v in summary.items() if k != "unverified_boundaries"}, indent=2))
+    if args.output:
+        Path(args.output).write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    return 0 if summary["unverified"] == 0 else 2
+
+
+def cmd_certify_audit(args) -> int:
+    project, steps, _ = _load(args.project)
+    batch = project.get("last_boundary_audit", {})
+    if not batch.get("keys"):
+        raise ValueError("This project has no exported audit batch")
+    count = certify_batch(project, steps, batch["keys"], "human_audit", {"audit_playlist": batch.get("playlist"), "audit_created_at": batch.get("created_at"), "user_attested_complete_review": True})
+    save_project(project, args.project)
+    print(f"Certified {count} boundaries from the explicitly attested audit batch")
+    return 0
+
+
+def cmd_subtitle_match(args) -> int:
+    project, steps, _ = _load(args.project)
+    result = propose_subtitle_matches(project, steps, args.work, args.minimum_gap)
+    save_project(project, args.project)
+    print(json.dumps(result, indent=2))
+    return 0
+
+
 def cmd_invariants(_args) -> int:
     steps, catalog = load_steps(), load_catalog()
     assert_default_invariants(steps, catalog)
@@ -133,6 +172,10 @@ def parser() -> argparse.ArgumentParser:
     p = sub.add_parser("ffconcat", help="Write experimental stream-copy plan"); p.add_argument("project"); p.add_argument("output"); p.add_argument("--allow-incomplete", action="store_true"); p.set_defaults(func=cmd_ffconcat)
     p = sub.add_parser("csv", help="Write readable active checklist"); p.add_argument("project"); p.add_argument("output"); p.set_defaults(func=cmd_csv)
     p = sub.add_parser("monster", help="Build exact normalized MKV or volumes"); p.add_argument("project"); p.add_argument("output"); p.add_argument("--cache"); p.add_argument("--encoder", choices=["libx264", "h264_nvenc"], default=""); p.add_argument("--volumes", action="store_true"); p.add_argument("--volume-hours", type=float, default=8.0); p.add_argument("--split-on-era", action="store_true"); p.add_argument("--ignore-disk-estimate", action="store_true"); p.set_defaults(func=cmd_monster)
+    p = sub.add_parser("audit", help="Write an exhaustive VLC boundary-review playlist"); p.add_argument("project"); p.add_argument("output"); p.add_argument("--context", type=float, default=4.0); p.add_argument("--include-verified", action="store_true"); p.set_defaults(func=cmd_audit)
+    p = sub.add_parser("certification", help="Report exact verified/unverified boundary counts"); p.add_argument("project"); p.add_argument("--output"); p.set_defaults(func=cmd_certification)
+    p = sub.add_parser("certify-audit", help="Attest that the last exported exhaustive audit was fully reviewed"); p.add_argument("project"); p.set_defaults(func=cmd_certify_audit)
+    p = sub.add_parser("subtitle-match", help="Experimentally propose subtitle-gap matches for one mapped work"); p.add_argument("project"); p.add_argument("work"); p.add_argument("--minimum-gap", type=float, default=4.0); p.set_defaults(func=cmd_subtitle_match)
     p = sub.add_parser("check-data", help="Verify bundled chronology invariants"); p.set_defaults(func=cmd_invariants)
     return ap
 

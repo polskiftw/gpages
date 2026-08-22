@@ -7,6 +7,9 @@ from pathlib import Path
 import pytest
 
 from chronomonster.build import MonsterBuilder, build_segment_command
+from chronomonster.audit import write_audit_xspf
+from chronomonster.calibration import resolved_step_range, set_calibration, transform_time
+from chronomonster.certification import boundary_descriptors, certification_summary, certify_boundary
 from chronomonster.chapters import chapter_rows
 from chronomonster.chronology import assert_default_invariants, load_catalog, load_steps, merge_continuous_rows, selected_steps
 from chronomonster.media import normalize_title, score_candidate
@@ -14,6 +17,7 @@ from chronomonster.playlist import VLC, XSPF, file_uri, write_xspf
 from chronomonster.project import load_project, new_project, save_project
 from chronomonster.timecode import format_timecode, parse_timecode
 from chronomonster.validation import validate_project
+from chronomonster.subtitles import parse_srt_intervals, subtitle_gaps
 
 
 def step(number=1, mode="range", start=1, end=3, scope="Core", work_id="WTEST"):
@@ -55,7 +59,7 @@ def test_windows_and_unc_file_uri():
 
 def test_xspf_modes_and_xml_escaping(tmp_path):
     media = tmp_path / "A #1.mkv"; media.touch()
-    project = new_project(); project["work_map"] = {"WTEST": str(media)}
+    project = new_project(); project["work_map"] = {"WTEST": str(media)}; project["preferences"]["strict_boundary_certification"] = False
     report = write_xspf(project, [step()], tmp_path / "out.xspf")
     assert report["entry_count"] == 1
     root = ET.parse(tmp_path / "out.xspf").getroot()
@@ -105,6 +109,47 @@ def test_duration_validation_without_probe(tmp_path):
     assert any(i["code"] == "invalid_range" for i in report["issues"])
 
 
+def test_calibration_affine_piecewise_and_nudge():
+    project = new_project()
+    set_calibration(project, "WTEST", [{"reference_seconds": 10, "local_seconds": 17}], "affine")
+    assert transform_time(project, "WTEST", 50) == 57
+    set_calibration(project, "WTEST", [{"reference_seconds": 0, "local_seconds": 5}, {"reference_seconds": 100, "local_seconds": 103}], "affine")
+    assert transform_time(project, "WTEST", 50) == 54
+    set_calibration(project, "WTEST", [{"reference_seconds": 0, "local_seconds": 0}, {"reference_seconds": 50, "local_seconds": 50}, {"reference_seconds": 100, "local_seconds": 110}], "piecewise")
+    assert transform_time(project, "WTEST", 75) == 80
+    project["boundary_nudges"]["WTEST@ref:75.000000"] = 81.25
+    assert resolved_step_range(project, step(start=75, end=90))[0] == 81.25
+
+
+def test_strict_boundary_ledger_and_invalidation(tmp_path):
+    media = tmp_path / "a.mkv"; media.write_bytes(b"media")
+    project = new_project(); project["work_map"] = {"WTEST": str(media)}
+    steps = [step(start=1, end=3)]
+    summary = certification_summary(project, steps)
+    assert summary["required"] == 2 and summary["unverified"] == 2
+    for boundary in boundary_descriptors(project, steps):
+        certify_boundary(project, boundary, "human")
+    assert certification_summary(project, steps)["unverified"] == 0
+    set_calibration(project, "WTEST", [{"reference_seconds": 1, "local_seconds": 2}], "affine")
+    assert certification_summary(project, steps)["unverified"] == 2
+
+
+def test_exhaustive_audit_deduplicates_shared_boundaries(tmp_path):
+    media = tmp_path / "a.mkv"; media.write_bytes(b"media")
+    project = new_project(); project["work_map"] = {"WTEST": str(media)}
+    steps = [step(1, start=1, end=3), step(2, start=3, end=5)]
+    report = write_audit_xspf(project, steps, tmp_path / "audit.xspf")
+    assert report["boundary_count"] == 3
+    assert (tmp_path / "audit.audit.json").is_file()
+
+
+def test_subtitle_gap_parser():
+    srt = """1\n00:00:01,000 --> 00:00:02,000\na\n\n2\n00:00:08,000 --> 00:00:09,000\nb\n"""
+    intervals = parse_srt_intervals(srt)
+    assert intervals == [(1.0, 2.0), (8.0, 9.0)]
+    assert subtitle_gaps(intervals, 4.0) == [{"start": 2.0, "end": 8.0, "duration": 6.0, "midpoint": 5.0}]
+
+
 def test_chapter_cumulative_timing():
     steps = [dict(step(1, start=1, end=3), media_path="a"), dict(step(2, mode="whole_file", start=None, end=None), media_path="b")]
     for s in steps:
@@ -128,4 +173,3 @@ def test_volume_grouping_never_splits_steps():
         s = dict(step(i + 1, start=0, end=4), resolved_start_seconds=0, resolved_end_seconds=4)
         steps.append(s)
     assert MonsterBuilder._volume_groups(steps, {"WTEST": 99}, 7, False) == [[0], [1], [2]]
-

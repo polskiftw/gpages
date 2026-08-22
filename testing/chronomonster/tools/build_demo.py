@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from chronomonster.build import MonsterBuilder
+from chronomonster.audit import write_audit_xspf
+from chronomonster.certification import boundary_descriptors, certify_boundary
 from chronomonster.playlist import write_companion_csv, write_ffconcat, write_xspf
 from chronomonster.project import new_project, save_project
 
@@ -45,6 +47,9 @@ def main():
     project["chronology"].update({"name":"Synthetic A → B → A acceptance demo","steps":3,"works":2,"sha256":"synthetic-a-b-a-demo","manifest_path":str(manifest),"catalog_path":str(catalog)})
     project["media_roots"] = [str(media)]; project["work_map"] = {"DEMO-A": str(media / "A-red.mkv"), "DEMO-B": str(media / "B-blue.mkv")}
     project["monster_profile"].update({"name":"synthetic-test","width":320,"height":180,"fps":10,"crf":28,"preset":"ultrafast","audio_bitrate":"96k"})
+    write_audit_xspf(project, steps, output / "synthetic-A-B-A.boundary-audit.xspf")
+    for boundary in boundary_descriptors(project, steps):
+        certify_boundary(project, boundary, "human_audit", {"workflow": "synthetic_acceptance_demo"})
     write_xspf(project, steps, output / "synthetic-A-B-A.xspf")
     write_ffconcat(project, steps, output / "synthetic-A-B-A.experimental.ffconcat")
     write_companion_csv(project, steps, output / "synthetic-A-B-A.checklist.csv")
@@ -54,11 +59,10 @@ def main():
     project["outputs"] = {"last_xspf":"output/synthetic-A-B-A.xspf","last_monster":["output/synthetic-A-B-A.monster.mkv"]}
     save_project(project, demo / "Synthetic_Demo.chronomonster.json")
     (demo / "README.md").write_text(
-        "# Synthetic acceptance demo\n\nOpen `Synthetic_Demo.chronomonster.json` in the app. It uses tiny generated red/blue media and a three-step A → B → A chronology. The output folder contains the XSPF, exact three-second monster MKV, three chapters, HTML browser, reports, and receipt. The retained resume cache completed a second pass with three cache hits.\n",
+        "# Synthetic acceptance demo\n\nOpen `Synthetic_Demo.chronomonster.json` in the app. It uses tiny generated red/blue media and a three-step A → B → A chronology. The output folder contains an exhaustive boundary-audit playlist, the certified XSPF, exact three-second monster MKV, three chapters, HTML browser, reports, and receipt. The retained resume cache completed a second pass with three cache hits.\n",
         encoding="utf-8",
     )
     print(json.dumps(second.__dict__, indent=2))
 
 
 if __name__ == "__main__": main()
-

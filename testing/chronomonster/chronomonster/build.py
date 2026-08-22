@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Callable
 
 from .chapters import chapter_rows, write_chapter_sidecars
+from .certification import certification_summary
 from .chronology import step_range
 from .media import choose_audio_stream, find_executable, probe_media, probe_with_cache
 from .playlist import active_resolved_steps
@@ -43,6 +44,14 @@ def _segment_identity(step: dict, profile: dict, probe: dict, ffmpeg_ver: str) -
         "end": step.get("resolved_end_seconds"), "profile": profile, "ffmpeg": ffmpeg_ver,
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def build_segment_command(ffmpeg: str, step: dict, output: Path, profile: dict, audio_stream_index: int) -> list[str]:
@@ -196,6 +205,9 @@ class MonsterBuilder:
             if end is not None and end > probes[work_id]["duration"] + 1.0:
                 raise ValueError(f"Source step {step['watch_step']} ends after the mapped file")
         estimate = estimate_build(resolved, probes, self.project["monster_profile"], self.output.parent)
+        certification = certification_summary(self.project, self.steps, probes)
+        if self.project.get("preferences", {}).get("strict_boundary_certification", True) and certification["unverified"]:
+            raise ValueError(f"Exact build blocked: {certification['unverified']} of {certification['required']} unique boundaries are unverified")
         if estimate["unknown_durations"]:
             raise ValueError("One or more whole-file steps have unknown duration")
         return resolved, probes, estimate
@@ -247,7 +259,7 @@ class MonsterBuilder:
                 if not verified.get("video") or not verified.get("audio") or abs(verified["duration"] - expected) > max(0.25, 2 / float(profile.get("fps", 30))):
                     raise RuntimeError(f"Segment {ordinal} failed duration/stream verification: expected {expected:.3f}s, got {verified.get('duration')}")
                 os.replace(partial, segment)
-            completed.append({"ordinal": ordinal, "watch_step": step["watch_step"], "identity": identity, "path": str(segment), "duration": expected})
+            completed.append({"ordinal": ordinal, "watch_step": step["watch_step"], "identity": identity, "path": str(segment), "duration": expected, "sha256": _sha256_file(segment)})
             finished_runtime += expected
             checkpoint = {
                 "format": "chronomonster-checkpoint-v1", "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -292,6 +304,8 @@ class MonsterBuilder:
             "format": "chronomonster-build-receipt-v1", "generated_at": datetime.now(timezone.utc).isoformat(),
             "chronology_sha256": self.project["chronology"]["sha256"], "ffmpeg_version": version,
             "profile": profile, "estimate": estimate, "segments": completed, "commands": commands,
+            "boundary_certification": certification_summary(self.project, self.steps, probes),
+            "boundary_certificates": self.project.get("boundary_certifications", {}),
             "outputs": output_files, "volumes": volume_records,
         }
         receipt_path.write_text(json.dumps(receipt, indent=2, ensure_ascii=False), encoding="utf-8")
