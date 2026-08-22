@@ -84,8 +84,11 @@ jobs:
       - name: Build portable Windows application
         shell: pwsh
         run: |
-          python -m PyInstaller --noconfirm --clean --onedir --console --name MCU-ChronoMonster-Windows --collect-data chronomonster chronomonster_launcher.py
-          dist\MCU-ChronoMonster-Windows\MCU-ChronoMonster-Windows.exe check-data
+          python -m PyInstaller --noconfirm --clean --onedir --console --name MCU-ChronoMonster-CI --collect-data chronomonster chronomonster_launcher.py
+          dist\MCU-ChronoMonster-CI\MCU-ChronoMonster-CI.exe check-data
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name MCU-ChronoMonster --collect-data chronomonster chronomonster_launcher.py
+          $process = Start-Process -FilePath "dist\MCU-ChronoMonster.exe" -ArgumentList "check-data" -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw "Packaged windowed executable failed the chronology gate with exit code $($process.ExitCode)" }
       - name: Upload tested Windows portable application
         uses: actions/upload-artifact@v4
         with:
@@ -93,5 +96,5 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           path: |
-            testing/chronomonster/dist/MCU-ChronoMonster-Windows/
+            testing/chronomonster/dist/MCU-ChronoMonster.exe
             testing/chronomonster/ci-windows-tests.txt
