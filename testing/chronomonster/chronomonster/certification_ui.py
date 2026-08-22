@@ -10,7 +10,7 @@ from .audit import write_audit_xspf
 from .calibration import reference_boundary_key, set_calibration
 from .certification import boundary_descriptors, certification_summary, certification_valid, certify_batch, certify_boundary
 from .media import find_executable
-from .subtitles import propose_subtitle_matches
+from .subtitles import accept_subtitle_proposals, propose_subtitle_matches
 from .timecode import format_timecode, parse_timecode
 
 
@@ -101,6 +101,7 @@ class CertificationResolver(tk.Toplevel):
         ttk.Separator(right).pack(fill="x", padx=12, pady=12)
         tk.Button(right, text="TRY SUBTITLE MATCH FOR THIS WORK", command=self._subtitle, bg=GOLD, fg="#1c1604", padx=12, pady=9).pack(fill="x", padx=12, pady=4)
         tk.Button(right, text="ACCEPT THIS SUBTITLE PROPOSAL", command=self._accept_subtitle, padx=12, pady=8).pack(fill="x", padx=12, pady=4)
+        tk.Button(right, text="ACCEPT ALL EXACT-RULE PROPOSALS FOR WORK", command=self._accept_all_subtitles, padx=12, pady=8).pack(fill="x", padx=12, pady=4)
         self.subtitle_detail = tk.Label(right, text="", bg=PANEL, fg=MUTED, justify="left", wraplength=360); self.subtitle_detail.pack(anchor="w", padx=12, pady=6)
         ttk.Separator(right).pack(fill="x", padx=12, pady=10)
         tk.Button(right, text="BUILD EXHAUSTIVE AUDIT PLAYLIST", command=self._audit, padx=12, pady=8).pack(fill="x", padx=12, pady=4)
@@ -220,6 +221,19 @@ class CertificationResolver(tk.Toplevel):
         except Exception as exc:
             messagebox.showerror("Subtitle certification blocked", str(exc), parent=self)
 
+    def _accept_all_subtitles(self):
+        boundary = self._selected()
+        if not boundary:
+            return
+        try:
+            count = accept_subtitle_proposals(self.app.project, self.app.steps, boundary["work_id"])
+            if not count:
+                raise ValueError("This work has no exact-rule subtitle proposals. Run the matcher first.")
+            self.app.dirty = True; self.refresh(boundary["key"])
+            self.app.log_line(f"Explicitly accepted {count} experimental subtitle-gap proposals for {boundary['work_id']}.")
+        except Exception as exc:
+            messagebox.showerror("Subtitle certification blocked", str(exc), parent=self)
+
     def _audit(self):
         path = filedialog.asksaveasfilename(parent=self, defaultextension=".xspf", filetypes=[("VLC playlist", "*.xspf")])
         if not path:
@@ -238,4 +252,3 @@ class CertificationResolver(tk.Toplevel):
             return messagebox.showerror("No audit batch", "Build and fully watch an audit playlist first.", parent=self)
         count = certify_batch(self.app.project, self.app.steps, keys, "human_audit", {"audit_playlist": batch.get("playlist"), "audit_created_at": batch.get("created_at"), "user_attested_complete_review": True})
         self.app.dirty = True; self.refresh(); self.app.log_line(f"Certified {count} boundaries from the explicitly attested exhaustive audit batch.")
-

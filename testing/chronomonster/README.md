@@ -36,7 +36,7 @@ The certification window supports keyboard-driven individual review and writes a
 
 **TRY SUBTITLE MATCH FOR THIS WORK** extracts a preferred text subtitle stream (or an adjacent SRT), finds caption-free gaps, and proposes a boundary only when the currently calibrated timestamp lies inside exactly one gap meeting the displayed minimum-length rule. It stores the exact cue count, gap, timestamps, rule, and stream used.
 
-Subtitle proposals never silently certify anything. You must choose **ACCEPT THIS SUBTITLE PROPOSAL** for every proposal you decide to trust. Its certificate remains labeled `subtitle_experimental`, and the build receipt reports certification methods separately. Bitmap subtitles such as PGS cannot be used; select a text subtitle track or place an SRT beside the video.
+Subtitle proposals never silently certify anything. You may accept one proposal or explicitly accept every exact-rule proposal for the selected work. Every resulting certificate remains labeled `subtitle_experimental`, and the build receipt reports certification methods separately. Bitmap subtitles such as PGS cannot be used; select a text subtitle track or place an SRT beside the video.
 
 ## If you really want one giant file
 

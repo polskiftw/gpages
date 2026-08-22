@@ -12,7 +12,7 @@ from .chronology import assert_default_invariants, load_catalog, load_steps
 from .media import match_catalog, probe_paths, scan_media
 from .playlist import active_resolved_steps, write_companion_csv, write_ffconcat, write_xspf
 from .project import load_project, new_project, save_project
-from .subtitles import propose_subtitle_matches
+from .subtitles import accept_subtitle_proposals, propose_subtitle_matches
 from .validation import validate_project
 
 
@@ -143,6 +143,8 @@ def cmd_certify_audit(args) -> int:
 def cmd_subtitle_match(args) -> int:
     project, steps, _ = _load(args.project)
     result = propose_subtitle_matches(project, steps, args.work, args.minimum_gap)
+    if args.accept:
+        result["accepted_certificates"] = accept_subtitle_proposals(project, steps, args.work)
     save_project(project, args.project)
     print(json.dumps(result, indent=2))
     return 0
@@ -175,7 +177,7 @@ def parser() -> argparse.ArgumentParser:
     p = sub.add_parser("audit", help="Write an exhaustive VLC boundary-review playlist"); p.add_argument("project"); p.add_argument("output"); p.add_argument("--context", type=float, default=4.0); p.add_argument("--include-verified", action="store_true"); p.set_defaults(func=cmd_audit)
     p = sub.add_parser("certification", help="Report exact verified/unverified boundary counts"); p.add_argument("project"); p.add_argument("--output"); p.set_defaults(func=cmd_certification)
     p = sub.add_parser("certify-audit", help="Attest that the last exported exhaustive audit was fully reviewed"); p.add_argument("project"); p.set_defaults(func=cmd_certify_audit)
-    p = sub.add_parser("subtitle-match", help="Experimentally propose subtitle-gap matches for one mapped work"); p.add_argument("project"); p.add_argument("work"); p.add_argument("--minimum-gap", type=float, default=4.0); p.set_defaults(func=cmd_subtitle_match)
+    p = sub.add_parser("subtitle-match", help="Experimentally propose subtitle-gap matches for one mapped work"); p.add_argument("project"); p.add_argument("work"); p.add_argument("--minimum-gap", type=float, default=4.0); p.add_argument("--accept", action="store_true", help="Explicitly accept all exact-rule proposals for this work as experimental certificates"); p.set_defaults(func=cmd_subtitle_match)
     p = sub.add_parser("check-data", help="Verify bundled chronology invariants"); p.set_defaults(func=cmd_invariants)
     return ap
 

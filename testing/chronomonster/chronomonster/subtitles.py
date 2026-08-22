@@ -4,7 +4,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from .certification import boundary_descriptors
+from .certification import boundary_descriptors, certify_boundary
 from .media import find_executable, probe_with_cache
 
 
@@ -96,3 +96,22 @@ def propose_subtitle_matches(project: dict, steps: list[dict], work_id: str, min
     project.setdefault("subtitle_proposals", {}).update({p["boundary_key"]: p for p in proposals})
     return result
 
+
+def accept_subtitle_proposals(project: dict, steps: list[dict], work_id: str) -> int:
+    proposals = {
+        key: value for key, value in project.get("subtitle_proposals", {}).items()
+        if value.get("rule_pass") and key.startswith(f"{work_id}@")
+    }
+    boundaries = {boundary["key"]: boundary for boundary in boundary_descriptors(project, steps, work_id)}
+    for key, proposal in proposals.items():
+        boundary = boundaries.get(key)
+        if boundary and boundary.get("reference_seconds") is not None:
+            project.setdefault("boundary_nudges", {})[key] = float(proposal["proposed_seconds"])
+    boundaries = {boundary["key"]: boundary for boundary in boundary_descriptors(project, steps, work_id)}
+    count = 0
+    for key, proposal in proposals.items():
+        boundary = boundaries.get(key)
+        if boundary:
+            certify_boundary(project, boundary, "subtitle_experimental", proposal)
+            count += 1
+    return count
