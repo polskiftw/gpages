@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .audit import write_audit_xspf
 from .build import MonsterBuilder, estimate_build
-from .certification import certification_summary, certify_batch
+from .certification import certification_summary, certify_audit_batch
 from .chronology import assert_default_invariants, load_catalog, load_steps
 from .media import match_catalog, probe_paths, scan_media
 from .playlist import active_resolved_steps, write_companion_csv, write_ffconcat, write_xspf
@@ -132,11 +132,11 @@ def cmd_certification(args) -> int:
 def cmd_certify_audit(args) -> int:
     project, steps, _ = _load(args.project)
     batch = project.get("last_boundary_audit", {})
-    if not batch.get("keys"):
+    if not batch.get("items"):
         raise ValueError("This project has no exported audit batch")
-    count = certify_batch(project, steps, batch["keys"], "human_audit", {"audit_playlist": batch.get("playlist"), "audit_created_at": batch.get("created_at"), "user_attested_complete_review": True})
+    count, skipped = certify_audit_batch(project, steps, batch)
     save_project(project, args.project)
-    print(f"Certified {count} boundaries from the explicitly attested audit batch")
+    print(f"Certified {count} unchanged boundaries; left {skipped} changed timestamps/files unverified")
     return 0
 
 

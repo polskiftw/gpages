@@ -9,7 +9,7 @@ import pytest
 from chronomonster.build import MonsterBuilder, build_segment_command
 from chronomonster.audit import write_audit_xspf
 from chronomonster.calibration import resolved_step_range, set_calibration, transform_time
-from chronomonster.certification import boundary_descriptors, certification_summary, certify_boundary
+from chronomonster.certification import boundary_descriptors, certification_summary, certify_audit_batch, certify_boundary
 from chronomonster.chapters import chapter_rows
 from chronomonster.chronology import assert_default_invariants, load_catalog, load_steps, merge_continuous_rows, selected_steps
 from chronomonster.media import normalize_title, score_candidate
@@ -141,6 +141,10 @@ def test_exhaustive_audit_deduplicates_shared_boundaries(tmp_path):
     report = write_audit_xspf(project, steps, tmp_path / "audit.xspf")
     assert report["boundary_count"] == 3
     assert (tmp_path / "audit.audit.json").is_file()
+    project["boundary_nudges"]["WTEST@ref:3.000000"] = 3.5
+    accepted, skipped = certify_audit_batch(project, steps, project["last_boundary_audit"])
+    assert (accepted, skipped) == (2, 1)
+    assert certification_summary(project, steps)["unverified"] == 1
 
 
 def test_subtitle_gap_parser():

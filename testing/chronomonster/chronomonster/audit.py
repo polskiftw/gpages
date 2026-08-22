@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .certification import boundary_descriptors, certification_valid
 from .playlist import VLC, XSPF, file_uri
+from .project import media_fingerprint
 from .timecode import format_timecode
 
 
@@ -44,6 +45,11 @@ def write_audit_xspf(project: dict, steps: list[dict], output: str | Path, conte
     }
     report_path = target.with_suffix(".audit.json")
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    project["last_boundary_audit"] = {"playlist": str(target.resolve()), "report": str(report_path.resolve()), "keys": [b["key"] for b in included], "created_at": report["created_at"]}
+    project["last_boundary_audit"] = {
+        "playlist": str(target.resolve()), "report": str(report_path.resolve()), "created_at": report["created_at"],
+        "items": [
+            {"key": b["key"], "local_seconds": b["local_seconds"], "media_fingerprint": media_fingerprint(project["work_map"][b["work_id"]])}
+            for b in included
+        ],
+    }
     return report
-

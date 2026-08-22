@@ -128,3 +128,28 @@ def certify_batch(project: dict, steps: list[dict], keys: list[str], method: str
             certify_boundary(project, boundary, method, evidence, (probes or {}).get(boundary["work_id"]))
             count += 1
     return count
+
+
+def certify_audit_batch(project: dict, steps: list[dict], batch: dict) -> tuple[int, int]:
+    items = batch.get("items", [])
+    if not items:
+        raise ValueError("The audit batch predates exact timestamp/file binding; export and watch a new audit playlist")
+    current = {boundary["key"]: boundary for boundary in boundary_descriptors(project, steps)}
+    accepted = skipped = 0
+    for item in items:
+        boundary = current.get(item.get("key", ""))
+        media = project.get("work_map", {}).get(boundary["work_id"]) if boundary else None
+        unchanged = bool(
+            boundary and media
+            and abs(float(boundary["local_seconds"]) - float(item.get("local_seconds", -1))) <= 0.001
+            and fingerprint_matches(media, item.get("media_fingerprint"))
+        )
+        if not unchanged:
+            skipped += 1
+            continue
+        certify_boundary(project, boundary, "human_audit", {
+            "audit_playlist": batch.get("playlist"), "audit_created_at": batch.get("created_at"),
+            "audited_local_seconds": item["local_seconds"], "user_attested_complete_review": True,
+        })
+        accepted += 1
+    return accepted, skipped

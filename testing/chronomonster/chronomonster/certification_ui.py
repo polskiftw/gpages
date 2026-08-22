@@ -8,7 +8,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from .audit import write_audit_xspf
 from .calibration import reference_boundary_key, set_calibration
-from .certification import boundary_descriptors, certification_summary, certification_valid, certify_batch, certify_boundary
+from .certification import boundary_descriptors, certification_summary, certification_valid, certify_audit_batch, certify_boundary
 from .media import find_executable
 from .subtitles import accept_subtitle_proposals, propose_subtitle_matches
 from .timecode import format_timecode, parse_timecode
@@ -247,8 +247,7 @@ class CertificationResolver(tk.Toplevel):
 
     def _certify_audit(self):
         batch = self.app.project.get("last_boundary_audit", {})
-        keys = batch.get("keys", [])
-        if not keys:
+        if not batch.get("items"):
             return messagebox.showerror("No audit batch", "Build and fully watch an audit playlist first.", parent=self)
-        count = certify_batch(self.app.project, self.app.steps, keys, "human_audit", {"audit_playlist": batch.get("playlist"), "audit_created_at": batch.get("created_at"), "user_attested_complete_review": True})
-        self.app.dirty = True; self.refresh(); self.app.log_line(f"Certified {count} boundaries from the explicitly attested exhaustive audit batch.")
+        count, skipped = certify_audit_batch(self.app.project, self.app.steps, batch)
+        self.app.dirty = True; self.refresh(); self.app.log_line(f"Certified {count} unchanged boundaries from the exhaustive audit; {skipped} changed timestamps/files were left unverified.")

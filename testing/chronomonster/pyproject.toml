@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcu-chronomonster"
-version = "1.0.0"
-description = "Compile the 2,622-step MCU chronology into VLC playlists or exact resumable MKVs"
+version = "1.1.0"
+description = "Calibrate and certify the 2,622-step MCU chronology for VLC or exact resumable MKVs"
 readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "For personal use with the bundled research data; see source package provenance."}
@@ -23,4 +23,3 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 chronomonster = ["data/*.json", "data/*.csv"]
-
