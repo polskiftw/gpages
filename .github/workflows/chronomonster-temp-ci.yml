@@ -84,7 +84,7 @@ jobs:
       - name: Build portable Windows application
         shell: pwsh
         run: |
-          python -m PyInstaller --noconfirm --clean --onedir --console --name MCU-ChronoMonster-Windows --collect-data chronomonster chronomonster/__main__.py
+          python -m PyInstaller --noconfirm --clean --onedir --console --name MCU-ChronoMonster-Windows --collect-data chronomonster chronomonster_launcher.py
           dist\MCU-ChronoMonster-Windows\MCU-ChronoMonster-Windows.exe check-data
       - name: Upload tested Windows portable application
         uses: actions/upload-artifact@v4
