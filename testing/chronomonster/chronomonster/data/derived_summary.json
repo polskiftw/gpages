@@ -1,0 +1,13 @@
+{
+  "source_fragment_rows": 5456,
+  "continuous_watch_steps": 2622,
+  "redundant_contiguous_fragments_collapsed": 2834,
+  "works": 663,
+  "range_steps": 2568,
+  "whole_file_steps": 45,
+  "manual_boundary_steps": 9,
+  "merge_rule": "Merge only adjacent strict chronology rows with identical Work ID when previous Source End TC exactly equals next Source Start TC.",
+  "known_ranged_runtime_seconds": 1652143,
+  "known_ranged_runtime_hours": 458.929,
+  "note_on_total_runtime": "This excludes 45 whole-file blocks and 9 unresolved tag-scene boundaries; final runtime must be computed after local media mapping/probing."
+}

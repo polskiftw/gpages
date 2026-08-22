@@ -1,0 +1,101 @@
+name: ChronoMonster temporary integration lab
+
+on:
+  push:
+    branches:
+      - testing/chronomonster-2026-08-22
+    paths:
+      - "testing/chronomonster/**"
+      - ".github/workflows/chronomonster-temp-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chronomonster-temp-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-ffmpeg-integration:
+    name: Linux exact-build integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: testing/chronomonster
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: testing/chronomonster/pyproject.toml
+      - name: Restore compressed chronology fixture
+        run: python -c "import gzip,pathlib; p=pathlib.Path('chronomonster/data/watch_steps_continuous.json.gz'); p.with_suffix('').write_bytes(gzip.decompress(p.read_bytes()))"
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Compile every Python module
+        run: python -m compileall -q chronomonster tests tools
+      - name: Run unit and exact FFmpeg integration suite
+        run: python tools/run_tests.py | tee ci-test-output.txt
+      - name: Verify full MCU chronology gates
+        run: python -m chronomonster check-data | tee ci-data-gates.txt
+      - name: Build retained A to B to A demo twice
+        run: python tools/build_demo.py | tee ci-demo-build.txt
+      - name: Validate portable demo project
+        run: python -m chronomonster validate demo/Synthetic_Demo.chronomonster.json --output demo/output/validation.json
+      - name: Inspect exact output and chapters
+        run: ffprobe -v error -show_format -show_streams -show_chapters -of json demo/output/synthetic-A-B-A.monster.mkv > demo/output/ffprobe-verification.json
+      - name: Upload exact-build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: chronomonster-linux-ffmpeg-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            testing/chronomonster/ci-*.txt
+            testing/chronomonster/demo/output/
+            testing/chronomonster/demo/resume-cache/checkpoint.json
+
+  windows-portable:
+    name: Windows portable build and smoke test
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: testing/chronomonster
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: testing/chronomonster/pyproject.toml
+      - name: Restore compressed chronology fixture
+        run: python -c "import gzip,pathlib; p=pathlib.Path('chronomonster/data/watch_steps_continuous.json.gz'); p.with_suffix('').write_bytes(gzip.decompress(p.read_bytes()))"
+      - name: Install Windows packaging dependencies
+        run: python -m pip install "pyinstaller>=6" "tkinterdnd2>=0.4.2"
+      - name: Compile and import desktop UI
+        shell: pwsh
+        run: |
+          python -m compileall -q chronomonster tests tools
+          python -c "import tkinter, chronomonster.ui; print('Windows Tk/UI import PASS', tkinter.TkVersion)"
+      - name: Verify full MCU chronology gates in Python
+        run: python -m chronomonster check-data
+      - name: Run dependency-free suite
+        run: python tools/run_tests.py | Tee-Object -FilePath ci-windows-tests.txt
+      - name: Build portable Windows application
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm --clean --onedir --console --name MCU-ChronoMonster-Windows --collect-data chronomonster chronomonster/__main__.py
+          dist\MCU-ChronoMonster-Windows\MCU-ChronoMonster-Windows.exe check-data
+      - name: Upload tested Windows portable application
+        uses: actions/upload-artifact@v4
+        with:
+          name: MCU-ChronoMonster-Windows-tested
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            testing/chronomonster/dist/MCU-ChronoMonster-Windows/
+            testing/chronomonster/ci-windows-tests.txt

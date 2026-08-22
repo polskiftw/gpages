@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcu-chronomonster"
+version = "1.0.0"
+description = "Compile the 2,622-step MCU chronology into VLC playlists or exact resumable MKVs"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "For personal use with the bundled research data; see source package provenance."}
+dependencies = []
+
+[project.optional-dependencies]
+dragdrop = ["tkinterdnd2>=0.4.2"]
+dev = ["pytest>=8", "pyinstaller>=6"]
+
+[project.scripts]
+chronomonster = "chronomonster.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+chronomonster = ["data/*.json", "data/*.csv"]
+

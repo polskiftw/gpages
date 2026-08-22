@@ -1,0 +1,664 @@
+﻿work_id,watch_item,medium,series_film,season,episode,recommended_scope,canon_tier,final_status,scene_count,required_min_duration_seconds,required_min_duration_tc,has_manual_boundary,has_whole_file_block
+W0001,Eyes of Wakanda — S01E01,TV episode,Eyes of Wakanda,1,1,Core,Official MCU,TIMECODED CANDIDATE,12,1640,00:27:20,False,False
+W0002,Eyes of Wakanda — S01E02,TV episode,Eyes of Wakanda,1,2,Core,Official MCU,TIMECODED CANDIDATE,10,1628,00:27:08,False,False
+W0003,Eyes of Wakanda — S01E03,TV episode,Eyes of Wakanda,1,3,Core,Official MCU,TIMECODED CANDIDATE,11,1553,00:25:53,False,False
+W0004,"The Untold Tales of Eternals — S01E01 — The Celestials, the Eternals and the Deviants",Web episode,The Untold Tales of Eternals,1,1,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,113,00:01:53,False,False
+W0005,The Untold Tales of Eternals — S01E02 — Ikaris and Sersi,Web episode,The Untold Tales of Eternals,1,2,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,123,00:02:03,False,False
+W0006,The Untold Tales of Eternals — S01E03 — Ajak and Phastos,Web episode,The Untold Tales of Eternals,1,3,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,180,00:03:00,False,False
+W0007,The Untold Tales of Eternals — S01E04 — Makkari and Druig,Web episode,The Untold Tales of Eternals,1,4,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,143,00:02:23,False,False
+W0008,The Untold Tales of Eternals — S01E05 — Gilgamesh and Thena,Web episode,The Untold Tales of Eternals,1,5,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,126,00:02:06,False,False
+W0009,Eyes of Wakanda — S01E04,TV episode,Eyes of Wakanda,1,4,Core,Official MCU,TIMECODED CANDIDATE,5,1498,00:24:58,False,False
+W0010,The Untold Tales of Eternals — S01E06 — Kingo and Sprite,Web episode,The Untold Tales of Eternals,1,6,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,163,00:02:43,False,False
+W0011,Captain America: The First Avenger,Movie,Captain America: The First Avenger,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,6,6820,01:53:40,False,False
+W0012,Marvel One-Shot: Agent Carter,One-Shot,Marvel One-Shot: Agent Carter,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,825,00:13:45,False,False
+W0013,Agent Carter — S01E01,TV episode,Agent Carter,1,1,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2514,00:41:54,False,False
+W0014,Agent Carter — S01E02,TV episode,Agent Carter,1,2,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2446,00:40:46,False,False
+W0015,Agent Carter — S01E03,TV episode,Agent Carter,1,3,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2440,00:40:40,False,False
+W0016,Agent Carter — S01E04,TV episode,Agent Carter,1,4,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2435,00:40:35,False,False
+W0017,Agent Carter — S01E05,TV episode,Agent Carter,1,5,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2537,00:42:17,False,False
+W0018,Agent Carter — S01E06,TV episode,Agent Carter,1,6,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2446,00:40:46,False,False
+W0019,Agent Carter — S01E07,TV episode,Agent Carter,1,7,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2428,00:40:28,False,False
+W0020,Agent Carter — S01E08,TV episode,Agent Carter,1,8,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,3,2535,00:42:15,False,False
+W0021,Agent Carter — S02E01,TV episode,Agent Carter,2,1,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2495,00:41:35,False,False
+W0022,Agent Carter — S02E02,TV episode,Agent Carter,2,2,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2529,00:42:09,False,False
+W0023,Agent Carter — S02E03,TV episode,Agent Carter,2,3,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2539,00:42:19,False,False
+W0024,Agent Carter — S02E04,TV episode,Agent Carter,2,4,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,14,2538,00:42:18,False,False
+W0025,Agent Carter — S02E05,TV episode,Agent Carter,2,5,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2499,00:41:39,False,False
+W0026,Agent Carter — S02E06,TV episode,Agent Carter,2,6,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2540,00:42:20,False,False
+W0027,Agent Carter — S02E07,TV episode,Agent Carter,2,7,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2533,00:42:13,False,False
+W0028,Agent Carter — S02E08,TV episode,Agent Carter,2,8,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2531,00:42:11,False,False
+W0029,Agent Carter — S02E09,TV episode,Agent Carter,2,9,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2480,00:41:20,False,False
+W0030,Agent Carter — S02E10,TV episode,Agent Carter,2,10,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2436,00:40:36,False,False
+W0031,Peggy Carter Smithsonian Interview,Promo / bonus video,Peggy Carter Smithsonian Interview,,,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,181,00:03:01,False,False
+W0032,Stark Expo 2010 — S01E01 — Stark Expo '74,Web episode,Stark Expo 2010,1,1,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,368,00:06:08,False,False
+W0033,Captain Marvel,Movie,Captain Marvel,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,5,7404,02:03:24,False,False
+W0034,Iron Man,Movie,Iron Man,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,7,7539,02:05:39,False,False
+W0035,Stark Expo 2010 — S01E02 — Stark Expo 2010,Web episode,Stark Expo 2010,1,2,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,107,00:01:47,False,False
+W0036,Stark Expo 2010 — S01E03 — Stark Expo 2010: AccuTech,Web episode,Stark Expo 2010,1,3,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,107,00:01:47,False,False
+W0037,Stark Expo 2010 — S01E04 — Cordco: A Subsidiary of Stark Industries,Web episode,Stark Expo 2010,1,4,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0038,Stark Expo 2010 — S01E05 — Fujikawa: A Subsidiary of Stark Industries,Web episode,Stark Expo 2010,1,5,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0039,Iron Man 2,Movie,Iron Man 2,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,10,7433,02:03:53,False,False
+W0040,The Incredible Hulk,Movie,The Incredible Hulk,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,16,6329,01:45:29,True,False
+W0041,Marvel One-Shot: A Funny Thing Happened on the Way to Thor's Hammer,One-Shot,Marvel One-Shot: A Funny Thing Happened on the Way to Thor's Hammer,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,161,00:02:41,False,False
+W0042,Thor,Movie,Thor,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,14,6872,01:54:32,False,False
+W0043,Marvel One-Shot: The Consultant,One-Shot,Marvel One-Shot: The Consultant,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,189,00:03:09,False,False
+W0044,The Avengers,Movie,The Avengers,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,8,8557,02:22:37,False,False
+W0045,Marvel One-Shot: Item 47,One-Shot,Marvel One-Shot: Item 47,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,580,00:09:40,False,False
+W0046,The Rising Tide — S01E01 — Evidence of Real Life Monster,Web episode,The Rising Tide,1,1,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0047,The Rising Tide — S01E02 — What Really Happened Here? S.H.I.E.L.D. Operatives Spotted?,Web episode,The Rising Tide,1,2,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,7,00:00:07,False,False
+W0048,The Rising Tide — S01E03 — S.H.I.E.L.D. Evidence Caught on Tape!,Web episode,The Rising Tide,1,3,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,17,00:00:17,False,False
+W0049,The Rising Tide — S01E04 — The Iron Man Takes Flight,Web episode,The Rising Tide,1,4,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,5,00:00:05,False,False
+W0050,The Rising Tide — S01E05 — Footage from Stark Expo Attacks,Web episode,The Rising Tide,1,5,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,7,00:00:07,False,False
+W0051,Agents of S.H.I.E.L.D. — S01E01,TV episode,Agents of S.H.I.E.L.D.,1,1,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2599,00:43:19,False,False
+W0052,Agents of S.H.I.E.L.D. — S01E02,TV episode,Agents of S.H.I.E.L.D.,1,2,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2446,00:40:46,False,False
+W0053,Agents of S.H.I.E.L.D. — S01E03,TV episode,Agents of S.H.I.E.L.D.,1,3,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2543,00:42:23,False,False
+W0054,Agents of S.H.I.E.L.D. — S01E04,TV episode,Agents of S.H.I.E.L.D.,1,4,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2504,00:41:44,False,False
+W0055,Agents of S.H.I.E.L.D. — S01E05,TV episode,Agents of S.H.I.E.L.D.,1,5,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2499,00:41:39,False,False
+W0056,Agents of S.H.I.E.L.D. — S01E06,TV episode,Agents of S.H.I.E.L.D.,1,6,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2537,00:42:17,False,False
+W0057,Agents of S.H.I.E.L.D. — S01E07,TV episode,Agents of S.H.I.E.L.D.,1,7,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2516,00:41:56,False,False
+W0058,Thor: The Dark World,Movie,Thor: The Dark World,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,7,6703,01:51:43,False,False
+W0059,Agents of S.H.I.E.L.D. — S01E08,TV episode,Agents of S.H.I.E.L.D.,1,8,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,5,2493,00:41:33,False,False
+W0060,Agents of S.H.I.E.L.D. — S01E09,TV episode,Agents of S.H.I.E.L.D.,1,9,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2541,00:42:21,False,False
+W0061,Agents of S.H.I.E.L.D. — S01E10,TV episode,Agents of S.H.I.E.L.D.,1,10,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2455,00:40:55,False,False
+W0062,Agents of S.H.I.E.L.D. — S01E11,TV episode,Agents of S.H.I.E.L.D.,1,11,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,4,2515,00:41:55,False,False
+W0063,Iron Man 3,Movie,Iron Man 3,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,4,7801,02:10:01,False,False
+W0064,Agents of S.H.I.E.L.D. — S01E12,TV episode,Agents of S.H.I.E.L.D.,1,12,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2541,00:42:21,False,False
+W0065,Agents of S.H.I.E.L.D. — S01E13,TV episode,Agents of S.H.I.E.L.D.,1,13,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2511,00:41:51,False,False
+W0066,Agents of S.H.I.E.L.D. — S01E14,TV episode,Agents of S.H.I.E.L.D.,1,14,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,5,2514,00:41:54,False,False
+W0067,Agents of S.H.I.E.L.D. — S01E15,TV episode,Agents of S.H.I.E.L.D.,1,15,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2541,00:42:21,False,False
+W0068,Marvel One-Shot: All Hail the King,One-Shot,Marvel One-Shot: All Hail the King,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,5,696,00:11:36,False,False
+W0069,Agents of S.H.I.E.L.D. — S01E16,TV episode,Agents of S.H.I.E.L.D.,1,16,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,5,2431,00:40:31,False,False
+W0070,Captain America: The Winter Soldier,Movie,Captain America: The Winter Soldier,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,11,8127,02:15:27,False,False
+W0071,Agents of S.H.I.E.L.D. — S01E17,TV episode,Agents of S.H.I.E.L.D.,1,17,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,5,2542,00:42:22,False,False
+W0072,Agents of S.H.I.E.L.D. — S01E18,TV episode,Agents of S.H.I.E.L.D.,1,18,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2542,00:42:22,False,False
+W0073,Agents of S.H.I.E.L.D. — S01E19,TV episode,Agents of S.H.I.E.L.D.,1,19,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2537,00:42:17,False,False
+W0074,Agents of S.H.I.E.L.D. — S01E20,TV episode,Agents of S.H.I.E.L.D.,1,20,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2539,00:42:19,False,False
+W0075,Agents of S.H.I.E.L.D. — S01E21,TV episode,Agents of S.H.I.E.L.D.,1,21,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,18,2537,00:42:17,False,False
+W0076,Agents of S.H.I.E.L.D. — S01E22,TV episode,Agents of S.H.I.E.L.D.,1,22,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,7,2538,00:42:18,False,False
+W0077,Agents of S.H.I.E.L.D. — S02E01,TV episode,Agents of S.H.I.E.L.D.,2,1,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2540,00:42:20,False,False
+W0078,Agents of S.H.I.E.L.D. — S02E02,TV episode,Agents of S.H.I.E.L.D.,2,2,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2538,00:42:18,False,False
+W0079,Guardians of the Galaxy,Movie,Guardians of the Galaxy,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,5,7226,02:00:26,False,False
+W0080,I Am Groot — S01E01,TV episode,I Am Groot,1,1,Core,Official MCU,TIMECODED CANDIDATE,2,172,00:02:52,False,False
+W0081,Agents of S.H.I.E.L.D. — S02E03,TV episode,Agents of S.H.I.E.L.D.,2,3,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2541,00:42:21,False,False
+W0082,Guardians of the Galaxy Vol. 2,Movie,Guardians of the Galaxy Vol. 2,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,8,8126,02:15:26,False,False
+W0083,I Am Groot — S01E02,TV episode,I Am Groot,1,2,Core,Official MCU,TIMECODED CANDIDATE,1,198,00:03:18,False,False
+W0084,I Am Groot — S01E03,TV episode,I Am Groot,1,3,Core,Official MCU,TIMECODED CANDIDATE,3,190,00:03:10,False,False
+W0085,I Am Groot — S01E04,TV episode,I Am Groot,1,4,Core,Official MCU,TIMECODED CANDIDATE,2,198,00:03:18,False,False
+W0086,I Am Groot — S01E05,TV episode,I Am Groot,1,5,Core,Official MCU,TIMECODED CANDIDATE,4,212,00:03:32,True,False
+W0087,I Am Groot — S02E01,TV episode,I Am Groot,2,1,Core,Official MCU,TIMECODED CANDIDATE,2,206,00:03:26,False,False
+W0088,I Am Groot — S02E02,TV episode,I Am Groot,2,2,Core,Official MCU,TIMECODED CANDIDATE,3,175,00:02:55,False,False
+W0089,I Am Groot — S02E03,TV episode,I Am Groot,2,3,Core,Official MCU,TIMECODED CANDIDATE,5,223,00:03:43,False,False
+W0090,Daredevil — S01E01,TV episode,Daredevil,1,1,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,6,3091,00:51:31,False,False
+W0091,I Am Groot — S02E04,TV episode,I Am Groot,2,4,Core,Official MCU,TIMECODED CANDIDATE,4,233,00:03:53,False,False
+W0092,Daredevil — S01E02,TV episode,Daredevil,1,2,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,11,3072,00:51:12,False,False
+W0093,I Am Groot — S02E05,TV episode,I Am Groot,2,5,Core,Official MCU,TIMECODED CANDIDATE,1,211,00:03:31,False,False
+W0094,Daredevil — S01E03,TV episode,Daredevil,1,3,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,3034,00:50:34,False,False
+W0095,Daredevil — S01E04,TV episode,Daredevil,1,4,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,3050,00:50:50,False,False
+W0096,Daredevil — S01E05,TV episode,Daredevil,1,5,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3254,00:54:14,False,False
+W0097,Daredevil — S01E06,TV episode,Daredevil,1,6,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2805,00:46:45,False,False
+W0098,Daredevil — S01E07,TV episode,Daredevil,1,7,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,7,2924,00:48:44,False,False
+W0099,Daredevil — S01E08,TV episode,Daredevil,1,8,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,9,3101,00:51:41,False,False
+W0100,Daredevil — S01E09,TV episode,Daredevil,1,9,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,6,3353,00:55:53,False,False
+W0101,Daredevil — S01E10,TV episode,Daredevil,1,10,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,11,3293,00:54:53,False,False
+W0102,Daredevil — S01E11,TV episode,Daredevil,1,11,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,3425,00:57:05,False,False
+W0103,Daredevil — S01E12,TV episode,Daredevil,1,12,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3479,00:57:59,False,False
+W0104,Daredevil — S01E13,TV episode,Daredevil,1,13,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,3248,00:54:08,False,False
+W0105,Agents of S.H.I.E.L.D. — S02E04,TV episode,Agents of S.H.I.E.L.D.,2,4,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,3,2470,00:41:10,False,False
+W0106,Agents of S.H.I.E.L.D. — S02E05,TV episode,Agents of S.H.I.E.L.D.,2,5,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,4,2542,00:42:22,False,False
+W0107,Agents of S.H.I.E.L.D. — S02E06,TV episode,Agents of S.H.I.E.L.D.,2,6,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,3,2467,00:41:07,False,False
+W0108,Jessica Jones — S01E01,TV episode,Jessica Jones,1,1,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,3038,00:50:38,False,False
+W0109,Jessica Jones — S01E02,TV episode,Jessica Jones,1,2,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3036,00:50:36,False,False
+W0110,Agents of S.H.I.E.L.D. — S02E07,TV episode,Agents of S.H.I.E.L.D.,2,7,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,4,2518,00:41:58,False,False
+W0111,Jessica Jones — S01E03,TV episode,Jessica Jones,1,3,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,7,3067,00:51:07,False,False
+W0112,Jessica Jones — S01E04,TV episode,Jessica Jones,1,4,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2809,00:46:49,False,False
+W0113,Jessica Jones — S01E05,TV episode,Jessica Jones,1,5,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,12,2887,00:48:07,False,False
+W0114,Agents of S.H.I.E.L.D. — S02E08,TV episode,Agents of S.H.I.E.L.D.,2,8,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,10,2541,00:42:21,False,False
+W0115,Agents of S.H.I.E.L.D. — S02E09,TV episode,Agents of S.H.I.E.L.D.,2,9,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,4,2541,00:42:21,False,False
+W0116,Agents of S.H.I.E.L.D. — S02E10,TV episode,Agents of S.H.I.E.L.D.,2,10,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2542,00:42:22,False,False
+W0117,Agents of S.H.I.E.L.D. — S02E11,TV episode,Agents of S.H.I.E.L.D.,2,11,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,5,2541,00:42:21,False,False
+W0118,Jessica Jones — S01E06,TV episode,Jessica Jones,1,6,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,4,3129,00:52:09,False,False
+W0119,Jessica Jones — S01E07,TV episode,Jessica Jones,1,7,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3176,00:52:56,False,False
+W0120,Agents of S.H.I.E.L.D. — S02E12,TV episode,Agents of S.H.I.E.L.D.,2,12,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,5,2460,00:41:00,False,False
+W0121,Jessica Jones — S01E08,TV episode,Jessica Jones,1,8,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,7,2899,00:48:19,False,False
+W0122,Agents of S.H.I.E.L.D. — S02E13,TV episode,Agents of S.H.I.E.L.D.,2,13,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,7,2542,00:42:22,False,False
+W0123,Jessica Jones — S01E09,TV episode,Jessica Jones,1,9,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,9,3204,00:53:24,False,False
+W0124,Jessica Jones — S01E10,TV episode,Jessica Jones,1,10,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,6,2676,00:44:36,False,False
+W0125,Agents of S.H.I.E.L.D. — S02E14,TV episode,Agents of S.H.I.E.L.D.,2,14,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,4,2541,00:42:21,False,False
+W0126,Agents of S.H.I.E.L.D. — S02E15,TV episode,Agents of S.H.I.E.L.D.,2,15,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,11,2533,00:42:13,False,False
+W0127,Jessica Jones — S01E11,TV episode,Jessica Jones,1,11,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,8,2922,00:48:42,False,False
+W0128,Jessica Jones — S01E12,TV episode,Jessica Jones,1,12,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,3113,00:51:53,False,False
+W0129,Jessica Jones — S01E13,TV episode,Jessica Jones,1,13,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,3033,00:50:33,False,False
+W0130,Agents of S.H.I.E.L.D. — S02E16,TV episode,Agents of S.H.I.E.L.D.,2,16,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,3,2541,00:42:21,False,False
+W0131,Agents of S.H.I.E.L.D. — S02E17,TV episode,Agents of S.H.I.E.L.D.,2,17,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,17,2534,00:42:14,False,False
+W0132,Agents of S.H.I.E.L.D. — S02E18,TV episode,Agents of S.H.I.E.L.D.,2,18,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2535,00:42:15,False,False
+W0133,Agents of S.H.I.E.L.D. — S02E19,TV episode,Agents of S.H.I.E.L.D.,2,19,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2444,00:40:44,False,False
+W0134,Avengers: Age of Ultron,Movie,Avengers: Age of Ultron,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,8003,02:13:23,False,False
+W0135,Agents of S.H.I.E.L.D. — S02E20,TV episode,Agents of S.H.I.E.L.D.,2,20,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,4,2541,00:42:21,False,False
+W0136,Agents of S.H.I.E.L.D. — S02E21,TV episode,Agents of S.H.I.E.L.D.,2,21,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2535,00:42:15,False,False
+W0137,Agents of S.H.I.E.L.D. — S02E22,TV episode,Agents of S.H.I.E.L.D.,2,22,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2541,00:42:21,False,False
+W0138,"WHiH Newsfront — S01E01 — WHiH Newsfront: July 2, 2015",Web episode,WHiH Newsfront,1,1,Completionist,In-universe supplement,TIMECODED VERIFIED/PARTIAL,1,28,00:00:28,False,False
+W0139,WHiH Newsfront — S01E02 — Top Stories,Web episode,WHiH Newsfront,1,2,Completionist,In-universe supplement,TIMECODED VERIFIED/PARTIAL,1,80,00:01:20,False,False
+W0140,WHiH Newsfront — S01E03 — Scott Lang Profile,Web episode,WHiH Newsfront,1,3,Completionist,In-universe supplement,TIMECODED VERIFIED/PARTIAL,1,108,00:01:48,False,False
+W0141,WHiH Newsfront — S01E04 — VistaCorp,Web episode,WHiH Newsfront,1,4,Completionist,In-universe supplement,TIMECODED VERIFIED/PARTIAL,1,156,00:02:36,False,False
+W0142,WHiH Newsfront — S01E05 — Ant-Man / Pym Tech coverage,Web episode,WHiH Newsfront,1,5,Completionist,In-universe supplement,TIMECODED VERIFIED/PARTIAL,1,203,00:03:23,False,False
+W0143,Ant-Man,Movie,Ant-Man,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,5,6612,01:50:12,False,False
+W0144,Daredevil — S02E01,TV episode,Daredevil,2,1,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2811,00:46:51,False,False
+W0145,Daredevil — S02E02,TV episode,Daredevil,2,2,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2901,00:48:21,False,False
+W0146,Daredevil — S02E03,TV episode,Daredevil,2,3,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2797,00:46:37,False,False
+W0147,Daredevil — S02E04,TV episode,Daredevil,2,4,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3535,00:58:55,False,False
+W0148,Daredevil — S02E05,TV episode,Daredevil,2,5,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,10,3250,00:54:10,False,False
+W0149,Daredevil — S02E06,TV episode,Daredevil,2,6,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3252,00:54:12,False,False
+W0150,Daredevil — S02E07,TV episode,Daredevil,2,7,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,3289,00:54:49,False,False
+W0151,Luke Cage — S01E01,TV episode,Luke Cage,1,1,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,5,3168,00:52:48,False,False
+W0152,Daredevil — S02E08,TV episode,Daredevil,2,8,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,7,3163,00:52:43,False,False
+W0153,Luke Cage — S01E02,TV episode,Luke Cage,1,2,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,3438,00:57:18,False,False
+W0154,Daredevil — S02E09,TV episode,Daredevil,2,9,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,23,3477,00:57:57,False,False
+W0155,Luke Cage — S01E03,TV episode,Luke Cage,1,3,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,10,3288,00:54:48,False,False
+W0156,Luke Cage — S01E04,TV episode,Luke Cage,1,4,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,33,3047,00:50:47,False,False
+W0157,Daredevil — S02E10,TV episode,Daredevil,2,10,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3038,00:50:38,False,False
+W0158,Daredevil — S02E11,TV episode,Daredevil,2,11,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3218,00:53:38,False,False
+W0159,Luke Cage — S01E05,TV episode,Luke Cage,1,5,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,5,3000,00:50:00,False,False
+W0160,Daredevil — S02E12,TV episode,Daredevil,2,12,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,15,3052,00:50:52,False,False
+W0161,Daredevil — S02E13,TV episode,Daredevil,2,13,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,3330,00:55:30,False,False
+W0162,Agents of S.H.I.E.L.D. — S03E01,TV episode,Agents of S.H.I.E.L.D.,3,1,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,4,2486,00:41:26,False,False
+W0163,Luke Cage — S01E06,TV episode,Luke Cage,1,6,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,4,3085,00:51:25,False,False
+W0164,Agents of S.H.I.E.L.D. — S03E02,TV episode,Agents of S.H.I.E.L.D.,3,2,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,12,2522,00:42:02,False,False
+W0165,Luke Cage — S01E07,TV episode,Luke Cage,1,7,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,10,2994,00:49:54,False,False
+W0166,Luke Cage — S01E08,TV episode,Luke Cage,1,8,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2801,00:46:41,False,False
+W0167,Agents of S.H.I.E.L.D. — S03E03,TV episode,Agents of S.H.I.E.L.D.,3,3,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,9,2423,00:40:23,False,False
+W0168,Luke Cage — S01E09,TV episode,Luke Cage,1,9,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,5,3823,01:03:43,False,False
+W0169,Luke Cage — S01E10,TV episode,Luke Cage,1,10,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2767,00:46:07,False,False
+W0170,Luke Cage — S01E11,TV episode,Luke Cage,1,11,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2964,00:49:24,False,False
+W0171,Luke Cage — S01E12,TV episode,Luke Cage,1,12,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3614,01:00:14,False,False
+W0172,Luke Cage — S01E13,TV episode,Luke Cage,1,13,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,8,2640,00:44:00,False,False
+W0173,Agents of S.H.I.E.L.D. — S03E04,TV episode,Agents of S.H.I.E.L.D.,3,4,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,3,2539,00:42:19,False,False
+W0174,Agents of S.H.I.E.L.D. — S03E05,TV episode,Agents of S.H.I.E.L.D.,3,5,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,15,2543,00:42:23,False,False
+W0175,Agents of S.H.I.E.L.D. — S03E06,TV episode,Agents of S.H.I.E.L.D.,3,6,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,3,2535,00:42:15,False,False
+W0176,Agents of S.H.I.E.L.D. — S03E07,TV episode,Agents of S.H.I.E.L.D.,3,7,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,5,2543,00:42:23,False,False
+W0177,Agents of S.H.I.E.L.D. — S03E08,TV episode,Agents of S.H.I.E.L.D.,3,8,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2541,00:42:21,False,False
+W0178,Agents of S.H.I.E.L.D. — S03E09,TV episode,Agents of S.H.I.E.L.D.,3,9,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2542,00:42:22,False,False
+W0179,Agents of S.H.I.E.L.D. — S03E10,TV episode,Agents of S.H.I.E.L.D.,3,10,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2536,00:42:16,False,False
+W0180,Iron Fist — S01E01,TV episode,Iron Fist,1,1,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,4,3292,00:54:52,False,False
+W0181,Iron Fist — S01E02,TV episode,Iron Fist,1,2,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,4,3582,00:59:42,False,False
+W0182,Iron Fist — S01E03,TV episode,Iron Fist,1,3,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3458,00:57:38,False,False
+W0183,Iron Fist — S01E04,TV episode,Iron Fist,1,4,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3123,00:52:03,False,False
+W0184,Iron Fist — S01E05,TV episode,Iron Fist,1,5,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3279,00:54:39,False,False
+W0185,Iron Fist — S01E06,TV episode,Iron Fist,1,6,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3083,00:51:23,False,False
+W0186,Iron Fist — S01E07,TV episode,Iron Fist,1,7,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,3393,00:56:33,False,False
+W0187,Iron Fist — S01E08,TV episode,Iron Fist,1,8,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3194,00:53:14,False,False
+W0188,Iron Fist — S01E09,TV episode,Iron Fist,1,9,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3167,00:52:47,False,False
+W0189,Iron Fist — S01E10,TV episode,Iron Fist,1,10,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3271,00:54:31,False,False
+W0190,Iron Fist — S01E11,TV episode,Iron Fist,1,11,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,3044,00:50:44,False,False
+W0191,Iron Fist — S01E12,TV episode,Iron Fist,1,12,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2886,00:48:06,False,False
+W0192,Iron Fist — S01E13,TV episode,Iron Fist,1,13,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,3097,00:51:37,False,False
+W0193,Agents of S.H.I.E.L.D. — S03E11,TV episode,Agents of S.H.I.E.L.D.,3,11,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2542,00:42:22,False,False
+W0194,Agents of S.H.I.E.L.D. — S03E12,TV episode,Agents of S.H.I.E.L.D.,3,12,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2541,00:42:21,False,False
+W0195,Agents of S.H.I.E.L.D. — S03E13,TV episode,Agents of S.H.I.E.L.D.,3,13,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,9,2530,00:42:10,False,False
+W0196,Agents of S.H.I.E.L.D. — S03E14,TV episode,Agents of S.H.I.E.L.D.,3,14,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2476,00:41:16,False,False
+W0197,WHiH Newsfront — S02E01 — AVENGERS IMPACT: A WHIH Newsfront Special Report,Web episode,WHiH Newsfront,2,1,Completionist,In-universe supplement,TIMECODED VERIFIED/PARTIAL,1,141,00:02:21,False,False
+W0198,Agents of S.H.I.E.L.D. — S03E15,TV episode,Agents of S.H.I.E.L.D.,3,15,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2543,00:42:23,False,False
+W0199,Agents of S.H.I.E.L.D. — S03E16,TV episode,Agents of S.H.I.E.L.D.,3,16,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,10,2543,00:42:23,False,False
+W0200,WHiH Newsfront — S02E02 — WHiH Newsfront: The Cost of Saving the World,Web episode,WHiH Newsfront,2,2,Completionist,In-universe supplement,TIMECODED VERIFIED/PARTIAL,1,100,00:01:40,False,False
+W0201,Agents of S.H.I.E.L.D. — S03E17,TV episode,Agents of S.H.I.E.L.D.,3,17,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,3,2482,00:41:22,False,False
+W0202,Agents of S.H.I.E.L.D. — S03E18,TV episode,Agents of S.H.I.E.L.D.,3,18,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2478,00:41:18,False,False
+W0203,WHiH Newsfront — S02E03 — WHiH Newsfront: The Avengers and The White House,Web episode,WHiH Newsfront,2,3,Completionist,In-universe supplement,TIMECODED VERIFIED/PARTIAL,1,191,00:03:11,False,False
+W0204,WHiH Newsfront — S02E04 — WHiH Newsfront Exclusive: President Ellis Discusses the Avengers,Web episode,WHiH Newsfront,2,4,Completionist,In-universe supplement,TIMECODED VERIFIED/PARTIAL,1,193,00:03:13,False,False
+W0205,The Defenders — S01E01,TV episode,The Defenders,1,1,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,2970,00:49:30,False,False
+W0206,The Defenders — S01E02,TV episode,The Defenders,1,2,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,2558,00:42:38,False,False
+W0207,The Defenders — S01E03,TV episode,The Defenders,1,3,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,3169,00:52:49,False,False
+W0208,Midland Circle Security Elevator B,Promo / web short,Midland Circle Security Elevator B,,,Completionist,In-universe supplement,TIMECODED VERIFIED/PARTIAL,1,15,00:00:15,False,False
+W0209,The Defenders — S01E04,TV episode,The Defenders,1,4,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2570,00:42:50,False,False
+W0210,The Defenders — S01E05,TV episode,The Defenders,1,5,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2924,00:48:44,False,False
+W0211,The Defenders — S01E06,TV episode,The Defenders,1,6,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2953,00:49:13,False,False
+W0212,The Defenders — S01E07,TV episode,The Defenders,1,7,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,2617,00:43:37,False,False
+W0213,The Defenders — S01E08,TV episode,The Defenders,1,8,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,3191,00:53:11,False,False
+W0214,Agents of S.H.I.E.L.D. — S03E19,TV episode,Agents of S.H.I.E.L.D.,3,19,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,6,2418,00:40:18,False,False
+W0215,WHiH Newsfront — S02E05 — WHiH Breaking News: Attack in Lagos,Web episode,WHiH Newsfront,2,5,Completionist,In-universe supplement,TIMECODED VERIFIED/PARTIAL,1,185,00:03:05,False,False
+W0216,Captain America: Civil War,Movie,Captain America: Civil War,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,18,8835,02:27:15,False,False
+W0217,Agents of S.H.I.E.L.D. — S03E20,TV episode,Agents of S.H.I.E.L.D.,3,20,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2527,00:42:07,False,False
+W0218,Agents of S.H.I.E.L.D. — S03E21,TV episode,Agents of S.H.I.E.L.D.,3,21,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2534,00:42:14,False,False
+W0219,Agents of S.H.I.E.L.D. — S03E22,TV episode,Agents of S.H.I.E.L.D.,3,22,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,3,2541,00:42:21,False,False
+W0220,Black Widow,Movie,Black Widow,,,Core,Official MCU,TIMECODED CANDIDATE,69,8010,02:13:30,False,False
+W0221,Black Panther,Movie,Black Panther,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,7,8049,02:14:09,False,False
+W0222,Inhumans — S01E01,TV episode,Inhumans,1,1,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,5,2508,00:41:48,False,False
+W0223,Inhumans — S01E02,TV episode,Inhumans,1,2,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2537,00:42:17,False,False
+W0224,Inhumans — S01E03,TV episode,Inhumans,1,3,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,9,2498,00:41:38,False,False
+W0225,Inhumans — S01E04,TV episode,Inhumans,1,4,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,5,2475,00:41:15,False,False
+W0226,Inhumans — S01E05,TV episode,Inhumans,1,5,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,4,2541,00:42:21,False,False
+W0227,Inhumans — S01E06,TV episode,Inhumans,1,6,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,3,2507,00:41:47,False,False
+W0228,Inhumans — S01E07,TV episode,Inhumans,1,7,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2537,00:42:17,False,False
+W0229,Inhumans — S01E08,TV episode,Inhumans,1,8,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,3,2533,00:42:13,False,False
+W0230,Spider-Man: Homecoming,Movie,Spider-Man: Homecoming,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,12,7551,02:05:51,False,False
+W0231,The Punisher — S01E01,TV episode,The Punisher,1,1,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,5,2952,00:49:12,False,False
+W0232,The Punisher — S01E02,TV episode,The Punisher,1,2,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,3304,00:55:04,False,False
+W0233,The Punisher — S01E03,TV episode,The Punisher,1,3,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,9,3327,00:55:27,False,False
+W0234,The Punisher — S01E04,TV episode,The Punisher,1,4,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2835,00:47:15,False,False
+W0235,The Punisher — S01E05,TV episode,The Punisher,1,5,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3179,00:52:59,False,False
+W0236,The Punisher — S01E06,TV episode,The Punisher,1,6,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3158,00:52:38,False,False
+W0237,The Punisher — S01E07,TV episode,The Punisher,1,7,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,2820,00:47:00,False,False
+W0238,The Punisher — S01E08,TV episode,The Punisher,1,8,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3059,00:50:59,False,False
+W0239,The Punisher — S01E09,TV episode,The Punisher,1,9,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3099,00:51:39,False,False
+W0240,The Punisher — S01E10,TV episode,The Punisher,1,10,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,27,2829,00:47:09,False,False
+W0241,The Punisher — S01E11,TV episode,The Punisher,1,11,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3017,00:50:17,False,False
+W0242,The Punisher — S01E12,TV episode,The Punisher,1,12,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2947,00:49:07,False,False
+W0243,The Punisher — S01E13,TV episode,The Punisher,1,13,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,7,3171,00:52:51,False,False
+W0244,Doctor Strange,Movie,Doctor Strange,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,20,6873,01:54:33,False,False
+W0245,Cloak & Dagger — S01E01,TV episode,Cloak & Dagger,1,1,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,15,2907,00:48:27,False,False
+W0246,Cloak & Dagger — S01E02,TV episode,Cloak & Dagger,1,2,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2493,00:41:33,False,False
+W0247,Cloak & Dagger — S01E03,TV episode,Cloak & Dagger,1,3,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,21,2375,00:39:35,False,False
+W0248,Cloak & Dagger — S01E04,TV episode,Cloak & Dagger,1,4,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,20,2474,00:41:14,False,False
+W0249,Cloak & Dagger — S01E05,TV episode,Cloak & Dagger,1,5,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2495,00:41:35,False,False
+W0250,Cloak & Dagger — S01E06,TV episode,Cloak & Dagger,1,6,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,10,2469,00:41:09,False,False
+W0251,Cloak & Dagger — S01E07,TV episode,Cloak & Dagger,1,7,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,5,2488,00:41:28,False,False
+W0252,Cloak & Dagger — S01E08,TV episode,Cloak & Dagger,1,8,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,14,2494,00:41:34,False,False
+W0253,Cloak & Dagger — S01E09,TV episode,Cloak & Dagger,1,9,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,6,2468,00:41:08,False,False
+W0254,Cloak & Dagger — S01E10,TV episode,Cloak & Dagger,1,10,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,13,2458,00:40:58,False,False
+W0255,Agents of S.H.I.E.L.D. — S04E01,TV episode,Agents of S.H.I.E.L.D.,4,1,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2540,00:42:20,False,False
+W0256,Ghost Rider Found Cell Phone Footage,Promo / web short,Ghost Rider Found Cell Phone Footage,,,Optional,In-universe supplement,TIMECODED WHOLE-SHORT,1,17,00:00:17,False,False
+W0257,Agents of S.H.I.E.L.D. — S04E02,TV episode,Agents of S.H.I.E.L.D.,4,2,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2540,00:42:20,False,False
+W0258,Agents of S.H.I.E.L.D. — S04E03,TV episode,Agents of S.H.I.E.L.D.,4,3,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2509,00:41:49,False,False
+W0259,Agents of S.H.I.E.L.D. — S04E04,TV episode,Agents of S.H.I.E.L.D.,4,4,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2541,00:42:21,False,False
+W0260,Agents of S.H.I.E.L.D. — S04E05,TV episode,Agents of S.H.I.E.L.D.,4,5,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2492,00:41:32,False,False
+W0261,Agents of S.H.I.E.L.D. — S04E06,TV episode,Agents of S.H.I.E.L.D.,4,6,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,20,2442,00:40:42,False,False
+W0262,Agents of S.H.I.E.L.D. — S04E07,TV episode,Agents of S.H.I.E.L.D.,4,7,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,59,2540,00:42:20,False,False
+W0263,Agents of S.H.I.E.L.D. — S04E08,TV episode,Agents of S.H.I.E.L.D.,4,8,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,5,2507,00:41:47,False,False
+W0264,Agents of S.H.I.E.L.D.: Slingshot — S01E01 — Vendetta,Web episode,Agents of S.H.I.E.L.D.: Slingshot,1,1,Completionist,In-universe supplement,TIMECODED VERIFIED/PARTIAL,2,333,00:05:33,False,False
+W0265,Agents of S.H.I.E.L.D.: Slingshot — S01E02 — John Hancock,Web episode,Agents of S.H.I.E.L.D.: Slingshot,1,2,Completionist,In-universe supplement,TIMECODED VERIFIED/PARTIAL,1,247,00:04:07,False,False
+W0266,Agents of S.H.I.E.L.D.: Slingshot — S01E03 — Progress,Web episode,Agents of S.H.I.E.L.D.: Slingshot,1,3,Completionist,In-universe supplement,TIMECODED VERIFIED/PARTIAL,1,419,00:06:59,False,False
+W0267,Agents of S.H.I.E.L.D.: Slingshot — S01E04 — Reunion,Web episode,Agents of S.H.I.E.L.D.: Slingshot,1,4,Completionist,In-universe supplement,TIMECODED VERIFIED/PARTIAL,1,312,00:05:12,False,False
+W0268,Agents of S.H.I.E.L.D.: Slingshot — S01E05 — Deal Breaker,Web episode,Agents of S.H.I.E.L.D.: Slingshot,1,5,Completionist,In-universe supplement,TIMECODED VERIFIED/PARTIAL,1,229,00:03:49,False,False
+W0269,Agents of S.H.I.E.L.D.: Slingshot — S01E06 — Justicia,Web episode,Agents of S.H.I.E.L.D.: Slingshot,1,6,Completionist,In-universe supplement,TIMECODED VERIFIED/PARTIAL,2,237,00:03:57,False,False
+W0270,Agents of S.H.I.E.L.D. — S04E09,TV episode,Agents of S.H.I.E.L.D.,4,9,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,4,2540,00:42:20,False,False
+W0271,Agents of S.H.I.E.L.D. — S04E10,TV episode,Agents of S.H.I.E.L.D.,4,10,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2511,00:41:51,False,False
+W0272,Agents of S.H.I.E.L.D. — S04E11,TV episode,Agents of S.H.I.E.L.D.,4,11,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,3,2531,00:42:11,False,False
+W0273,Agents of S.H.I.E.L.D. — S04E12,TV episode,Agents of S.H.I.E.L.D.,4,12,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2536,00:42:16,False,False
+W0274,Agents of S.H.I.E.L.D. — S04E13,TV episode,Agents of S.H.I.E.L.D.,4,13,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2537,00:42:17,False,False
+W0275,Jessica Jones — S02E01,TV episode,Jessica Jones,2,1,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,10,3108,00:51:48,False,False
+W0276,Agents of S.H.I.E.L.D. — S04E14,TV episode,Agents of S.H.I.E.L.D.,4,14,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,15,2530,00:42:10,False,False
+W0277,Agents of S.H.I.E.L.D. — S04E15,TV episode,Agents of S.H.I.E.L.D.,4,15,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2540,00:42:20,False,False
+W0278,Agents of S.H.I.E.L.D. — S04E16,TV episode,Agents of S.H.I.E.L.D.,4,16,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2534,00:42:14,False,False
+W0279,Jessica Jones — S02E02,TV episode,Jessica Jones,2,2,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3251,00:54:11,False,False
+W0280,Jessica Jones — S02E03,TV episode,Jessica Jones,2,3,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3147,00:52:27,False,False
+W0281,Jessica Jones — S02E04,TV episode,Jessica Jones,2,4,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2880,00:48:00,False,False
+W0282,Jessica Jones — S02E05,TV episode,Jessica Jones,2,5,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,10,3026,00:50:26,False,False
+W0283,Agents of S.H.I.E.L.D. — S04E17,TV episode,Agents of S.H.I.E.L.D.,4,17,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2539,00:42:19,False,False
+W0284,Agents of S.H.I.E.L.D. — S04E18,TV episode,Agents of S.H.I.E.L.D.,4,18,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,7,2539,00:42:19,False,False
+W0285,Agents of S.H.I.E.L.D. — S04E19,TV episode,Agents of S.H.I.E.L.D.,4,19,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2540,00:42:20,False,False
+W0286,Agents of S.H.I.E.L.D. — S04E20,TV episode,Agents of S.H.I.E.L.D.,4,20,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,9,2443,00:40:43,False,False
+W0287,Agents of S.H.I.E.L.D. — S04E21,TV episode,Agents of S.H.I.E.L.D.,4,21,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,9,2542,00:42:22,False,False
+W0288,Agents of S.H.I.E.L.D. — S04E22,TV episode,Agents of S.H.I.E.L.D.,4,22,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,10,2491,00:41:31,False,False
+W0289,Jessica Jones — S02E06,TV episode,Jessica Jones,2,6,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2824,00:47:04,False,False
+W0290,Jessica Jones — S02E07,TV episode,Jessica Jones,2,7,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,4,3109,00:51:49,False,False
+W0291,Jessica Jones — S02E08,TV episode,Jessica Jones,2,8,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,6,2900,00:48:20,False,False
+W0292,Jessica Jones — S02E09,TV episode,Jessica Jones,2,9,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,6,2882,00:48:02,False,False
+W0293,Jessica Jones — S02E10,TV episode,Jessica Jones,2,10,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3195,00:53:15,False,False
+W0294,Jessica Jones — S02E11,TV episode,Jessica Jones,2,11,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,2835,00:47:15,False,False
+W0295,Jessica Jones — S02E12,TV episode,Jessica Jones,2,12,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,2710,00:45:10,False,False
+W0296,Jessica Jones — S02E13,TV episode,Jessica Jones,2,13,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,3052,00:50:52,False,False
+W0297,Luke Cage — S02E01,TV episode,Luke Cage,2,1,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,3238,00:53:58,False,False
+W0298,Luke Cage — S02E02,TV episode,Luke Cage,2,2,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3165,00:52:45,False,False
+W0299,Luke Cage — S02E03,TV episode,Luke Cage,2,3,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,3478,00:57:58,False,False
+W0300,Luke Cage — S02E04,TV episode,Luke Cage,2,4,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,3138,00:52:18,False,False
+W0301,Luke Cage — S02E05,TV episode,Luke Cage,2,5,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,4,3327,00:55:27,False,False
+W0302,Luke Cage — S02E06,TV episode,Luke Cage,2,6,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3719,01:01:59,False,False
+W0303,Luke Cage — S02E07,TV episode,Luke Cage,2,7,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,8,3221,00:53:41,False,False
+W0304,Luke Cage — S02E08,TV episode,Luke Cage,2,8,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3182,00:53:02,False,False
+W0305,Luke Cage — S02E09,TV episode,Luke Cage,2,9,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3430,00:57:10,False,False
+W0306,Luke Cage — S02E10,TV episode,Luke Cage,2,10,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3429,00:57:09,False,False
+W0307,Luke Cage — S02E11,TV episode,Luke Cage,2,11,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,21,3253,00:54:13,False,False
+W0308,Luke Cage — S02E12,TV episode,Luke Cage,2,12,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3614,01:00:14,False,False
+W0309,Luke Cage — S02E13,TV episode,Luke Cage,2,13,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,4017,01:06:57,False,False
+W0310,Iron Fist — S02E01,TV episode,Iron Fist,2,1,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3306,00:55:06,False,False
+W0311,Iron Fist — S02E02,TV episode,Iron Fist,2,2,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,7,3036,00:50:36,False,False
+W0312,Iron Fist — S02E03,TV episode,Iron Fist,2,3,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,2975,00:49:35,False,False
+W0313,Iron Fist — S02E04,TV episode,Iron Fist,2,4,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,3038,00:50:38,False,False
+W0314,Iron Fist — S02E05,TV episode,Iron Fist,2,5,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,8,3155,00:52:35,False,False
+W0315,Iron Fist — S02E06,TV episode,Iron Fist,2,6,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2905,00:48:25,False,False
+W0316,Iron Fist — S02E07,TV episode,Iron Fist,2,7,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,11,3112,00:51:52,False,False
+W0317,Daredevil — S03E01,TV episode,Daredevil,3,1,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,11,3077,00:51:17,False,False
+W0318,Daredevil — S03E02,TV episode,Daredevil,3,2,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,2849,00:47:29,False,False
+W0319,Daredevil — S03E03,TV episode,Daredevil,3,3,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,5,2845,00:47:25,False,False
+W0320,Iron Fist — S02E08,TV episode,Iron Fist,2,8,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,13,2831,00:47:11,False,False
+W0321,Daredevil — S03E04,TV episode,Daredevil,3,4,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,7,3136,00:52:16,False,False
+W0322,Iron Fist — S02E09,TV episode,Iron Fist,2,9,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,6,2885,00:48:05,False,False
+W0323,Daredevil — S03E05,TV episode,Daredevil,3,5,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,12,2836,00:47:16,False,False
+W0324,Iron Fist — S02E10,TV episode,Iron Fist,2,10,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,10,2966,00:49:26,False,False
+W0325,Daredevil — S03E06,TV episode,Daredevil,3,6,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,10,3128,00:52:08,False,False
+W0326,Cloak & Dagger — S02E01,TV episode,Cloak & Dagger,2,1,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,30,2511,00:41:51,False,False
+W0327,Daredevil — S03E07,TV episode,Daredevil,3,7,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,5,2863,00:47:43,False,False
+W0328,Daredevil — S03E08,TV episode,Daredevil,3,8,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,8,2897,00:48:17,False,False
+W0329,Cloak & Dagger — S02E02,TV episode,Cloak & Dagger,2,2,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,26,2471,00:41:11,False,False
+W0330,Cloak & Dagger — S02E03,TV episode,Cloak & Dagger,2,3,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,31,2492,00:41:32,False,False
+W0331,Cloak & Dagger — S02E04,TV episode,Cloak & Dagger,2,4,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,6,2478,00:41:18,False,False
+W0332,Daredevil — S03E09,TV episode,Daredevil,3,9,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,15,3113,00:51:53,False,False
+W0333,Daredevil — S03E10,TV episode,Daredevil,3,10,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,4,2645,00:44:05,False,False
+W0334,Daredevil — S03E11,TV episode,Daredevil,3,11,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2858,00:47:38,False,False
+W0335,Daredevil — S03E12,TV episode,Daredevil,3,12,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,9,3189,00:53:09,False,False
+W0336,Cloak & Dagger — S02E05,TV episode,Cloak & Dagger,2,5,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,12,2484,00:41:24,False,False
+W0337,Cloak & Dagger — S02E06,TV episode,Cloak & Dagger,2,6,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2421,00:40:21,False,False
+W0338,Cloak & Dagger — S02E07,TV episode,Cloak & Dagger,2,7,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,8,2489,00:41:29,False,False
+W0339,Daredevil — S03E13,TV episode,Daredevil,3,13,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,11,3111,00:51:51,False,False
+W0340,Cloak & Dagger — S02E08,TV episode,Cloak & Dagger,2,8,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2485,00:41:25,False,False
+W0341,Cloak & Dagger — S02E09,TV episode,Cloak & Dagger,2,9,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,11,2456,00:40:56,False,False
+W0342,Cloak & Dagger — S02E10,TV episode,Cloak & Dagger,2,10,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,4,2487,00:41:27,False,False
+W0343,Runaways — S01E01,TV episode,Runaways,1,1,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,23,3123,00:52:03,False,False
+W0344,Runaways — S01E02,TV episode,Runaways,1,2,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,34,2884,00:48:04,False,False
+W0345,Runaways — S01E03,TV episode,Runaways,1,3,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2689,00:44:49,False,False
+W0346,Runaways — S01E04,TV episode,Runaways,1,4,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,3024,00:50:24,False,False
+W0347,Runaways — S01E05,TV episode,Runaways,1,5,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2751,00:45:51,False,False
+W0348,Runaways — S01E06,TV episode,Runaways,1,6,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,3,2932,00:48:52,False,False
+W0349,Runaways — S01E07,TV episode,Runaways,1,7,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,4,3181,00:53:01,False,False
+W0350,Runaways — S01E08,TV episode,Runaways,1,8,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,5,2959,00:49:19,False,False
+W0351,Runaways — S01E09,TV episode,Runaways,1,9,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,4,2646,00:44:06,False,False
+W0352,Runaways — S01E10,TV episode,Runaways,1,10,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2840,00:47:20,False,False
+W0353,Runaways — S02E01,TV episode,Runaways,2,1,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,3,2909,00:48:29,False,False
+W0354,Runaways — S02E02,TV episode,Runaways,2,2,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2656,00:44:16,False,False
+W0355,Runaways — S02E03,TV episode,Runaways,2,3,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2997,00:49:57,False,False
+W0356,Runaways — S02E04,TV episode,Runaways,2,4,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2690,00:44:50,False,False
+W0357,Runaways — S02E05,TV episode,Runaways,2,5,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2942,00:49:02,False,False
+W0358,Runaways — S02E06,TV episode,Runaways,2,6,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2646,00:44:06,False,False
+W0359,Runaways — S02E07,TV episode,Runaways,2,7,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,3,2844,00:47:24,False,False
+W0360,Runaways — S02E08,TV episode,Runaways,2,8,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,4,2568,00:42:48,False,False
+W0361,Runaways — S02E09,TV episode,Runaways,2,9,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2676,00:44:36,False,False
+W0362,Runaways — S02E10,TV episode,Runaways,2,10,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2498,00:41:38,False,False
+W0363,Runaways — S02E11,TV episode,Runaways,2,11,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2992,00:49:52,False,False
+W0364,Runaways — S02E12,TV episode,Runaways,2,12,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2855,00:47:35,False,False
+W0365,Runaways — S02E13,TV episode,Runaways,2,13,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2929,00:48:49,False,False
+W0366,Agents of S.H.I.E.L.D. — S05E01,TV episode,Agents of S.H.I.E.L.D.,5,1,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,9,2533,00:42:13,False,False
+W0367,Agents of S.H.I.E.L.D. — S05E02,TV episode,Agents of S.H.I.E.L.D.,5,2,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2540,00:42:20,False,False
+W0368,Agents of S.H.I.E.L.D. — S05E03,TV episode,Agents of S.H.I.E.L.D.,5,3,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2533,00:42:13,False,False
+W0369,Agents of S.H.I.E.L.D. — S05E04,TV episode,Agents of S.H.I.E.L.D.,5,4,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2540,00:42:20,False,False
+W0370,Agents of S.H.I.E.L.D. — S05E05,TV episode,Agents of S.H.I.E.L.D.,5,5,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,14,2537,00:42:17,False,False
+W0371,Agents of S.H.I.E.L.D. — S05E06,TV episode,Agents of S.H.I.E.L.D.,5,6,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2523,00:42:03,False,False
+W0372,Agents of S.H.I.E.L.D. — S05E07,TV episode,Agents of S.H.I.E.L.D.,5,7,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2414,00:40:14,False,False
+W0373,Agents of S.H.I.E.L.D. — S05E08,TV episode,Agents of S.H.I.E.L.D.,5,8,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,14,2533,00:42:13,False,False
+W0374,Agents of S.H.I.E.L.D. — S05E09,TV episode,Agents of S.H.I.E.L.D.,5,9,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2449,00:40:49,False,False
+W0375,Agents of S.H.I.E.L.D. — S05E10,TV episode,Agents of S.H.I.E.L.D.,5,10,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2532,00:42:12,False,False
+W0376,Thor: Ragnarok,Movie,Thor: Ragnarok,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,5,7807,02:10:07,False,False
+W0377,Agents of S.H.I.E.L.D. — S05E11,TV episode,Agents of S.H.I.E.L.D.,5,11,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2530,00:42:10,False,False
+W0378,Agents of S.H.I.E.L.D. — S05E12,TV episode,Agents of S.H.I.E.L.D.,5,12,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2565,00:42:45,False,False
+W0379,Agents of S.H.I.E.L.D. — S05E13,TV episode,Agents of S.H.I.E.L.D.,5,13,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2502,00:41:42,False,False
+W0380,Runaways — S03E01,TV episode,Runaways,3,1,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2994,00:49:54,False,False
+W0381,Runaways — S03E02,TV episode,Runaways,3,2,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2640,00:44:00,False,False
+W0382,Runaways — S03E03,TV episode,Runaways,3,3,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2984,00:49:44,False,False
+W0383,Runaways — S03E04,TV episode,Runaways,3,4,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2951,00:49:11,False,False
+W0384,Leaving it all in the past.,Promo / web short,Leaving it all in the past.,,,Optional,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0385,The Punisher — S02E01,TV episode,The Punisher,2,1,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,3059,00:50:59,False,False
+W0386,Jessica Jones — S03E01,TV episode,Jessica Jones,3,1,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,18,2987,00:49:47,False,False
+W0387,The Punisher — S02E02,TV episode,The Punisher,2,2,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,7,3164,00:52:44,False,False
+W0388,Jessica Jones — S03E02,TV episode,Jessica Jones,3,2,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,27,3172,00:52:52,False,False
+W0389,The Punisher — S02E03,TV episode,The Punisher,2,3,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,12,2944,00:49:04,False,False
+W0390,Jessica Jones — S03E03,TV episode,Jessica Jones,3,3,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,16,3247,00:54:07,False,False
+W0391,The Punisher — S02E04,TV episode,The Punisher,2,4,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,28,3350,00:55:50,False,False
+W0392,Ant-Man and the Wasp,Movie,Ant-Man and the Wasp,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,36,7061,01:57:41,False,False
+W0393,The Punisher — S02E05,TV episode,The Punisher,2,5,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,2951,00:49:11,False,False
+W0394,Jessica Jones — S03E04,TV episode,Jessica Jones,3,4,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,2623,00:43:43,False,False
+W0395,The Punisher — S02E06,TV episode,The Punisher,2,6,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,13,3280,00:54:40,False,False
+W0396,Jessica Jones — S03E05,TV episode,Jessica Jones,3,5,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,4,3074,00:51:14,False,False
+W0397,Jessica Jones — S03E06,TV episode,Jessica Jones,3,6,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,6,3083,00:51:23,False,False
+W0398,The Punisher — S02E07,TV episode,The Punisher,2,7,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,14,2979,00:49:39,False,False
+W0399,Jessica Jones — S03E07,TV episode,Jessica Jones,3,7,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,8,2906,00:48:26,False,False
+W0400,The Punisher — S02E08,TV episode,The Punisher,2,8,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,2804,00:46:44,False,False
+W0401,Jessica Jones — S03E08,TV episode,Jessica Jones,3,8,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,12,2535,00:42:15,False,False
+W0402,The Punisher — S02E09,TV episode,The Punisher,2,9,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,13,3342,00:55:42,False,False
+W0403,Jessica Jones — S03E09,TV episode,Jessica Jones,3,9,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,24,2979,00:49:39,False,False
+W0404,The Punisher — S02E10,TV episode,The Punisher,2,10,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,19,2712,00:45:12,False,False
+W0405,The Punisher — S02E11,TV episode,The Punisher,2,11,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,13,3143,00:52:23,False,False
+W0406,The Punisher — S02E12,TV episode,The Punisher,2,12,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,2863,00:47:43,False,False
+W0407,The Punisher — S02E13,TV episode,The Punisher,2,13,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,4,3320,00:55:20,False,False
+W0408,Agents of S.H.I.E.L.D. — S05E14,TV episode,Agents of S.H.I.E.L.D.,5,14,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2522,00:42:02,False,False
+W0409,Agents of S.H.I.E.L.D. — S05E15,TV episode,Agents of S.H.I.E.L.D.,5,15,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,9,2571,00:42:51,False,False
+W0410,Agents of S.H.I.E.L.D. — S05E16,TV episode,Agents of S.H.I.E.L.D.,5,16,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2508,00:41:48,False,False
+W0411,Agents of S.H.I.E.L.D. — S05E17,TV episode,Agents of S.H.I.E.L.D.,5,17,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2478,00:41:18,False,False
+W0412,Jessica Jones — S03E10,TV episode,Jessica Jones,3,10,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,23,2872,00:47:52,False,False
+W0413,Jessica Jones — S03E11,TV episode,Jessica Jones,3,11,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,50,2774,00:46:14,False,False
+W0414,Jessica Jones — S03E12,TV episode,Jessica Jones,3,12,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,7,2821,00:47:01,False,False
+W0415,Jessica Jones — S03E13,TV episode,Jessica Jones,3,13,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,2949,00:49:09,False,False
+W0416,Agents of S.H.I.E.L.D. — S05E18,TV episode,Agents of S.H.I.E.L.D.,5,18,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,4,2426,00:40:26,False,False
+W0417,Agents of S.H.I.E.L.D. — S05E19,TV episode,Agents of S.H.I.E.L.D.,5,19,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2520,00:42:00,False,False
+W0418,Agents of S.H.I.E.L.D. — S05E20,TV episode,Agents of S.H.I.E.L.D.,5,20,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,4,2495,00:41:35,False,False
+W0419,Agents of S.H.I.E.L.D. — S05E21,TV episode,Agents of S.H.I.E.L.D.,5,21,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,5,2540,00:42:20,False,False
+W0420,Avengers: Infinity War,Movie,Avengers: Infinity War,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,19,8937,02:28:57,False,False
+W0421,Agents of S.H.I.E.L.D. — S05E22,TV episode,Agents of S.H.I.E.L.D.,5,22,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,6,2537,00:42:17,False,False
+W0422,Runaways — S03E05,TV episode,Runaways,3,5,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,7,2804,00:46:44,False,False
+W0423,Runaways — S03E06,TV episode,Runaways,3,6,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2875,00:47:55,False,False
+W0424,Runaways — S03E07,TV episode,Runaways,3,7,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2543,00:42:23,False,False
+W0425,Runaways — S03E08,TV episode,Runaways,3,8,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2512,00:41:52,False,False
+W0426,Runaways — S03E09,TV episode,Runaways,3,9,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,11,3073,00:51:13,False,False
+W0427,Runaways — S03E10,TV episode,Runaways,3,10,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,13,2861,00:47:41,False,False
+W0428,Agents of S.H.I.E.L.D. — S06E01,TV episode,Agents of S.H.I.E.L.D.,6,1,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,4,2499,00:41:39,False,False
+W0429,Agents of S.H.I.E.L.D. — S06E02,TV episode,Agents of S.H.I.E.L.D.,6,2,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2539,00:42:19,False,False
+W0430,Agents of S.H.I.E.L.D. — S06E03,TV episode,Agents of S.H.I.E.L.D.,6,3,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2540,00:42:20,False,False
+W0431,Agents of S.H.I.E.L.D. — S06E04,TV episode,Agents of S.H.I.E.L.D.,6,4,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,17,2422,00:40:22,False,False
+W0432,Agents of S.H.I.E.L.D. — S06E05,TV episode,Agents of S.H.I.E.L.D.,6,5,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,8,2539,00:42:19,False,False
+W0433,Agents of S.H.I.E.L.D. — S06E06,TV episode,Agents of S.H.I.E.L.D.,6,6,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,3,2538,00:42:18,False,False
+W0434,Agents of S.H.I.E.L.D. — S06E07,TV episode,Agents of S.H.I.E.L.D.,6,7,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2508,00:41:48,False,False
+W0435,Agents of S.H.I.E.L.D. — S06E08,TV episode,Agents of S.H.I.E.L.D.,6,8,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2506,00:41:46,False,False
+W0436,Agents of S.H.I.E.L.D. — S06E09,TV episode,Agents of S.H.I.E.L.D.,6,9,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2490,00:41:30,False,False
+W0437,Agents of S.H.I.E.L.D. — S06E10,TV episode,Agents of S.H.I.E.L.D.,6,10,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2489,00:41:29,False,False
+W0438,Agents of S.H.I.E.L.D. — S06E11,TV episode,Agents of S.H.I.E.L.D.,6,11,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2532,00:42:12,False,False
+W0439,Agents of S.H.I.E.L.D. — S06E12,TV episode,Agents of S.H.I.E.L.D.,6,12,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,4,2458,00:40:58,False,False
+W0440,Agents of S.H.I.E.L.D. — S06E13,TV episode,Agents of S.H.I.E.L.D.,6,13,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,19,2542,00:42:22,False,False
+W0441,Agents of S.H.I.E.L.D. — S07E01,TV episode,Agents of S.H.I.E.L.D.,7,1,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,3,2543,00:42:23,False,False
+W0442,Agents of S.H.I.E.L.D. — S07E02,TV episode,Agents of S.H.I.E.L.D.,7,2,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2509,00:41:49,False,False
+W0443,Agents of S.H.I.E.L.D. — S07E03,TV episode,Agents of S.H.I.E.L.D.,7,3,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2481,00:41:21,False,False
+W0444,Agents of S.H.I.E.L.D. — S07E04,TV episode,Agents of S.H.I.E.L.D.,7,4,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,6,2537,00:42:17,False,False
+W0445,Agents of S.H.I.E.L.D. — S07E05,TV episode,Agents of S.H.I.E.L.D.,7,5,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,2,2450,00:40:50,False,False
+W0446,Agents of S.H.I.E.L.D. — S07E06,TV episode,Agents of S.H.I.E.L.D.,7,6,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,6,2526,00:42:06,False,False
+W0447,Agents of S.H.I.E.L.D. — S07E07,TV episode,Agents of S.H.I.E.L.D.,7,7,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,9,2539,00:42:19,False,False
+W0448,Agents of S.H.I.E.L.D. — S07E08,TV episode,Agents of S.H.I.E.L.D.,7,8,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,8,1512,00:25:12,False,False
+W0449,Agents of S.H.I.E.L.D. — S07E09,TV episode,Agents of S.H.I.E.L.D.,7,9,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2525,00:42:05,False,False
+W0450,Agents of S.H.I.E.L.D. — S07E10,TV episode,Agents of S.H.I.E.L.D.,7,10,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2442,00:40:42,False,False
+W0451,Agents of S.H.I.E.L.D. — S07E11,TV episode,Agents of S.H.I.E.L.D.,7,11,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2542,00:42:22,False,False
+W0452,Agents of S.H.I.E.L.D. — S07E12,TV episode,Agents of S.H.I.E.L.D.,7,12,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,1,2540,00:42:20,False,False
+W0453,Agents of S.H.I.E.L.D. — S07E13,TV episode,Agents of S.H.I.E.L.D.,7,13,Completionist,Legacy MCU-connected,TIMECODED VERIFIED/PARTIAL,28,2536,00:42:16,False,False
+W0454,Helstrom — S01E01,TV episode,Helstrom,1,1,Optional,Legacy / disputed,TIMECODED CANDIDATE,29,3338,00:55:38,False,False
+W0455,Helstrom — S01E02,TV episode,Helstrom,1,2,Optional,Legacy / disputed,TIMECODED CANDIDATE,21,2874,00:47:54,False,False
+W0456,Helstrom — S01E03,TV episode,Helstrom,1,3,Optional,Legacy / disputed,TIMECODED CANDIDATE,20,2688,00:44:48,False,False
+W0457,Helstrom — S01E04,TV episode,Helstrom,1,4,Optional,Legacy / disputed,TIMECODED CANDIDATE,19,3111,00:51:51,False,False
+W0458,Helstrom — S01E05,TV episode,Helstrom,1,5,Optional,Legacy / disputed,TIMECODED CANDIDATE,20,2709,00:45:09,False,False
+W0459,Helstrom — S01E06,TV episode,Helstrom,1,6,Optional,Legacy / disputed,TIMECODED CANDIDATE,25,2828,00:47:08,False,False
+W0460,Helstrom — S01E07,TV episode,Helstrom,1,7,Optional,Legacy / disputed,TIMECODED CANDIDATE,20,3062,00:51:02,False,False
+W0461,Helstrom — S01E08,TV episode,Helstrom,1,8,Optional,Legacy / disputed,TIMECODED CANDIDATE,25,3009,00:50:09,False,False
+W0462,Helstrom — S01E09,TV episode,Helstrom,1,9,Optional,Legacy / disputed,TIMECODED CANDIDATE,24,3116,00:51:56,False,False
+W0463,Helstrom — S01E10,TV episode,Helstrom,1,10,Optional,Legacy / disputed,TIMECODED CANDIDATE,26,3232,00:53:52,False,False
+W0464,Avengers: Endgame,Movie,Avengers: Endgame,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,27,10135,02:48:55,False,False
+W0465,Loki — S01E01,TV episode,Loki,1,1,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,9,2730,00:45:30,False,False
+W0466,Loki — S01E02,TV episode,Loki,1,2,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,10,2906,00:48:26,False,False
+W0467,Loki — S01E03,TV episode,Loki,1,3,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,4,2172,00:36:12,False,False
+W0468,Loki — S01E04,TV episode,Loki,1,4,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,14,2711,00:45:11,False,False
+W0469,Loki — S01E05,TV episode,Loki,1,5,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,8,2619,00:43:39,False,False
+W0470,Loki — S01E06,TV episode,Loki,1,6,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,2420,00:40:20,False,False
+W0471,What If...? — S01E01,TV episode,What If...?,1,1,Core,Official MCU,TIMECODED CANDIDATE,18,1758,00:29:18,False,False
+W0472,What If...? — S01E02,TV episode,What If...?,1,2,Core,Official MCU,TIMECODED CANDIDATE,12,1820,00:30:20,False,False
+W0473,What If...? — S01E03,TV episode,What If...?,1,3,Core,Official MCU,TIMECODED CANDIDATE,10,1709,00:28:29,False,False
+W0474,What If...? — S01E04,TV episode,What If...?,1,4,Core,Official MCU,TIMECODED CANDIDATE,15,1965,00:32:45,False,False
+W0475,What If...? — S01E05,TV episode,What If...?,1,5,Core,Official MCU,TIMECODED CANDIDATE,11,1685,00:28:05,False,False
+W0476,What If...? — S01E06,TV episode,What If...?,1,6,Core,Official MCU,TIMECODED CANDIDATE,17,1750,00:29:10,False,False
+W0477,What If...? — S01E07,TV episode,What If...?,1,7,Core,Official MCU,TIMECODED CANDIDATE,8,1856,00:30:56,False,False
+W0478,What If...? — S01E08,TV episode,What If...?,1,8,Core,Official MCU,TIMECODED CANDIDATE,15,1558,00:25:58,False,False
+W0479,What If...? — S01E09,TV episode,What If...?,1,9,Core,Official MCU,TIMECODED CANDIDATE,17,1887,00:31:27,False,False
+W0480,Marvel Zombies — S01E01,TV episode,Marvel Zombies,1,1,Core,Official MCU,TIMECODED CANDIDATE,12,1917,00:31:57,False,False
+W0481,Marvel Zombies — S01E02,TV episode,Marvel Zombies,1,2,Core,Official MCU,TIMECODED CANDIDATE,18,1672,00:27:52,False,False
+W0482,Marvel Zombies — S01E03,TV episode,Marvel Zombies,1,3,Core,Official MCU,TIMECODED CANDIDATE,14,1614,00:26:54,False,False
+W0483,Marvel Zombies — S01E04,TV episode,Marvel Zombies,1,4,Core,Official MCU,TIMECODED CANDIDATE,17,1518,00:25:18,False,False
+W0484,WandaVision — S01E01,TV episode,WandaVision,1,1,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,1321,00:22:01,False,False
+W0485,WandaVision — S01E02,TV episode,WandaVision,1,2,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,8,1764,00:29:24,False,False
+W0486,WandaVision — S01E03,TV episode,WandaVision,1,3,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,7,1516,00:25:16,False,False
+W0487,WandaVision — S01E04,TV episode,WandaVision,1,4,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,21,1698,00:28:18,False,False
+W0488,WandaVision — S01E05,TV episode,WandaVision,1,5,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2033,00:33:53,False,False
+W0489,WandaVision — S01E06,TV episode,WandaVision,1,6,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,1828,00:30:28,False,False
+W0490,WandaVision — S01E07,TV episode,WandaVision,1,7,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,1932,00:32:12,False,False
+W0491,WandaVision — S01E08,TV episode,WandaVision,1,8,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,9,2452,00:40:52,False,False
+W0492,WandaVision — S01E09,TV episode,WandaVision,1,9,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,3,2809,00:46:49,False,False
+W0493,Shang-Chi and the Legend of the Ten Rings,Movie,Shang-Chi and the Legend of the Ten Rings,,,Core,Official MCU,TIMECODED CANDIDATE,74,7891,02:11:31,False,False
+W0494,The Falcon and the Winter Soldier — S01E01,TV episode,The Falcon and the Winter Soldier,1,1,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,5,2554,00:42:34,False,False
+W0495,The Falcon and the Winter Soldier — S01E02,TV episode,The Falcon and the Winter Soldier,1,2,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2564,00:42:44,False,False
+W0496,The Falcon and the Winter Soldier — S01E03,TV episode,The Falcon and the Winter Soldier,1,3,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,1,2768,00:46:08,False,False
+W0497,The Falcon and the Winter Soldier — S01E04,TV episode,The Falcon and the Winter Soldier,1,4,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,2793,00:46:33,False,False
+W0498,The Falcon and the Winter Soldier — S01E05,TV episode,The Falcon and the Winter Soldier,1,5,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,3291,00:54:51,False,False
+W0499,Peter's To-Do List,Short / deleted-feature short,Peter's To-Do List,,,Completionist,In-universe supplement,TIMECODED VERIFIED/PARTIAL,1,196,00:03:16,False,False
+W0500,Spider-Man: Far From Home,Movie,Spider-Man: Far From Home,,,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,6,7728,02:08:48,False,False
+W0501,The Falcon and the Winter Soldier — S01E06,TV episode,The Falcon and the Winter Soldier,1,6,Core,Official MCU,TIMECODED VERIFIED/PARTIAL,2,2767,00:46:07,False,False
+W0502,The Daily Bugle — S01E01,Web episode,The Daily Bugle,1,1,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0503,The Daily Bugle — S01E02,Web episode,The Daily Bugle,1,2,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0504,The Daily Bugle — S01E03,Web episode,The Daily Bugle,1,3,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0505,The Daily Bugle — S01E04,Web episode,The Daily Bugle,1,4,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0506,The Daily Bugle — S01E05,Web episode,The Daily Bugle,1,5,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0507,The Daily Bugle — S01E06,Web episode,The Daily Bugle,1,6,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0508,Eternals,Movie,Eternals,,,Core,Official MCU,TIMECODED CANDIDATE,30,9312,02:35:12,True,False
+W0509,Spider-Man: No Way Home,Movie,Spider-Man: No Way Home,,,Core,Official MCU,TIMECODED CANDIDATE,59,8873,02:27:53,True,False
+W0510,The Daily Bugle — TikTok — S01E01,Web episode,The Daily Bugle — TikTok,1,1,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0511,The Daily Bugle — TikTok — S01E02,Web episode,The Daily Bugle — TikTok,1,2,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0512,The Daily Bugle — TikTok — S01E03,Web episode,The Daily Bugle — TikTok,1,3,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0513,The Daily Bugle — TikTok — S01E04,Web episode,The Daily Bugle — TikTok,1,4,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0514,The Daily Bugle — TikTok — S01E05,Web episode,The Daily Bugle — TikTok,1,5,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0515,The Daily Bugle — TikTok — S01E06,Web episode,The Daily Bugle — TikTok,1,6,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0516,The Daily Bugle — TikTok — S01E07,Web episode,The Daily Bugle — TikTok,1,7,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0517,The Daily Bugle — TikTok — S01E08,Web episode,The Daily Bugle — TikTok,1,8,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0518,The Daily Bugle — TikTok — S01E09,Web episode,The Daily Bugle — TikTok,1,9,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0519,The Daily Bugle — TikTok — S01E10,Web episode,The Daily Bugle — TikTok,1,10,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0520,The Daily Bugle — TikTok — S01E11,Web episode,The Daily Bugle — TikTok,1,11,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0521,The Daily Bugle — TikTok — S01E12,Web episode,The Daily Bugle — TikTok,1,12,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0522,The Daily Bugle — TikTok — S01E13,Web episode,The Daily Bugle — TikTok,1,13,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0523,The Daily Bugle — S01E07,Web episode,The Daily Bugle,1,7,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0524,The Daily Bugle — S01E08,Web episode,The Daily Bugle,1,8,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0525,The Daily Bugle — S01E09,Web episode,The Daily Bugle,1,9,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0526,The Daily Bugle — S01E10,Web episode,The Daily Bugle,1,10,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0527,The Daily Bugle — S01E11,Web episode,The Daily Bugle,1,11,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0528,The Daily Bugle — S01E12,Web episode,The Daily Bugle,1,12,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0529,Doctor Strange in the Multiverse of Madness,Movie,Doctor Strange in the Multiverse of Madness,,,Core,Official MCU,TIMECODED CANDIDATE,42,7575,02:06:15,False,False
+W0530,Hawkeye — S01E01,TV episode,Hawkeye,1,1,Core,Official MCU,TIMECODED CANDIDATE,28,2700,00:45:00,False,False
+W0531,Hawkeye — S01E02,TV episode,Hawkeye,1,2,Core,Official MCU,TIMECODED CANDIDATE,15,2718,00:45:18,False,False
+W0532,Hawkeye — S01E03,TV episode,Hawkeye,1,3,Core,Official MCU,TIMECODED CANDIDATE,19,2362,00:39:22,False,False
+W0533,Hawkeye — S01E04,TV episode,Hawkeye,1,4,Core,Official MCU,TIMECODED CANDIDATE,12,2082,00:34:42,False,False
+W0534,Hawkeye — S01E05,TV episode,Hawkeye,1,5,Core,Official MCU,TIMECODED CANDIDATE,21,2333,00:38:53,False,False
+W0535,Hawkeye — S01E06,TV episode,Hawkeye,1,6,Core,Official MCU,TIMECODED CANDIDATE,30,3408,00:56:48,False,False
+W0536,Moon Knight — S01E01,TV episode,Moon Knight,1,1,Core,Official MCU,TIMECODED CANDIDATE,22,2477,00:41:17,False,False
+W0537,Moon Knight — S01E02,TV episode,Moon Knight,1,2,Core,Official MCU,TIMECODED CANDIDATE,21,2781,00:46:21,False,False
+W0538,Moon Knight — S01E03,TV episode,Moon Knight,1,3,Core,Official MCU,TIMECODED CANDIDATE,23,2767,00:46:07,False,False
+W0539,Moon Knight — S01E04,TV episode,Moon Knight,1,4,Core,Official MCU,TIMECODED CANDIDATE,21,2806,00:46:46,False,False
+W0540,Moon Knight — S01E05,TV episode,Moon Knight,1,5,Core,Official MCU,TIMECODED CANDIDATE,16,2577,00:42:57,False,False
+W0541,Moon Knight — S01E06,TV episode,Moon Knight,1,6,Core,Official MCU,TIMECODED CANDIDATE,26,2395,00:39:55,False,False
+W0542,Echo — S01E01,TV episode,Echo,1,1,Core,Official MCU,TIMECODED CANDIDATE,24,2781,00:46:21,False,False
+W0543,Echo — S01E02,TV episode,Echo,1,2,Core,Official MCU,TIMECODED CANDIDATE,19,2250,00:37:30,False,False
+W0544,Black Panther: Wakanda Forever,Movie,Black Panther: Wakanda Forever,,,Core,Official MCU,TIMECODED CANDIDATE,87,9434,02:37:14,False,False
+W0545,Echo — S01E03,TV episode,Echo,1,3,Core,Official MCU,TIMECODED CANDIDATE,19,2399,00:39:59,False,False
+W0546,Echo — S01E04,TV episode,Echo,1,4,Core,Official MCU,TIMECODED CANDIDATE,22,2126,00:35:26,False,False
+W0547,Echo — S01E05,TV episode,Echo,1,5,Core,Official MCU,TIMECODED CANDIDATE,18,2022,00:33:42,False,False
+W0548,She-Hulk: Attorney at Law — S01E01,TV episode,She-Hulk: Attorney at Law,1,1,Core,Official MCU,TIMECODED CANDIDATE,9,1972,00:32:52,False,False
+W0549,She-Hulk: Attorney at Law — S01E02,TV episode,She-Hulk: Attorney at Law,1,2,Core,Official MCU,TIMECODED CANDIDATE,9,1513,00:25:13,False,False
+W0550,She-Hulk: Attorney at Law — S01E03,TV episode,She-Hulk: Attorney at Law,1,3,Core,Official MCU,TIMECODED CANDIDATE,9,1766,00:29:26,True,False
+W0551,GLK&H Commercial,In-universe commercial,GLK&H Commercial,,,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,46,00:00:46,False,False
+W0552,She-Hulk: Attorney at Law — S01E04,TV episode,She-Hulk: Attorney at Law,1,4,Core,Official MCU,TIMECODED CANDIDATE,9,1880,00:31:20,False,False
+W0553,She-Hulk: Attorney at Law — S01E05,TV episode,She-Hulk: Attorney at Law,1,5,Core,Official MCU,TIMECODED CANDIDATE,5,1471,00:24:31,False,False
+W0554,She-Hulk: Attorney at Law — S01E06,TV episode,She-Hulk: Attorney at Law,1,6,Core,Official MCU,TIMECODED CANDIDATE,7,1458,00:24:18,False,False
+W0555,She-Hulk: Attorney at Law — S01E07,TV episode,She-Hulk: Attorney at Law,1,7,Core,Official MCU,TIMECODED CANDIDATE,10,1689,00:28:09,False,False
+W0556,She-Hulk: Attorney at Law — S01E08,TV episode,She-Hulk: Attorney at Law,1,8,Core,Official MCU,TIMECODED CANDIDATE,10,1774,00:29:34,False,False
+W0557,She-Hulk: Attorney at Law — S01E09,TV episode,She-Hulk: Attorney at Law,1,9,Core,Official MCU,TIMECODED CANDIDATE,9,1765,00:29:25,False,False
+W0558,Ms. Marvel — S01E01,TV episode,Ms. Marvel,1,1,Core,Official MCU,TIMECODED CANDIDATE,20,2670,00:44:30,False,False
+W0559,Ms. Marvel — S01E02,TV episode,Ms. Marvel,1,2,Core,Official MCU,TIMECODED CANDIDATE,16,2668,00:44:28,False,False
+W0560,Ms. Marvel — S01E03,TV episode,Ms. Marvel,1,3,Core,Official MCU,TIMECODED CANDIDATE,20,2704,00:45:04,False,False
+W0561,Ms. Marvel — S01E04,TV episode,Ms. Marvel,1,4,Core,Official MCU,TIMECODED CANDIDATE,28,2556,00:42:36,False,False
+W0562,Ms. Marvel — S01E05,TV episode,Ms. Marvel,1,5,Core,Official MCU,TIMECODED CANDIDATE,23,2072,00:34:32,False,False
+W0563,Ms. Marvel — S01E06,TV episode,Ms. Marvel,1,6,Core,Official MCU,TIMECODED CANDIDATE,26,2670,00:44:30,False,False
+W0564,Thor: Love and Thunder,Movie,Thor: Love and Thunder,,,Core,Official MCU,TIMECODED CANDIDATE,36,7108,01:58:28,False,False
+W0565,Ironheart — S01E01,TV episode,Ironheart,1,1,Core,Official MCU,TIMECODED CANDIDATE,16,2336,00:38:56,False,False
+W0566,Ironheart — S01E02,TV episode,Ironheart,1,2,Core,Official MCU,TIMECODED CANDIDATE,16,2820,00:47:00,False,False
+W0567,Ironheart — S01E03,TV episode,Ironheart,1,3,Core,Official MCU,TIMECODED CANDIDATE,16,3021,00:50:21,False,False
+W0568,Ironheart — S01E04,TV episode,Ironheart,1,4,Core,Official MCU,TIMECODED CANDIDATE,22,2933,00:48:53,False,False
+W0569,Ironheart — S01E05,TV episode,Ironheart,1,5,Core,Official MCU,TIMECODED CANDIDATE,29,3246,00:54:06,False,False
+W0570,Ironheart — S01E06,TV episode,Ironheart,1,6,Core,Official MCU,TIMECODED CANDIDATE,16,2234,00:37:14,False,False
+W0571,Werewolf by Night,Special,Werewolf by Night,,,Core,Official MCU,TIMECODED CANDIDATE,31,2879,00:47:59,False,False
+W0572,The Guardians of the Galaxy Holiday Special,Special,The Guardians of the Galaxy Holiday Special,,,Core,Official MCU,TIMECODED CANDIDATE,16,2508,00:41:48,False,False
+W0573,Ant-Man and the Wasp: Quantumania,Movie,Ant-Man and the Wasp: Quantumania,,,Core,Official MCU,TIMECODED CANDIDATE,63,7444,02:04:04,False,False
+W0574,Guardians of the Galaxy Vol. 3,Movie,Guardians of the Galaxy Vol. 3,,,Core,Official MCU,TIMECODED CANDIDATE,87,8665,02:24:25,False,False
+W0575,Daredevil: Born Again — S01E01,TV episode,Daredevil: Born Again,1,1,Core,Official MCU,TIMECODED CANDIDATE,21,3474,00:57:54,False,False
+W0576,Secret Invasion — S01E01,TV episode,Secret Invasion,1,1,Core,Official MCU,TIMECODED CANDIDATE,26,3010,00:50:10,False,False
+W0577,Secret Invasion — S01E02,TV episode,Secret Invasion,1,2,Core,Official MCU,TIMECODED CANDIDATE,25,3234,00:53:54,False,False
+W0578,Secret Invasion — S01E03,TV episode,Secret Invasion,1,3,Core,Official MCU,TIMECODED CANDIDATE,21,2352,00:39:12,False,False
+W0579,Secret Invasion — S01E04,TV episode,Secret Invasion,1,4,Core,Official MCU,TIMECODED CANDIDATE,16,1991,00:33:11,False,False
+W0580,Secret Invasion — S01E05,TV episode,Secret Invasion,1,5,Core,Official MCU,TIMECODED CANDIDATE,17,2055,00:34:15,False,False
+W0581,Secret Invasion — S01E06,TV episode,Secret Invasion,1,6,Core,Official MCU,TIMECODED CANDIDATE,18,1998,00:33:18,False,False
+W0582,The Marvels,Movie,The Marvels,,,Core,Official MCU,TIMECODED CANDIDATE,32,6276,01:44:36,False,False
+W0583,Your Place at the TVA,Promo / web short,Your Place at the TVA,,,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,39,00:00:39,False,False
+W0584,Butterfly Effect,Promo / web short,Butterfly Effect,,,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,38,00:00:38,False,False
+W0585,Loki — S02E01,TV episode,Loki,2,1,Core,Official MCU,TIMECODED CANDIDATE,21,2556,00:42:36,False,False
+W0586,Loki — S02E02,TV episode,Loki,2,2,Core,Official MCU,TIMECODED CANDIDATE,18,2672,00:44:32,False,False
+W0587,Loki — S02E03,TV episode,Loki,2,3,Core,Official MCU,TIMECODED CANDIDATE,15,3070,00:51:10,False,False
+W0588,Loki — S02E04,TV episode,Loki,2,4,Core,Official MCU,TIMECODED CANDIDATE,17,2607,00:43:27,False,False
+W0589,Loki — S02E05,TV episode,Loki,2,5,Core,Official MCU,TIMECODED CANDIDATE,17,2676,00:44:36,False,False
+W0590,Loki — S02E06,TV episode,Loki,2,6,Core,Official MCU,TIMECODED CANDIDATE,19,2993,00:49:53,False,False
+W0591,What If...? — S02E01,TV episode,What If...?,2,1,Core,Official MCU,TIMECODED CANDIDATE,11,1595,00:26:35,False,False
+W0592,What If...? — S02E02,TV episode,What If...?,2,2,Core,Official MCU,TIMECODED CANDIDATE,11,1670,00:27:50,False,False
+W0593,What If...? — S02E03,TV episode,What If...?,2,3,Core,Official MCU,TIMECODED CANDIDATE,8,1619,00:26:59,False,False
+W0594,What If...? — S02E04,TV episode,What If...?,2,4,Core,Official MCU,TIMECODED CANDIDATE,18,1822,00:30:22,False,False
+W0595,What If...? — S02E05,TV episode,What If...?,2,5,Core,Official MCU,TIMECODED CANDIDATE,14,1716,00:28:36,False,False
+W0596,What If...? — S02E06,TV episode,What If...?,2,6,Core,Official MCU,TIMECODED CANDIDATE,16,1799,00:29:59,False,False
+W0597,What If...? — S02E07,TV episode,What If...?,2,7,Core,Official MCU,TIMECODED CANDIDATE,11,1599,00:26:39,False,False
+W0598,What If...? — S02E08,TV episode,What If...?,2,8,Core,Official MCU,TIMECODED CANDIDATE,8,1657,00:27:37,False,False
+W0599,What If...? — S02E09,TV episode,What If...?,2,9,Core,Official MCU,TIMECODED CANDIDATE,18,1759,00:29:19,False,False
+W0600,Deadpool & Wolverine,Movie,Deadpool & Wolverine,,,Core,Official MCU,TIMECODED CANDIDATE,50,7658,02:07:38,False,False
+W0601,Agatha All Along — S01E01,TV episode,Agatha All Along,1,1,Core,Official MCU,TIMECODED CANDIDATE,22,2114,00:35:14,False,False
+W0602,Agatha All Along — S01E02,TV episode,Agatha All Along,1,2,Core,Official MCU,TIMECODED CANDIDATE,12,2210,00:36:50,False,False
+W0603,Agatha All Along — S01E03,TV episode,Agatha All Along,1,3,Core,Official MCU,TIMECODED CANDIDATE,13,1945,00:32:25,False,False
+W0604,Agatha All Along — S01E04,TV episode,Agatha All Along,1,4,Core,Official MCU,TIMECODED CANDIDATE,15,2180,00:36:20,False,False
+W0605,Agatha All Along — S01E05,TV episode,Agatha All Along,1,5,Core,Official MCU,TIMECODED CANDIDATE,12,1522,00:25:22,False,False
+W0606,Agatha All Along — S01E06,TV episode,Agatha All Along,1,6,Core,Official MCU,TIMECODED CANDIDATE,17,2559,00:42:39,False,False
+W0607,Agatha All Along — S01E07,TV episode,Agatha All Along,1,7,Core,Official MCU,TIMECODED CANDIDATE,12,1910,00:31:50,False,False
+W0608,Agatha All Along — S01E08,TV episode,Agatha All Along,1,8,Core,Official MCU,TIMECODED CANDIDATE,22,2525,00:42:05,False,False
+W0609,Agatha All Along — S01E09,TV episode,Agatha All Along,1,9,Core,Official MCU,TIMECODED CANDIDATE,18,2321,00:38:41,False,False
+W0610,What If...? — S03E01,TV episode,What If...?,3,1,Core,Official MCU,TIMECODED CANDIDATE,6,1592,00:26:32,False,False
+W0611,What If...? — S03E02,TV episode,What If...?,3,2,Core,Official MCU,TIMECODED CANDIDATE,13,1695,00:28:15,False,False
+W0612,What If...? — S03E03,TV episode,What If...?,3,3,Core,Official MCU,TIMECODED CANDIDATE,10,1681,00:28:01,False,False
+W0613,What If...? — S03E04,TV episode,What If...?,3,4,Core,Official MCU,TIMECODED CANDIDATE,7,1662,00:27:42,False,False
+W0614,What If...? — S03E05,TV episode,What If...?,3,5,Core,Official MCU,TIMECODED CANDIDATE,13,1711,00:28:31,False,False
+W0615,What If...? — S03E06,TV episode,What If...?,3,6,Core,Official MCU,TIMECODED CANDIDATE,9,1803,00:30:03,False,False
+W0616,What If...? — S03E07,TV episode,What If...?,3,7,Core,Official MCU,TIMECODED CANDIDATE,7,1390,00:23:10,False,False
+W0617,What If...? — S03E08,TV episode,What If...?,3,8,Core,Official MCU,TIMECODED CANDIDATE,9,1689,00:28:09,False,False
+W0618,Daredevil: Born Again — S01E02,TV episode,Daredevil: Born Again,1,2,Core,Official MCU,TIMECODED CANDIDATE,13,2778,00:46:18,False,False
+W0619,Daredevil: Born Again — S01E03,TV episode,Daredevil: Born Again,1,3,Core,Official MCU,TIMECODED CANDIDATE,15,2529,00:42:09,False,False
+W0620,Daredevil: Born Again — S01E04,TV episode,Daredevil: Born Again,1,4,Core,Official MCU,TIMECODED CANDIDATE,12,2967,00:49:27,False,False
+W0621,Daredevil: Born Again — S01E05,TV episode,Daredevil: Born Again,1,5,Core,Official MCU,TIMECODED CANDIDATE,13,2227,00:37:07,False,False
+W0622,Daredevil: Born Again — S01E06,TV episode,Daredevil: Born Again,1,6,Core,Official MCU,TIMECODED CANDIDATE,12,2525,00:42:05,False,False
+W0623,Daredevil: Born Again — S01E07,TV episode,Daredevil: Born Again,1,7,Core,Official MCU,TIMECODED CANDIDATE,19,2338,00:38:58,False,False
+W0624,Daredevil: Born Again — S01E08,TV episode,Daredevil: Born Again,1,8,Core,Official MCU,TIMECODED CANDIDATE,19,2815,00:46:55,False,False
+W0625,Daredevil: Born Again — S01E09,TV episode,Daredevil: Born Again,1,9,Core,Official MCU,TIMECODED CANDIDATE,27,3316,00:55:16,False,False
+W0626,Captain America: Brave New World,Movie,Captain America: Brave New World,,,Core,Official MCU,TIMECODED CANDIDATE,46,7146,01:59:06,False,False
+W0627,Wonder Man — S01E04,TV episode,Wonder Man,1,4,Core,Official MCU,TIMECODED CANDIDATE,12,1792,00:29:52,False,False
+W0628,Red Guardian Limo Service,Promo / web short,Red Guardian Limo Service,,,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,69,00:01:09,False,False
+W0629,Thunderbolts*,Movie,Thunderbolts*,,,Core,Official MCU,TIMECODED CANDIDATE,53,7633,02:07:13,True,False
+W0630,The Fantastic Four: First Steps,Movie,The Fantastic Four: First Steps,,,Core,Official MCU,TIMECODED CANDIDATE,37,6860,01:54:20,False,False
+W0631,Meet the Fantastic Four — S01E01,Web episode,Meet the Fantastic Four,1,1,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0632,Meet the Fantastic Four — S01E02,Web episode,Meet the Fantastic Four,1,2,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0633,Meet the Fantastic Four — S01E03,Web episode,Meet the Fantastic Four,1,3,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0634,Meet the Fantastic Four — S01E04,Web episode,Meet the Fantastic Four,1,4,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0635,Meet the Fantastic Four — S01E05,Web episode,Meet the Fantastic Four,1,5,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0636,Meet the Fantastic Four — S01E06,Web episode,Meet the Fantastic Four,1,6,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0637,Meet the Fantastic Four — S01E07,Web episode,Meet the Fantastic Four,1,7,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0638,Meet the Fantastic Four — S01E08,Web episode,Meet the Fantastic Four,1,8,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0639,Meet the Fantastic Four — S01E09,Web episode,Meet the Fantastic Four,1,9,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0640,Meet the Fantastic Four — S01E10,Web episode,Meet the Fantastic Four,1,10,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0641,Internet Database of Movies — S01E01 — The Slattery Method by Trevor Slattery,Web episode,Internet Database of Movies,1,1,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0642,Internet Database of Movies — S01E02 — Wonder Man's Trevor Slattery Loses it During Ben Mankiewicz Interview,Web episode,Internet Database of Movies,1,2,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0643,Internet Database of Movies — S01E03 — Von Kovak Talks Inspiration for 'Wonder Man',Web episode,Internet Database of Movies,1,3,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0644,Internet Database of Movies — S01E04 — Wonder Man's Simon Williams and Trevor Slattery — Actors Unscripted,Web episode,Internet Database of Movies,1,4,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0645,Internet Database of Movies — S01E05 — The Cast of Wonder Man — Straw Hat Goofy Interview,Web episode,Internet Database of Movies,1,5,Completionist,In-universe supplement,PARENT-LEVEL ONLY,1,,,False,True
+W0646,Wonder Man — S01E01,TV episode,Wonder Man,1,1,Core,Official MCU,TIMECODED CANDIDATE,11,1701,00:28:21,False,False
+W0647,Wonder Man — S01E02,TV episode,Wonder Man,1,2,Core,Official MCU,TIMECODED CANDIDATE,11,1680,00:28:00,False,False
+W0648,Wonder Man — S01E03,TV episode,Wonder Man,1,3,Core,Official MCU,TIMECODED CANDIDATE,10,1843,00:30:43,False,False
+W0649,Wonder Man — S01E05,TV episode,Wonder Man,1,5,Core,Official MCU,TIMECODED CANDIDATE,7,1324,00:22:04,False,False
+W0650,Wonder Man — S01E06,TV episode,Wonder Man,1,6,Core,Official MCU,TIMECODED CANDIDATE,15,2010,00:33:30,False,False
+W0651,Daredevil: Born Again — S02E01,TV episode,Daredevil: Born Again,2,1,Core,Official MCU,TIMECODED CANDIDATE,19,3028,00:50:28,False,False
+W0652,Daredevil: Born Again — S02E02,TV episode,Daredevil: Born Again,2,2,Core,Official MCU,TIMECODED CANDIDATE,17,2601,00:43:21,False,False
+W0653,Daredevil: Born Again — S02E03,TV episode,Daredevil: Born Again,2,3,Core,Official MCU,TIMECODED CANDIDATE,18,2672,00:44:32,False,False
+W0654,Daredevil: Born Again — S02E04,TV episode,Daredevil: Born Again,2,4,Core,Official MCU,TIMECODED CANDIDATE,22,2888,00:48:08,False,False
+W0655,Daredevil: Born Again — S02E05,TV episode,Daredevil: Born Again,2,5,Core,Official MCU,TIMECODED CANDIDATE,18,2817,00:46:57,False,False
+W0656,Daredevil: Born Again — S02E06,TV episode,Daredevil: Born Again,2,6,Core,Official MCU,TIMECODED CANDIDATE,25,2763,00:46:03,False,False
+W0657,Daredevil: Born Again — S02E07,TV episode,Daredevil: Born Again,2,7,Core,Official MCU,TIMECODED CANDIDATE,18,2469,00:41:09,False,False
+W0658,Daredevil: Born Again — S02E08,TV episode,Daredevil: Born Again,2,8,Core,Official MCU,TIMECODED CANDIDATE,22,2898,00:48:18,False,False
+W0659,Wonder Man — S01E07,TV episode,Wonder Man,1,7,Core,Official MCU,TIMECODED CANDIDATE,9,1860,00:31:00,False,False
+W0660,Wonder Man — S01E08,TV episode,Wonder Man,1,8,Core,Official MCU,TIMECODED CANDIDATE,9,1804,00:30:04,False,False
+W0661,The Punisher: One Last Kill,Special,The Punisher: One Last Kill,,,Core,Official MCU,PARENT-LEVEL ONLY,1,,,False,True
+W0662,NED Talk — Introducing the Spidey Tracker,Promo / web short,Spidey Tracker,,,Completionist,In-universe supplement,TIMECODED WHOLE-SHORT,1,86,00:01:26,False,False
+W0663,Spider-Man: Brand New Day,Movie,Spider-Man: Brand New Day,,,Core,Official MCU,TAG-LEVEL ONLY,1,,,True,False

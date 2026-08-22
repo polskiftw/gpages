@@ -1,0 +1,29 @@
+{
+  "cutoff": "2026-08-22",
+  "parentWorks": 663,
+  "sceneFragmentRows": 5456,
+  "timecodedSegments": 2462,
+  "subtitleDerivedCandidates": 2920,
+  "timecodedWholeShortBlocks": 20,
+  "tagLevelScenes": 9,
+  "parentLevelBlocks": 45,
+  "parentsWithTimecodedSegments": 443,
+  "parentsWithSubtitleCandidates": 154,
+  "parentsWithTimecodedWholeShorts": 20,
+  "parentsParentLevelOnly": 45,
+  "outsideTimeRows": 184,
+  "branchesRepresented": 57,
+  "missingTimecodeRows": 54,
+  "missingEvidenceRows": 0,
+  "verificationCounts": {
+    "DRAFT": 2994,
+    "BOUNDARY VERIFIED": 2462
+  },
+  "dateConfidenceCounts": {
+    "High": 2602,
+    "Low": 237,
+    "Medium": 2617
+  },
+  "unmatchedSourceRows": 0,
+  "completionClaim": "PARTIAL \u2014 substantive timecoded research package; not a complete conventional-scene census"
+}
