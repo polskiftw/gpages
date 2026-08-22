@@ -29,8 +29,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: testing/chronomonster/pyproject.toml
       - name: Restore compressed chronology fixture
         run: python -c "import gzip,pathlib; p=pathlib.Path('chronomonster/data/watch_steps_continuous.json.gz'); p.with_suffix('').write_bytes(gzip.decompress(p.read_bytes()))"
       - name: Install FFmpeg
@@ -70,8 +68,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: testing/chronomonster/pyproject.toml
       - name: Restore compressed chronology fixture
         run: python -c "import gzip,pathlib; p=pathlib.Path('chronomonster/data/watch_steps_continuous.json.gz'); p.with_suffix('').write_bytes(gzip.decompress(p.read_bytes()))"
       - name: Install Windows packaging dependencies
