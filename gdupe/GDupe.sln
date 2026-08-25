@@ -1,0 +1,31 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GDupe.Core", "src\GDupe.Core\GDupe.Core.csproj", "{82DB31E7-C0F5-40AC-A730-345EC25681B8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GDupe.App", "src\GDupe.App\GDupe.App.csproj", "{92DDE7BB-D503-4D99-8A1E-3B2A93EB1A9A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GDupe.Tests", "tests\GDupe.Tests\GDupe.Tests.csproj", "{5D590106-65E1-46F4-A80A-DCB7012E77BB}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{82DB31E7-C0F5-40AC-A730-345EC25681B8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{82DB31E7-C0F5-40AC-A730-345EC25681B8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{82DB31E7-C0F5-40AC-A730-345EC25681B8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{82DB31E7-C0F5-40AC-A730-345EC25681B8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{92DDE7BB-D503-4D99-8A1E-3B2A93EB1A9A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{92DDE7BB-D503-4D99-8A1E-3B2A93EB1A9A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{92DDE7BB-D503-4D99-8A1E-3B2A93EB1A9A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{92DDE7BB-D503-4D99-8A1E-3B2A93EB1A9A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5D590106-65E1-46F4-A80A-DCB7012E77BB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5D590106-65E1-46F4-A80A-DCB7012E77BB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5D590106-65E1-46F4-A80A-DCB7012E77BB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5D590106-65E1-46F4-A80A-DCB7012E77BB}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

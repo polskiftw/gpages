@@ -1,0 +1,18 @@
+GDupe third-party notices
+=========================
+
+This distribution includes the .NET 8 runtime and Windows Desktop Runtime.
+Copyright Microsoft Corporation and contributors. Licensed under the MIT License.
+https://github.com/dotnet/runtime/blob/main/LICENSE.TXT
+https://github.com/dotnet/wpf/blob/main/LICENSE.TXT
+
+This distribution includes Microsoft.Data.Sqlite and SQLitePCLRaw.
+Copyright Microsoft Corporation and contributors. Licensed under the MIT License.
+https://github.com/dotnet/efcore/blob/main/LICENSE.txt
+https://github.com/ericsink/SQLitePCL.raw/blob/master/LICENSE.TXT
+
+This distribution includes SQLite, which is in the public domain.
+https://www.sqlite.org/copyright.html
+
+The complete corresponding dependency manifests are the project files shipped in
+the GDupe source tree. This notice does not alter the repository license for GDupe.
