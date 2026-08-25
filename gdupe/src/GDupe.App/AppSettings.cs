@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text.Json;
 
 namespace GDupe.App;
@@ -9,12 +10,12 @@ public sealed record AppSettings(string? MonitoredFolder)
         try
         {
             return File.Exists(path)
-                ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path)) ?? new(null)
-                : new(null);
+                ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path)) ?? new AppSettings(MonitoredFolder: null)
+                : new AppSettings(MonitoredFolder: null);
         }
         catch
         {
-            return new(null);
+            return new AppSettings(MonitoredFolder: null);
         }
     }
 

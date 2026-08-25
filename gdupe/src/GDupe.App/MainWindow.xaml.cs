@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Media.Imaging;
 using GDupe.Core.Abstractions;
@@ -37,9 +38,10 @@ public partial class MainWindow : Window
     {
         await RefreshResultsAsync();
         var settings = AppSettings.Load(_settingsPath);
-        if (settings.MonitoredFolder is not null && Directory.Exists(settings.MonitoredFolder))
+        var monitoredFolder = settings.MonitoredFolder;
+        if (monitoredFolder is not null && Directory.Exists(monitoredFolder))
         {
-            await StartFolderAsync(settings.MonitoredFolder);
+            await StartFolderAsync(monitoredFolder);
         }
     }
 
@@ -200,12 +202,13 @@ public partial class MainWindow : Window
 
     private void OpenSelected(bool selectInExplorer)
     {
-        if (_selectedFile is null || !File.Exists(_selectedFile.FullPath)) return;
+        var selectedFile = _selectedFile;
+        if (selectedFile is null || !File.Exists(selectedFile.FullPath)) return;
         try
         {
             var info = selectInExplorer
-                ? new ProcessStartInfo("explorer.exe", $"/select,\"{_selectedFile.FullPath}\"") { UseShellExecute = true }
-                : new ProcessStartInfo(_selectedFile.FullPath) { UseShellExecute = true };
+                ? new ProcessStartInfo("explorer.exe", $"/select,\"{selectedFile.FullPath}\"") { UseShellExecute = true }
+                : new ProcessStartInfo(selectedFile.FullPath) { UseShellExecute = true };
             Process.Start(info);
         }
         catch (Exception ex) { ShowFailure("Windows could not open that file.", ex); }

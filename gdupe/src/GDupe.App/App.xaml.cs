@@ -1,6 +1,7 @@
 using GDupe.Core.Abstractions;
 using GDupe.Core.Data;
 using GDupe.Core.Services;
+using System.IO;
 using System.Windows;
 
 namespace GDupe.App;
