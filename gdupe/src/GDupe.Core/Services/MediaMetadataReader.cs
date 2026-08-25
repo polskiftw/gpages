@@ -118,6 +118,7 @@ public sealed class MediaMetadataReader : IMediaMetadataReader
         }
 
         Span<byte> header = stackalloc byte[16];
+        Span<byte> movieHeader = stackalloc byte[32];
         while (stream.Position + 8 <= end)
         {
             var start = stream.Position;
@@ -148,21 +149,20 @@ public sealed class MediaMetadataReader : IMediaMetadataReader
             var boxEnd = start + size;
             if (type == "mvhd" && size >= headerSize + 20)
             {
-                Span<byte> mvhd = stackalloc byte[32];
-                var needed = (int)Math.Min(mvhd.Length, boxEnd - stream.Position);
-                if (stream.Read(mvhd[..needed]) == needed)
+                var needed = (int)Math.Min(movieHeader.Length, boxEnd - stream.Position);
+                if (stream.Read(movieHeader[..needed]) == needed)
                 {
-                    var version = mvhd[0];
+                    var version = movieHeader[0];
                     if (version == 0 && needed >= 20)
                     {
-                        var timescale = BinaryPrimitives.ReadUInt32BigEndian(mvhd[12..16]);
-                        var duration = BinaryPrimitives.ReadUInt32BigEndian(mvhd[16..20]);
+                        var timescale = BinaryPrimitives.ReadUInt32BigEndian(movieHeader[12..16]);
+                        var duration = BinaryPrimitives.ReadUInt32BigEndian(movieHeader[16..20]);
                         if (timescale > 0) durationMs = (long)Math.Round(duration * 1000d / timescale);
                     }
                     else if (version == 1 && needed >= 32)
                     {
-                        var timescale = BinaryPrimitives.ReadUInt32BigEndian(mvhd[20..24]);
-                        var duration = BinaryPrimitives.ReadUInt64BigEndian(mvhd[24..32]);
+                        var timescale = BinaryPrimitives.ReadUInt32BigEndian(movieHeader[20..24]);
+                        var duration = BinaryPrimitives.ReadUInt64BigEndian(movieHeader[24..32]);
                         if (timescale > 0) durationMs = (long)Math.Round(duration * 1000d / timescale);
                     }
                 }
