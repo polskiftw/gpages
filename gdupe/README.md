@@ -38,7 +38,7 @@ cd gdupe
 .\build\package.ps1
 ```
 
-The distributable is written to `artifacts\GDupe-win-x64.zip`. GitHub Actions runs the same Release tests and packaging process and uploads the ZIP plus test results.
+The distributable is written to `artifacts\GDupe-win-x64.zip`. Packaging also launches the published executable in smoke-test mode to verify that the self-contained app and SQLite runtime start successfully. GitHub Actions runs the same Release tests and packaging process and uploads the ZIP plus test results.
 
 ## Architecture
 

@@ -23,7 +23,11 @@ dotnet publish (Join-Path $projectRoot "src/GDupe.App/GDupe.App.csproj") `
     --no-restore `
     --output $publish
 
+$smoke = Start-Process -FilePath (Join-Path $publish "GDupe.exe") -ArgumentList "--smoke-test" -Wait -PassThru
+if ($smoke.ExitCode -ne 0) { throw "Published GDupe.exe smoke test failed with exit code $($smoke.ExitCode)." }
+
 Copy-Item (Join-Path $publish "*") $packageRoot -Recurse
+Get-ChildItem $packageRoot -Filter "*.pdb" | Remove-Item -Force
 Copy-Item (Join-Path $projectRoot "README.md") $packageRoot
 Copy-Item (Join-Path $projectRoot "THIRD-PARTY-NOTICES.txt") $packageRoot
 Copy-Item (Join-Path (Split-Path -Parent $projectRoot) "LICENSE") $packageRoot
