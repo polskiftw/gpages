@@ -29,7 +29,7 @@ jobs:
       - name: Commit generated data when changed
         shell: bash
         run: |
-          if git diff --quiet -- terraria-shopping/data.generated.js; then
+          if [ -z "$(git status --porcelain -- terraria-shopping/data.generated.js)" ]; then
             echo "Recipe graph is already current."
             exit 0
           fi
