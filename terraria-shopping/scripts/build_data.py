@@ -18,9 +18,27 @@ import urllib.request
 API = "https://terraria.wiki.gg/api.php"
 OUT = pathlib.Path(__file__).resolve().parents[1] / "data.generated.js"
 PAGE_SIZE = 500
-USER_AGENT = "polskiftw/gpages terraria-shopping recipe-catalog/2.1 (GitHub Pages data refresh)"
+USER_AGENT = "polskiftw/gpages terraria-shopping recipe-catalog/2.2 (GitHub Pages data refresh)"
 FIELDS = "result,resultid,amount,version,station,args,legacy"
 SKIP_STATIONS = {"Shimmer", "Chlorophyte Extractinator"}
+
+# A few old-gen-console / 3DS recipes currently leak through Cargo without a
+# useful legacy/version marker. This site is explicitly Desktop 1.4.5.x, so do
+# not let Ocram-era craftables enter the PC graph.
+SKIP_RESULTS = {
+    "Sharanga",
+    "Sparkly Wings",
+    "Suspicious Looking Skull",
+    "Tizona",
+    "Tonbogiri",
+    "Vulcan Repeater",
+}
+
+# Current-name normalization for stale names that still appear inside otherwise
+# current Desktop recipe rows.
+INGREDIENT_ALIASES = {
+    "Fiery Greatsword": "Volcano",
+}
 
 
 def request_json(params: dict[str, object], retries: int = 4) -> dict:
@@ -54,7 +72,7 @@ def clean_ingredient_name(value: str) -> str:
     for marker in ("#i:", "#n:"):
         if marker in value:
             value = value.split(marker, 1)[0].strip()
-    return value
+    return INGREDIENT_ALIASES.get(value, value)
 
 
 def parse_args(value: str) -> list[list[object]]:
@@ -118,7 +136,7 @@ def fetch_recipes() -> list[dict[str, object]]:
             if not desktop_compatible(version):
                 continue
             result = str(title.get("result") or "").strip()
-            if not result:
+            if not result or result in SKIP_RESULTS:
                 continue
             try:
                 amount = int(float(str(title.get("amount") or "1")))
@@ -265,6 +283,9 @@ def validate(recipes: list[dict[str, object]]) -> None:
     missing = sorted(must_exist - results)
     if missing:
         raise RuntimeError("Missing sentinel recipes: " + ", ".join(missing))
+    leaked = sorted(SKIP_RESULTS & results)
+    if leaked:
+        raise RuntimeError("Legacy-only craftables leaked into Desktop data: " + ", ".join(leaked))
 
 
 def main() -> int:
