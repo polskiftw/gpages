@@ -20,7 +20,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 RECIPE_DATA = ROOT / "data.generated.js"
 OUT = ROOT / "availability.generated.js"
 PAGE_SIZE = 500
-USER_AGENT = "polskiftw/gpages terraria-shopping availability-badges/1.0 (GitHub Pages data refresh)"
+USER_AGENT = "polskiftw/gpages terraria-shopping availability-badges/1.1 (GitHub Pages data refresh)"
 ITEM_FIELDS = "name,hardmode"
 
 # Second-pill detail for progression-gated leaves that regularly appear in
@@ -65,6 +65,19 @@ PROGRESSION_OVERRIDES: dict[str, tuple[str, int]] = {
     "Luminite": ("After Moon Lord • Moon Lord drop", 90),
     "Meowmere": ("After Moon Lord • Moon Lord drop", 90),
     "Star Wrath": ("After Moon Lord • Moon Lord drop", 90),
+}
+
+# Cargo recipe arguments sometimes use recipe-category labels or display names
+# that are not literal rows in the Items table. These are real current-PC
+# ingredients, so classify the aliases explicitly instead of letting them become
+# bare shopping-list rows.
+PSEUDO_AVAILABILITY: dict[str, tuple[str, str, int]] = {
+    "Adamantite/Titanium Bar": ("Hardmode", "After Wall of Flesh • third altar tier", 40),
+    "Blue Jellyfish (bait)": ("Pre-Hardmode", "Available immediately • Fishing Underground/Cavern", 10),
+    "Green Jellyfish (bait)": ("Hardmode", "After Wall of Flesh • Fishing Underground/Cavern", 40),
+    "Pink Jellyfish (bait)": ("Pre-Hardmode", "Available immediately • Fishing Ocean", 10),
+    "Music Box (Ocean)": ("Hardmode", "After Wall of Flesh • Wizard / record at Ocean", 40),
+    "Music Box (Space)": ("Hardmode", "After Wall of Flesh • Wizard / record in Space", 40),
 }
 
 HARDMODE_PSEUDO_HINTS = (
@@ -205,6 +218,10 @@ def main() -> int:
     rows: dict[str, list[object]] = {}
     unresolved: list[str] = []
     for name in sorted(leaf_names, key=str.casefold):
+        pseudo = PSEUDO_AVAILABILITY.get(name)
+        if pseudo:
+            rows[name] = list(pseudo)
+            continue
         if name in item_modes:
             mode = "Hardmode" if item_modes[name] else "Pre-Hardmode"
         else:
