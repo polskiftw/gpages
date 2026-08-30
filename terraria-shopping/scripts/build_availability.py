@@ -230,6 +230,12 @@ def main() -> int:
             unresolved.append(name)
             continue
         when, rank = PROGRESSION_OVERRIDES.get(name, ("", 40 if mode == "Hardmode" else 10))
+        # Some Wiki item rows omit/misstate the broad Hardmode flag even when a
+        # known progression gate is unambiguously post-Wall-of-Flesh. The
+        # explicit milestone wins in that case. Pre-Hardmode milestones use
+        # ranks below 40 and keep their Pre-Hardmode badge.
+        if rank >= 40 and name in PROGRESSION_OVERRIDES:
+            mode = "Hardmode"
         rows[name] = [mode, when, rank]
     if unresolved:
         print("Unresolved shopping-list names:", file=sys.stderr)
