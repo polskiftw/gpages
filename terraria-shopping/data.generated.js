@@ -1,0 +1,1 @@
+window.TERRARIA_RECIPE_DATA={"schema":2,"game":"Terraria Desktop 1.4.5.x","generatedAt":null,"source":"pending first automatic refresh","recipeCount":0,"craftableCount":0,"endpointCount":0,"nodes":[],"recipes":[]};
