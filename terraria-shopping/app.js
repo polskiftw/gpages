@@ -4,6 +4,7 @@ const W='https://terraria.wiki.gg/wiki/';
 const D=window.TERRARIA_RECIPE_DATA||{recipes:[],nodes:[],recipeCount:0,craftableCount:0,endpointCount:0};
 const E=window.TERRARIA_ENRICHMENT||{items:{},availability:{},projects:[]};
 const items=E.items||{}, availability=E.availability||{}, curatedProjects=E.projects||[];
+const generatedAvailability=window.TERRARIA_GENERATED_AVAILABILITY||{};
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const search=$('#search'), sort=$('#sort'), missingOnly=$('#missingOnly'), content=$('#content'), stats=$('#stats'), status=$('#status'), clearSearch=$('#clearSearch');
 const PAGE=80;
@@ -33,11 +34,14 @@ const save=()=>localStorage.setItem('terraria-shopping-progress-v2',JSON.stringi
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const wikiName=name=>W+encodeURIComponent(String(name).replaceAll(' ','_'));
 const wikiItem=id=>W+(items[id]?.wiki||encodeURIComponent(String(items[id]?.name||id).replaceAll(' ','_')));
-const av=id=>{const a=availability[id]||['Unknown','',999];return{mode:a[0],when:a[1],rank:a[2]}};
+const avObject=tuple=>{const a=tuple||['Unknown','',999];return{mode:a[0],when:a[1],rank:a[2]}};
+const av=id=>avObject(availability[id]);
 const modeClass=mode=>mode==='Hardmode'?'hard':'pre';
 const cleanWhen=when=>String(when||'').replace(/^Available immediately(?:\s*[•/]\s*)?/,'').replace(/^After Wall of Flesh(?:\s*•\s*)?/,'').trim();
 const whenPill=when=>{const w=cleanWhen(when);return w?`<span class="pill">${esc(w)}</span>`:''};
-const avPills=id=>{const a=av(id);return a.mode==='Unknown'?'':`<span class="pill ${modeClass(a.mode)}">${esc(a.mode.toUpperCase())}</span>${whenPill(a.when)}`};
+const avTuplePills=tuple=>{const a=avObject(tuple);return a.mode==='Unknown'?'':`<span class="pill ${modeClass(a.mode)}">${esc(a.mode.toUpperCase())}</span>${whenPill(a.when)}`};
+const avPills=id=>avTuplePills(availability[id]);
+const entryAvPills=entry=>avTuplePills((entry.id&&availability[entry.id])||generatedAvailability[entry.name]);
 const keyFor=(name,explicitId=null)=>explicitId?'legacy:'+explicitId:(legacyExact(name)?'legacy:'+legacyExact(name):'gen:'+name);
 const isMissing=key=>!acquired[key];
 const checkedCount=()=>Object.values(acquired).filter(Boolean).length;
@@ -100,7 +104,7 @@ const EVIL_GROUPS=[
 ];
 const evilMap=new Map();
 EVIL_GROUPS.forEach((names,index)=>names.forEach(name=>evilMap.set(name,{token:`@evil${index}`,names})));
-const stationGroup=new Map([['Demon Altar',{token:'@evil-altar',names:['Demon Altar','Crimson Altar']}],['Crimson Altar',{token:'@evil-altar',names:['Demon Altar','Crimson Altar']}]]);
+const stationGroup=new Map([['Demon Altar',{token:'@evil-altar',names:['Demon Altar','Crimson Altar']}],['Crimson Altar',{token:'@evil-altar',names:['Demon Altar','Crimson Altar']}] ]);
 function normalizedRecipeKey(r){
   const station=stationGroup.get(String(r.s||''))?.token||String(r.s||'By hand');
   const ingredients=(r.i||[]).map(([name,qty])=>[evilMap.get(String(name))?.token||String(name),Number(qty)||1]).sort((a,b)=>a[0].localeCompare(b[0])||a[1]-b[1]);
@@ -135,7 +139,7 @@ function recipeOptionsHtml(name){
 function shoppingRow(entry){
   if(missingOnly.checked&&!isMissing(entry.key))return'';
   const i=entry.info, source=i?(i.fish?(i.fishSource||i.source):i.source):'';
-  const meta=entry.id?avPills(entry.id):'';
+  const meta=entryAvPills(entry);
   const sourceHtml=source?`<div class="source">${i?.fish?'<span class="pill fish">FISHING ROUTE</span> ':''}${esc(source)}</div>`:'';
   return`<div class="row">${checkbox(entry.key,entry.name)}<div><div class="itemname">${esc(entry.name)} ${entry.qty>1?`<span class="qty">×${entry.qty}</span>`:''}</div>${meta?`<div class="itemmeta">${meta}</div>`:''}${sourceHtml}${i?.note?`<div class="note">${esc(i.note)}</div>`:''}</div><a class="wiki" href="${entry.id?wikiItem(entry.id):wikiName(entry.name)}" target="_blank" rel="noopener">Wiki ↗</a></div>`;
 }
