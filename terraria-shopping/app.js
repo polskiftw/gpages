@@ -64,7 +64,7 @@ function planItem(name,qty=1,stack=new Set(),depth=0){
     candidates.push({leaves,cycles,steps,recipe});
   }
   const clean=candidates.filter(c=>c.cycles===0);
-  if(!clean.length)return{leaves:new Map([[name,qty]]),cycles:1,steps:0};
+  if(!clean.length)return{leaves:new Map([[name,qty]]),cycles:0,steps:0};
   clean.sort((a,b)=>a.leaves.size-b.leaves.size||totalQty(a.leaves)-totalQty(b.leaves)||a.steps-b.steps||String(a.recipe.s).localeCompare(String(b.recipe.s))||JSON.stringify(a.recipe.i).localeCompare(JSON.stringify(b.recipe.i)));
   return clean[0];
 }
