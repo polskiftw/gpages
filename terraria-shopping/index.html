@@ -12,7 +12,7 @@
 <body><main>
 <div class="topline"><a class="back" href="../">‹ gpages</a><span class="version">PC 1.4.5.8</span></div>
 <h1>Terraria Shopping</h1>
-<p class="subtitle">Every terminal craftable as a project, every craftable as a searchable component, and the hand-verified acquisition routes we actually care about layered on top.</p>
+<p class="subtitle">Pick something to craft, see the unique items you still need, and check them off as you collect them.</p>
 <div class="controls">
   <div class="segments" role="tablist" aria-label="View">
     <button class="active" data-view="projects" role="tab">Projects</button>
@@ -23,9 +23,7 @@
   <div class="search"><input id="search" type="search" placeholder="Search craftables, ingredients, stations…" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Search"><button class="clear" id="clearSearch" aria-label="Clear search">×</button></div>
   <div class="subcontrols">
     <select id="sort" aria-label="Sort">
-      <option value="complexity">Complexity ↓</option>
-      <option value="direct">Direct recipe size ↓</option>
-      <option value="recipes">Recipe options ↓</option>
+      <option value="items">Unique items needed ↓</option>
       <option value="name">Name A–Z</option>
     </select>
     <label class="missing"><input id="missingOnly" type="checkbox"> Only missing ingredients</label>
@@ -35,12 +33,13 @@
 <div id="status"></div>
 <div id="content"></div>
 <section class="about">
-  <strong>Projects</strong> are craftable results that are not ingredients in another normal crafting recipe — the actual ends of the recipe graph. <strong>Components</strong> exposes every craftable result, including intermediates.<br><br>
-  <strong>Complexity</strong> counts distinct dependencies reachable through the full recipe graph, not raw stack quantity. That keeps “make 999 bricks” from outranking genuinely gnarly projects just because it consumes a large pile. Open a card for a flattened shopping list, recipe options, and an expandable canonical recipe path.<br><br>
-  Generated shopping lists choose a cycle-safe canonical normal crafting route. Hand-verified projects such as Shellphone and Ankh Shield override the generated leaf list where a human route is more useful. <strong>Fishable</strong> and <strong>Remaining</strong> are the curated acquisition-source layer; unannotated generated ingredients are never guessed.
+  <strong>Projects</strong> are finished craftables — items that are not used as an ingredient in another normal recipe. <strong>Components</strong> includes every craftable item, including intermediates.<br><br>
+  The default sort is <strong>unique shopping-list items needed</strong>. Quantity does not affect the ranking: 9,000 of one ingredient still counts as one unique item.<br><br>
+  Each card shows how many unique shopping-list items have a known <strong>fishing route</strong> and how many you have <strong>obtained</strong>. If none of the required items are fishable, the card says <strong>LANDLOCKED</strong> instead.<br><br>
+  Open a card for the shopping list and its direct crafting recipe. Corruption/Crimson substitutions are grouped together, so swapping an equivalent world-evil ingredient does not pretend to be a separate recipe.
 </section>
 <div class="footerbuttons"><button class="textbtn" id="resetChecks">Reset acquired checks</button></div>
-<div class="mutedline" id="dataLine">Recipe graph: loading…</div>
+<div class="mutedline" id="dataLine">Recipe data: loading…</div>
 </main>
 <script src="data.generated.js"></script>
 <script src="enrichment-core.js"></script>
