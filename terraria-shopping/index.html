@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f2f2f7">
+<title>Terraria Shopping</title>
+<style>
+:root{color-scheme:light dark;--bg:#f2f2f7;--card:#fff;--field:#f7f7fa;--text:#111;--muted:#6e6e73;--border:rgba(60,60,67,.18);--accent:#007aff;--good:#248a3d;--warn:#b25000;--shadow:0 1px 2px rgba(0,0,0,.04),0 8px 28px rgba(0,0,0,.055)}
+@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--field:#2c2c2e;--text:#f5f5f7;--muted:#98989d;--border:rgba(84,84,88,.65);--accent:#0a84ff;--good:#30d158;--warn:#ff9f0a;--shadow:none}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;padding:max(18px,env(safe-area-inset-top)) 14px max(36px,env(safe-area-inset-bottom));background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}main{width:min(100%,860px);margin:0 auto}.topline{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 2px 12px}.back{color:var(--accent);text-decoration:none;font-size:14px;font-weight:650}.version{font-size:12px;color:var(--muted);white-space:nowrap}h1{font-size:32px;line-height:1.08;letter-spacing:-.7px;margin:4px 2px 6px}.subtitle{color:var(--muted);font-size:14px;line-height:1.45;margin:0 2px 18px}.controls{position:sticky;top:max(0px,env(safe-area-inset-top));z-index:10;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);padding:8px 0 10px;margin-bottom:4px}.segments{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;background:var(--field);border:1px solid var(--border);border-radius:13px;padding:4px;margin-bottom:9px}.segments button{border:0;border-radius:9px;min-height:36px;background:transparent;color:var(--muted);font:700 13px/1 -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;cursor:pointer}.segments button.active{background:var(--card);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.12)}.search{position:relative}.search input{width:100%;height:44px;padding:0 40px 0 38px;border:1px solid var(--border);border-radius:13px;background:var(--card);color:var(--text);font:16px/1.2 -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;outline:none;-webkit-appearance:none}.search input:focus{border-color:var(--accent)}.search:before{content:'⌕';position:absolute;left:13px;top:8px;font-size:23px;color:var(--muted);line-height:1}.clear{position:absolute;right:8px;top:7px;width:30px;height:30px;border:0;border-radius:50%;background:transparent;color:var(--muted);font-size:18px;display:none}.subcontrols{display:grid;grid-template-columns:1.15fr 1fr auto;gap:7px;margin-top:8px}.select,select{min-width:0;height:38px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text);font:13px/1.2 -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;padding:0 28px 0 9px}.missing{display:flex;align-items:center;gap:6px;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:10px;background:var(--card);font-size:12px;font-weight:650;white-space:nowrap}.missing input{accent-color:var(--accent);width:16px;height:16px;margin:0}.stats{display:flex;flex-wrap:wrap;gap:7px;margin:11px 2px 12px}.stat{font-size:12px;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:999px;padding:6px 9px}.stat strong{color:var(--text)}.sectionhead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:18px 2px 8px}.sectionhead h2{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:0}.sectionhead span{font-size:12px;color:var(--muted)}.card{background:var(--card);border:1px solid var(--border);border-radius:17px;margin-bottom:11px;box-shadow:var(--shadow);overflow:hidden}.project{padding:0}.project summary{list-style:none;cursor:pointer;padding:15px 15px 13px;-webkit-tap-highlight-color:transparent}.project summary::-webkit-details-marker{display:none}.projecttop{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.projecttitle{font-size:17px;font-weight:750;line-height:1.22}.projectmeta{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.pill{display:inline-flex;align-items:center;min-height:22px;padding:3px 7px;border-radius:999px;font-size:10px;font-weight:750;letter-spacing:.015em;background:var(--field);color:var(--muted);border:1px solid var(--border)}.pill.fish{color:var(--good)}.pill.remaining{color:var(--warn)}.chev{font-size:18px;color:var(--muted);transition:transform .18s}.project[open] .chev{transform:rotate(90deg)}.progress{height:5px;background:var(--field);border-top:1px solid var(--border)}.progress>i{display:block;height:100%;background:var(--accent);width:0}.projectnote{padding:11px 15px;color:var(--muted);font-size:12px;line-height:1.45;border-top:1px solid var(--border)}.rows{border-top:1px solid var(--border)}.row{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:start;padding:12px 14px;border-bottom:1px solid var(--border)}.row:last-child{border-bottom:0}.check{width:21px;height:21px;margin:1px 0 0;accent-color:var(--accent)}.itemname{font-size:14px;font-weight:720;line-height:1.25}.qty{color:var(--muted);font-weight:600}.source{color:var(--muted);font-size:12px;line-height:1.4;margin-top:4px}.note{color:var(--muted);font-size:11px;line-height:1.35;margin-top:5px}.wiki{align-self:center;color:var(--accent);text-decoration:none;font-size:12px;font-weight:700;padding:5px 0 5px 7px}.ingredient{padding:13px 14px}.ingredient .row{padding:0;border:0;grid-template-columns:28px minmax(0,1fr) auto}.tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}.tag{font-size:10px;color:var(--muted);background:var(--field);border:1px solid var(--border);border-radius:999px;padding:3px 6px}.empty{padding:28px 18px;text-align:center;color:var(--muted);font-size:14px;line-height:1.45}.about{margin-top:18px;padding:14px 15px;background:var(--card);border:1px solid var(--border);border-radius:17px;color:var(--muted);font-size:12px;line-height:1.5}.about strong{color:var(--text)}.footerbuttons{display:flex;justify-content:center;gap:8px;margin-top:13px}.textbtn{border:0;background:transparent;color:var(--accent);font:650 12px/1.2 -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;padding:8px;cursor:pointer}.mutedline{text-align:center;color:var(--muted);font-size:11px;margin-top:8px}@media(max-width:560px){body{padding-left:11px;padding-right:11px}.controls{margin-left:-1px;margin-right:-1px}.subcontrols{grid-template-columns:1fr 1fr}.missing{grid-column:1/-1;justify-content:center}.projecttitle{font-size:16px}.row{grid-template-columns:27px minmax(0,1fr) auto;padding-left:12px;padding-right:12px}.ingredient{padding-left:12px;padding-right:12px}}@media(min-width:700px){.projectgrid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.projectgrid .card{margin-bottom:0}.ingredientgrid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.ingredientgrid .card{margin-bottom:0}}
+</style>
+</head>
+<body><main>
+<div class="topline"><a class="back" href="../">‹ gpages</a><span class="version">PC 1.4.5.8</span></div>
+<h1>Terraria Shopping</h1>
+<p class="subtitle">A searchable acquisition planner for compound crafting projects. Fishing routes are separated from the ingredients you still have to buy, find, mine, or murder something for.</p>
+<div class="controls">
+  <div class="segments" role="tablist" aria-label="View">
+    <button class="active" data-view="projects" role="tab">Projects</button>
+    <button data-view="fishable" role="tab">Fishable</button>
+    <button data-view="remaining" role="tab">Remaining</button>
+  </div>
+  <div class="search"><input id="search" type="search" placeholder="Search items, sources, projects…" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Search"><button class="clear" id="clearSearch" aria-label="Clear search">×</button></div>
+  <div class="subcontrols">
+    <select id="projectFilter" aria-label="Filter by project"><option value="all">All projects</option></select>
+    <select id="sort" aria-label="Sort"><option value="default">Recommended order</option><option value="name">Name A–Z</option><option value="stage">Progression</option><option value="source">Source / method</option></select>
+    <label class="missing"><input id="missingOnly" type="checkbox"> Only missing</label>
+  </div>
+</div>
+<div class="stats" id="stats"></div>
+<div id="content"></div>
+<section class="about">
+  <strong>How this planner defines “fishable”:</strong> the base ingredient has a practical route through direct fishing, fishing crates/lock boxes, or an Angler quest reward. Shimmer conversions from a fishable item also count. Lock-box routes still require the appropriate Dungeon/Shadow key.<br><br>
+  Project recipes use leaf ingredients rather than intermediate crafts, so you can shop once and combine everything later. Where a recipe has multiple equivalent routes, this planner chooses a clean canonical route and notes the alternatives.
+</section>
+<div class="footerbuttons"><button class="textbtn" id="resetChecks">Reset acquired checks</button></div>
+<div class="mutedline">Data checked against the Official Terraria Wiki • 30 Aug 2026</div>
+</main>
+<script>
+(() => {
+const W='https://terraria.wiki.gg/wiki/';
+const items={
+  goldBar:{name:'Gold / Platinum Bar',fish:true,fishSource:'Standard fishing crates; collect 10 of either Gold or Platinum Bars for the watch.',source:'Gold/Platinum ore smelting; also standard fishing crates.',type:'Crate',stage:'Pre-Hardmode',wiki:'Gold_Bar'},
+  ironBar:{name:'Iron / Lead Bar',fish:true,fishSource:'Standard fishing crates; one Iron or Lead Bar is enough to make the Chain needed for the watch.',source:'Iron/Lead ore smelting; also standard fishing crates.',type:'Crate',stage:'Pre-Hardmode',wiki:'Iron_Bar'},
+  depthMeter:{name:'Depth Meter',fish:false,source:'Cave Bat, Jungle Bat, Ice Bat, Giant Bat, or Spore Bat (0.5%); Crawdad, Giant Shelly, or Salamander (1.25%).',type:'Enemy',stage:'Pre-Hardmode',wiki:'Depth_Meter'},
+  compass:{name:'Compass',fish:false,source:'Armored Viking, Mother Slime, Snow Flinx, or Undead Viking (1%); Crawdad, Giant Shelly, or Salamander (1.23%); Piranha (1.33%).',type:'Enemy',stage:'Pre-Hardmode',wiki:'Compass'},
+  radar:{name:'Radar',fish:true,fishSource:'Wooden or Pearlwood Crates.',source:'Surface Chests and Wooden/Pearlwood Crates.',type:'Crate',stage:'Pre-Hardmode',wiki:'Radar'},
+  lifeform:{name:'Lifeform Analyzer',fish:false,source:'Traveling Merchant — 5 gold.',type:'NPC',stage:'Pre-Hardmode',wiki:'Lifeform_Analyzer'},
+  tally:{name:'Tally Counter',fish:false,source:'Angry Bones, Cursed Skull, Dark Caster, or Librarian Skeleton in the Dungeon (1%).',type:'Enemy',stage:'Post-Skeletron',wiki:'Tally_Counter'},
+  metalDetector:{name:'Metal Detector',fish:false,source:'Lost Girl / Nymph in the Cavern layer — 50% Classic, 100% Expert/Master.',type:'Enemy',stage:'Pre-Hardmode',wiki:'Metal_Detector'},
+  stopwatch:{name:'Stopwatch',fish:false,source:'Traveling Merchant — 5 gold.',type:'NPC',stage:'Pre-Hardmode',wiki:'Stopwatch'},
+  dps:{name:'DPS Meter',fish:false,source:'Traveling Merchant — 5 gold.',type:'NPC',stage:'Pre-Hardmode',wiki:'DPS_Meter'},
+  pocketGuide:{name:"Fisherman's Pocket Guide",fish:true,fishSource:'Angler quest reward. Interchangeable with Weather Radio and Sextant via Shimmer.',source:'Angler quest reward.',type:'Angler',stage:'Pre-Hardmode',wiki:'Fisherman%27s_Pocket_Guide',note:'Angler info trio can be cycled through Shimmer.'},
+  weatherRadio:{name:'Weather Radio',fish:true,fishSource:'Angler quest reward. Interchangeable with Fisherman\'s Pocket Guide and Sextant via Shimmer.',source:'Angler quest reward.',type:'Angler',stage:'Pre-Hardmode',wiki:'Weather_Radio',note:'Angler info trio can be cycled through Shimmer.'},
+  sextant:{name:'Sextant',fish:true,fishSource:'Angler quest reward. Interchangeable with Fisherman\'s Pocket Guide and Weather Radio via Shimmer.',source:'Angler quest reward.',type:'Angler',stage:'Pre-Hardmode',wiki:'Sextant',note:'Angler info trio can be cycled through Shimmer.'},
+  mirror:{name:'Magic Mirror or Ice Mirror',fish:false,source:'Magic Mirror: Underground/Cavern Gold Chests or pre-Hardmode Mimic. Ice Mirror: Frozen Chest. Journey characters start with a Magic Mirror.',type:'Chest',stage:'Pre-Hardmode',wiki:'Magic_Mirrors'},
+  magicConch:{name:'Magic Conch',fish:true,fishSource:'Oasis or Mirage Crates.',source:'Sandstone Chests or Oasis/Mirage Crates.',type:'Crate',stage:'Pre-Hardmode',wiki:'Magic_Conch'},
+  demonConch:{name:'Demon Conch',fish:true,fishSource:'Direct rare catch while fishing in lava.',source:'Fishing in lava.',type:'Direct catch',stage:'Pre-Hardmode',wiki:'Demon_Conch'},
+
+  cobaltShield:{name:'Cobalt Shield',fish:true,fishSource:'Golden Lock Box from Dungeon/Stockade Crates (1/7); requires a Golden Key to open.',source:'Locked Dungeon Gold Chest or Golden Lock Box (1/7).',type:'Lock box',stage:'Post-Skeletron',wiki:'Cobalt_Shield',note:'Fishing route is renewable, but each lock box consumes a Golden Key.'},
+  obsidian:{name:'Obsidian',fish:false,source:'Form it where water contacts lava, then mine it.',type:'Material',stage:'Pre-Hardmode',wiki:'Obsidian'},
+  armorPolish:{name:'Armor Polish',fish:false,source:'Armored Skeleton or Blue Armored Bones — 1% Classic / 1.99% Expert.',type:'Enemy',stage:'Hardmode',wiki:'Armor_Polish',note:'Shimmer pair: Armor Polish ↔ Vitamins.'},
+  vitamins:{name:'Vitamins',fish:false,source:'Corruptor or Floaty Gross — 1% Classic / 1.99% Expert.',type:'Enemy',stage:'Hardmode',wiki:'Vitamins',note:'Shimmer pair: Vitamins ↔ Armor Polish.'},
+  bezoar:{name:'Bezoar',fish:false,source:'Hornet, Moss Hornet, or Toxic Sludge — 1% Classic / 1.99% Expert.',type:'Enemy',stage:'Pre-Hardmode',wiki:'Bezoar',note:'Shimmer pair: Bezoar ↔ Adhesive Bandage.'},
+  bandage:{name:'Adhesive Bandage',fish:false,source:'Angler Fish, Rusty Armored Bones, or Werewolf — 1% Classic / 1.99% Expert.',type:'Enemy',stage:'Hardmode',wiki:'Adhesive_Bandage',note:'Shimmer pair: Adhesive Bandage ↔ Bezoar.'},
+  fastClock:{name:'Fast Clock',fish:false,source:'Regular Mummy, Pixie, or Wraith — 1% Classic / 1.99% Expert.',type:'Enemy',stage:'Hardmode',wiki:'Fast_Clock',note:'Shimmer pair: Fast Clock ↔ Trifold Map.'},
+  trifold:{name:'Trifold Map',fish:false,source:'Clown — 1% Classic / 1.99% Expert.',type:'Enemy',stage:'Hardmode',wiki:'Trifold_Map',note:'Current 1.4.5 source is Clown. Shimmer pair: Trifold Map ↔ Fast Clock.'},
+  megaphone:{name:'Megaphone',fish:false,source:'Green Jellyfish, Blood Mummy, Dark Mummy, or Pixie — 1% Classic / 1.99% Expert.',type:'Enemy',stage:'Hardmode',wiki:'Megaphone',note:'Shimmer pair: Megaphone ↔ Nazar.'},
+  nazar:{name:'Nazar',fish:false,source:'Cursed Skull, Giant Cursed Skull, Cursed Hammer, Crimson Axe, or Enchanted Sword — 1% Classic / 1.99% Expert.',type:'Enemy',stage:'Post-Skeletron',wiki:'Nazar',note:'Shimmer pair: Nazar ↔ Megaphone.'},
+  blindfold:{name:'Blindfold',fish:false,source:'Corrupt Slime, Crimslime, Blood Mummy, Dark Mummy, Slimeling, or wingless Slimer — 1% Classic / 1.99% Expert.',type:'Enemy',stage:'Hardmode',wiki:'Blindfold',note:'Shimmer pair: Blindfold ↔ Pocket Mirror.'},
+  pocketMirror:{name:'Pocket Mirror',fish:false,source:'Naturally spawned Medusa — 2.5% Classic / 5% Expert.',type:'Enemy',stage:'Hardmode',wiki:'Pocket_Mirror',note:'Shimmer pair: Pocket Mirror ↔ Blindfold.'},
+
+  sprintBoots:{name:'Sprint boots (one pair)',fish:true,fishSource:'Use Sailfish Boots (Wooden/Pearlwood Crate), Flurry Boots (Frozen/Boreal Crate), or Dunerider Boots (Oasis/Mirage Crate).',source:'Hermes Boots from Gold Chests, or fish Sailfish/Flurry/Dunerider Boots from their matching crates.',type:'Crate',stage:'Pre-Hardmode',wiki:'Boots',note:'Any valid sprint-boot variant works for Spectre Boots.'},
+  rocketBoots:{name:'Rocket Boots',fish:false,source:'Goblin Tinkerer — 5 gold; always available after rescue.',type:'NPC',stage:'Pre-Hardmode',wiki:'Rocket_Boots'},
+  aglet:{name:'Aglet',fish:true,fishSource:'Wooden or Pearlwood Crates.',source:'Surface Chests and Wooden/Pearlwood Crates.',type:'Crate',stage:'Pre-Hardmode',wiki:'Aglet'},
+  anklet:{name:'Anklet of the Wind',fish:true,fishSource:'Jungle or Bramble Crates.',source:'Ivy Chests and Jungle/Bramble Crates.',type:'Crate',stage:'Pre-Hardmode',wiki:'Anklet_of_the_Wind'},
+  iceSkates:{name:'Ice Skates',fish:true,fishSource:'Frozen or Boreal Crates.',source:'Frozen Chests and Frozen/Boreal Crates.',type:'Crate',stage:'Pre-Hardmode',wiki:'Ice_Skates'},
+  waterBoots:{name:'Water Walking Boots',fish:true,fishSource:'Ocean or Seaside Crates — 10%.',source:'Water Chests, Ocean Crates, or Seaside Crates — 10%.',type:'Crate',stage:'Pre-Hardmode',wiki:'Water_Walking_Boots'},
+  lavaCharm:{name:'Lava Charm',fish:true,fishSource:'Obsidian or Hellstone Crates — 5%.',source:'Cavern-layer lava chests or Obsidian/Hellstone Crates.',type:'Crate',stage:'Pre-Hardmode',wiki:'Lava_Charm'},
+  obsidianRose:{name:'Obsidian Rose',fish:false,source:'Fire Imp in the Underworld — 5%. Statue-spawned Fire Imps have a reduced rate.',type:'Enemy',stage:'Pre-Hardmode',wiki:'Obsidian_Rose'},
+
+  brickLayer:{name:'Brick Layer',fish:false,source:'Traveling Merchant — 10 gold when stocked.',type:'NPC',stage:'Pre-Hardmode',wiki:'Brick_Layer'},
+  extendo:{name:'Extendo Grip',fish:false,source:'Traveling Merchant — 10 gold when stocked.',type:'NPC',stage:'Pre-Hardmode',wiki:'Extendo_Grip'},
+  paintSprayer:{name:'Paint Sprayer',fish:false,source:'Traveling Merchant — 10 gold when stocked.',type:'NPC',stage:'Pre-Hardmode',wiki:'Paint_Sprayer'},
+  cementMixer:{name:'Portable Cement Mixer',fish:false,source:'Traveling Merchant — 10 gold when stocked.',type:'NPC',stage:'Pre-Hardmode',wiki:'Portable_Cement_Mixer'},
+  ancientChisel:{name:'Ancient Chisel',fish:true,fishSource:'Oasis or Mirage Crates.',source:'Sandstone Chests and Oasis/Mirage Crates.',type:'Crate',stage:'Pre-Hardmode',wiki:'Ancient_Chisel'},
+  treasureMagnet:{name:'Treasure Magnet',fish:true,fishSource:'Obsidian Lock Box from Obsidian/Hellstone Crates; requires a Shadow Key. Treasure Magnet is 20% from the lock box.',source:'Shadow Chests or Obsidian Lock Boxes.',type:'Lock box',stage:'Post-Skeletron',wiki:'Treasure_Magnet',note:'The fishing route requires a Shadow Key.'},
+  stepStool:{name:'Step Stool',fish:true,fishSource:'Wooden or Pearlwood Crates.',source:'Surface Chests and Wooden/Pearlwood Crates.',type:'Crate',stage:'Pre-Hardmode',wiki:'Step_Stool'},
+
+  redWrench:{name:'Red Wrench',fish:false,source:'Mechanic; always available after rescue.',type:'NPC',stage:'Post-Skeletron',wiki:'Wrench'},
+  blueWrench:{name:'Blue Wrench',fish:false,source:'Mechanic; always available after rescue.',type:'NPC',stage:'Post-Skeletron',wiki:'Wrench'},
+  greenWrench:{name:'Green Wrench',fish:false,source:'Mechanic; always available after rescue.',type:'NPC',stage:'Post-Skeletron',wiki:'Wrench'},
+  yellowWrench:{name:'Yellow Wrench',fish:false,source:'Mechanic; always available after rescue.',type:'NPC',stage:'Post-Skeletron',wiki:'Wrench'},
+  wireCutter:{name:'Wire Cutter',fish:false,source:'Mechanic; always available after rescue.',type:'NPC',stage:'Post-Skeletron',wiki:'Wire_Cutter'},
+  mechLens:{name:'Mechanical Lens',fish:false,source:'Mechanic — 1 gold; always available after rescue.',type:'NPC',stage:'Post-Skeletron',wiki:'Mechanical_Lens'},
+  mechRuler:{name:'Mechanical Ruler',fish:false,source:'Mechanic — 1 gold; always available after rescue.',type:'NPC',stage:'Post-Skeletron',wiki:'Mechanical_Ruler'},
+  wire:{name:'Wire',fish:false,source:'Mechanic; always available after rescue.',type:'NPC',stage:'Post-Skeletron',wiki:'Wire'},
+
+  cloudBottle:{name:'Cloud in a Bottle',fish:false,source:'Underground/Cavern Gold Chests or pre-Hardmode Mimic.',type:'Chest',stage:'Pre-Hardmode',wiki:'Cloud_in_a_Bottle'},
+  blizzardBottle:{name:'Blizzard in a Bottle',fish:true,fishSource:'Frozen or Boreal Crates.',source:'Frozen Chests and Frozen/Boreal Crates.',type:'Crate',stage:'Pre-Hardmode',wiki:'Blizzard_in_a_Bottle'},
+  sandstormBottle:{name:'Sandstorm in a Bottle',fish:true,fishSource:'Oasis or Mirage Crates; rare crate primary loot.',source:'Pyramid chests, Oasis/Mirage Crates, or craftable in Hardmode from Forbidden Fragments.',type:'Crate',stage:'Pre-Hardmode',wiki:'Sandstorm_in_a_Bottle'},
+  redBalloon:{name:'Shiny Red Balloon',fish:true,fishSource:'Sky or Azure Crates.',source:'Skyware Chests and Sky/Azure Crates.',type:'Crate',stage:'Pre-Hardmode',wiki:'Shiny_Red_Balloon'},
+  luckyHorseshoe:{name:'Lucky Horseshoe',fish:true,fishSource:'Sky or Azure Crates.',source:'Sky/Azure Crates and world loot depending on version/seed.',type:'Crate',stage:'Pre-Hardmode',wiki:'Lucky_Horseshoe'},
+
+  frogLeg:{name:'Frog Leg',fish:true,fishSource:'Direct fishing catch in any viable body of water.',source:'Fishing in any biome.',type:'Direct catch',stage:'Pre-Hardmode',wiki:'Frog_Leg'},
+  flipper:{name:'Flipper',fish:true,fishSource:'Ocean or Seaside Crates.',source:'Water Chests and Ocean/Seaside Crates.',type:'Crate',stage:'Pre-Hardmode',wiki:'Flipper'},
+  climbingClaws:{name:'Climbing Claws',fish:true,fishSource:'Wooden or Pearlwood Crates.',source:'Surface Chests, Wooden/Pearlwood Crates, or Skeleton Merchant.',type:'Crate',stage:'Pre-Hardmode',wiki:'Climbing_Claws'},
+  shoeSpikes:{name:'Shoe Spikes',fish:true,fishSource:'Fish a second Climbing Claws, then convert Climbing Claws ↔ Shoe Spikes in Shimmer.',source:'Underground Gold Chests or Shimmer a Climbing Claws.',type:'Shimmer',stage:'Pre-Hardmode',wiki:'Shoe_Spikes',note:'Since 1.4.5, Climbing Claws and Shoe Spikes convert both ways in Shimmer.'},
+
+  divingHelmet:{name:'Diving Helmet',fish:false,source:'Shark or Orca — 5%.',type:'Enemy',stage:'Pre-Hardmode',wiki:'Diving_Helmet'},
+  jellyNecklace:{name:'Jellyfish Necklace',fish:false,source:'Pink, Blue, or Green Jellyfish — 1%.',type:'Enemy',stage:'Pre-Hardmode',wiki:'Jellyfish_Necklace'},
+  tabi:{name:'Tabi',fish:false,source:'Bone Lee in the post-Plantera Dungeon — 8.33% Classic / 15.97% Expert.',type:'Enemy',stage:'Post-Plantera',wiki:'Tabi'},
+  blackBelt:{name:'Black Belt',fish:false,source:'Bone Lee in the post-Plantera Dungeon — 8.33% Classic / 15.97% Expert.',type:'Enemy',stage:'Post-Plantera',wiki:'Black_Belt'},
+
+  anglerEarring:{name:'Angler Earring',fish:true,fishSource:'Angler quest reward. Interchangeable with Tackle Box and High Test Fishing Line via Shimmer.',source:'Angler quest reward.',type:'Angler',stage:'Pre-Hardmode',wiki:'Angler_Earring',note:'Angler tackle trio can be cycled through Shimmer.'},
+  tackleBox:{name:'Tackle Box',fish:true,fishSource:'Angler quest reward. Interchangeable with Angler Earring and High Test Fishing Line via Shimmer.',source:'Angler quest reward.',type:'Angler',stage:'Pre-Hardmode',wiki:'Tackle_Box',note:'Angler tackle trio can be cycled through Shimmer.'},
+  highTest:{name:'High Test Fishing Line',fish:true,fishSource:'Angler quest reward. Interchangeable with Angler Earring and Tackle Box via Shimmer.',source:'Angler quest reward.',type:'Angler',stage:'Pre-Hardmode',wiki:'High_Test_Fishing_Line',note:'Angler tackle trio can be cycled through Shimmer.'},
+  lavaHook:{name:'Lavaproof Fishing Hook',fish:true,fishSource:'Obsidian or Hellstone Crates.',source:'Obsidian/Hellstone Crates.',type:'Crate',stage:'Pre-Hardmode',wiki:'Lavaproof_Fishing_Hook'},
+
+  moonCharm:{name:'Moon Charm',fish:false,source:'Werewolf — 1.67%.',type:'Enemy',stage:'Hardmode',wiki:'Moon_Charm'},
+  neptuneShell:{name:"Neptune's Shell",fish:false,source:'Creature from the Deep during a Solar Eclipse — 2% Classic / 3.96% Expert.',type:'Event',stage:'Hardmode',wiki:'Neptune%27s_Shell'},
+  moonStone:{name:'Moon Stone',fish:false,source:'Vampire / Vampire Bat during a Solar Eclipse — 2.86% Classic / 5.63% Expert.',type:'Event',stage:'Hardmode',wiki:'Moon_Stone'},
+  sunStone:{name:'Sun Stone',fish:false,source:'Golem or Golem Treasure Bag — 14.29%.',type:'Boss',stage:'Post-Golem',wiki:'Sun_Stone'},
+
+  silverBracer:{name:'Silver Bracer',fish:true,fishSource:'Golden Lock Box from Dungeon/Stockade Crates — 25%; requires a Golden Key. Desktop 1.4.5.7+.',source:'Locked Dungeon Gold Chest or Golden Lock Box — 25% on Desktop 1.4.5.7+.',type:'Lock box',stage:'Post-Skeletron',wiki:'Silver_Bracer',note:'Desktop-only item added in 1.4.5.7.'},
+  wickedArmlet:{name:'Wicked Armlet',fish:false,source:'Cursed Hammer or Crimson Axe — 4%. Desktop 1.4.5.7+.',type:'Enemy',stage:'Hardmode',wiki:'Wicked_Armlet'},
+  feralClaws:{name:'Feral Claws',fish:true,fishSource:'Jungle or Bramble Crates.',source:'Ivy Chests and Jungle/Bramble Crates.',type:'Crate',stage:'Pre-Hardmode',wiki:'Feral_Claws'},
+  snakeBand:{name:'Snake Band',fish:false,source:'Light or Dark Lamia in the Hardmode Underground Desert — 2.5%. Desktop 1.4.5.7+.',type:'Enemy',stage:'Hardmode',wiki:'Snake_Band'},
+  mobiusStrip:{name:'Mobius Strip',fish:false,source:'Golem — 1/6 (16.67%). Desktop 1.4.5.7+.',type:'Boss',stage:'Post-Golem',wiki:'Mobius_Strip'},
+  snappingStone:{name:'Snapping Stone',fish:false,source:'Granite Golem or Granite Elemental — 1.25%. Desktop 1.4.5.7+.',type:'Enemy',stage:'Pre-Hardmode',wiki:'Snapping_Stone'}
+};
+
+const projects=[
+{id:'shellphone',name:'Shellphone',group:'Major projects',stage:'Post-Skeletron',note:'Leaf list for Cell Phone + Magic Conch + Demon Conch. The Gold/Platinum Watch branch is represented by its bars and one Iron/Lead Bar for Chain.',items:[['goldBar',10],['ironBar',1],['depthMeter',1],['compass',1],['radar',1],['lifeform',1],['tally',1],['metalDetector',1],['stopwatch',1],['dps',1],['pocketGuide',1],['weatherRadio',1],['sextant',1],['mirror',1],['magicConch',1],['demonConch',1]]},
+{id:'ankh',name:'Ankh Shield',group:'Major projects',stage:'Hardmode',note:'All leaf ingredients for Obsidian Shield + Ankh Charm. Each immunity pair can be duplicated from its partner with Shimmer, which can save a miserable farm.',items:[['cobaltShield',1],['obsidian',20],['armorPolish',1],['vitamins',1],['bezoar',1],['bandage',1],['fastClock',1],['trifold',1],['megaphone',1],['nazar',1],['blindfold',1],['pocketMirror',1]]},
+{id:'terraspark',name:'Terraspark Boots',group:'Major projects',stage:'Pre-Hardmode',note:'Uses any valid sprint-boot variant for Spectre Boots. The fishing route avoids needing Hermes Boots specifically.',items:[['sprintBoots',1],['rocketBoots',1],['aglet',1],['anklet',1],['iceSkates',1],['waterBoots',1],['lavaCharm',1],['obsidianRose',1],['obsidian',20]]},
+{id:'creation',name:'Hand Of Creation',group:'Major projects',stage:'Post-Skeletron',note:'Architect Gizmo Pack + Ancient Chisel + Treasure Magnet + Step Stool.',items:[['brickLayer',1],['extendo',1],['paintSprayer',1],['cementMixer',1],['ancientChisel',1],['treasureMagnet',1],['stepStool',1]]},
+{id:'grand',name:'The Grand Design',group:'Major projects',stage:'Post-Skeletron',note:'All components are bought from the Mechanic after she is rescued. No RNG once the NPC is available.',items:[['redWrench',1],['blueWrench',1],['greenWrench',1],['yellowWrench',1],['wireCutter',1],['mechLens',1],['mechRuler',1],['wire',60]]},
+{id:'balloons',name:'Bundle of Horseshoe Balloons',group:'Major projects',stage:'Pre-Hardmode',note:'Canonical shopping route: Cloud + Blizzard + Sandstorm bottles, three Shiny Red Balloons, and Lucky Horseshoe. Terraria also supports alternate equivalent balloon recipes.',items:[['cloudBottle',1],['blizzardBottle',1],['sandstormBottle',1],['redBalloon',3],['luckyHorseshoe',1]]},
+{id:'frog',name:'Frog Gear',group:'Major projects',stage:'Pre-Hardmode',note:'Can be made entirely from fishing-derived ingredients in current 1.4.5: fish two Climbing Claws and Shimmer one into Shoe Spikes.',items:[['frogLeg',1],['flipper',1],['climbingClaws',1],['shoeSpikes',1]]},
+{id:'arctic',name:'Arctic Diving Gear',group:'Major projects',stage:'Pre-Hardmode',note:'Diving Gear + Jellyfish Necklace + Ice Skates.',items:[['flipper',1],['divingHelmet',1],['jellyNecklace',1],['iceSkates',1]]},
+{id:'ninja',name:'Master Ninja Gear',group:'Major projects',stage:'Post-Plantera',note:'Tiger Climbing Gear + Tabi + Black Belt. Claws/Spikes can be fishing-derived; Bone Lee supplies the two Hardmode pieces.',items:[['climbingClaws',1],['shoeSpikes',1],['tabi',1],['blackBelt',1]]},
+{id:'tackle',name:'Lavaproof Tackle Bag',group:'Major projects',stage:'Pre-Hardmode',note:'Every leaf ingredient has a fishing route. The three Angler accessories are interchangeable via Shimmer.',items:[['anglerEarring',1],['tackleBox',1],['highTest',1],['lavaHook',1]]},
+{id:'celestial',name:'Celestial Shell',group:'Major projects',stage:'Post-Golem',note:'Moon Shell + Celestial Stone. This one is essentially all combat/event farming rather than fishing.',items:[['moonCharm',1],['neptuneShell',1],['moonStone',1],['sunStone',1]]},
+{id:'twilight',name:'Twilight Grasp',group:'1.4.5.7 summoner upgrades',stage:'Hardmode',note:'Desktop-only 1.4.5.7 whip accessory.',items:[['silverBracer',1],['wickedArmlet',1]]},
+{id:'silverShield',name:'Silver Shield',group:'1.4.5.7 summoner upgrades',stage:'Hardmode',note:'Desktop-only 1.4.5.7 whip accessory. Leaf list expands Obsidian Shield into Cobalt Shield + 20 Obsidian.',items:[['silverBracer',1],['cobaltShield',1],['obsidian',20]]},
+{id:'ouroboros',name:'Ouroboros Ring',group:'1.4.5.7 summoner upgrades',stage:'Post-Golem',note:'Desktop-only 1.4.5.7 whip accessory.',items:[['snakeBand',1],['mobiusStrip',1]]},
+{id:'wickedClaws',name:'Wicked Claws',group:'1.4.5.7 summoner upgrades',stage:'Hardmode',note:'Desktop-only 1.4.5.7 whip accessory.',items:[['wickedArmlet',1],['feralClaws',1]]},
+{id:'ruin',name:'Armlet Of Ruin',group:'1.4.5.7 summoner upgrades',stage:'Hardmode',note:'Desktop-only 1.4.5.7 whip accessory.',items:[['wickedArmlet',1],['snappingStone',1]]}
+];
+
+const stageRank={'Pre-Hardmode':1,'Post-Skeletron':2,'Hardmode':3,'Post-Plantera':4,'Post-Golem':5};
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const search=$('#search'), projectFilter=$('#projectFilter'), sort=$('#sort'), missingOnly=$('#missingOnly'), content=$('#content'), stats=$('#stats'), clearSearch=$('#clearSearch');
+let view='projects';
+let acquired={};
+try{acquired=JSON.parse(localStorage.getItem('terraria-shopping-progress-v1')||'{}')||{}}catch(_){acquired={}}
+const save=()=>localStorage.setItem('terraria-shopping-progress-v1',JSON.stringify(acquired));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+const wiki=i=>W+(items[i].wiki||encodeURIComponent(items[i].name.replaceAll(' ','_')));
+const neededBy=id=>projects.filter(p=>p.items.some(([x])=>x===id));
+const totalUnique=()=>Object.keys(items).length;
+
+projects.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;projectFilter.appendChild(o)});
+function selectedProjects(){const id=projectFilter.value;return id==='all'?projects:projects.filter(p=>p.id===id)}
+function matchesText(text){const q=search.value.trim().toLowerCase();return !q||text.toLowerCase().includes(q)}
+function isMissing(id){return !acquired[id]}
+function setAcquired(id,v){acquired[id]=!!v;save();render()}
+function checkbox(id){return `<input class="check" type="checkbox" data-item="${id}" ${acquired[id]?'checked':''} aria-label="Mark ${esc(items[id].name)} acquired">`}
+function itemSearchText(id){const i=items[id], ps=neededBy(id).map(p=>p.name).join(' ');return [i.name,i.fishSource||'',i.source||'',i.type,i.stage,i.note||'',ps].join(' ')}
+function sortIds(ids){const mode=sort.value;return [...ids].sort((a,b)=>{const A=items[a],B=items[b];if(mode==='name')return A.name.localeCompare(B.name);if(mode==='stage')return (stageRank[A.stage]||99)-(stageRank[B.stage]||99)||A.name.localeCompare(B.name);if(mode==='source')return (A.type||'').localeCompare(B.type||'')||A.name.localeCompare(B.name);return 0})}
+function renderStats(visibleCount){const all=Object.keys(items), done=all.filter(id=>acquired[id]).length, fish=all.filter(id=>items[id].fish).length, rem=all.length-fish;stats.innerHTML=`<span class="stat"><strong>${visibleCount}</strong> shown</span><span class="stat"><strong>${fish}</strong> fishable</span><span class="stat"><strong>${rem}</strong> remaining</span><span class="stat"><strong>${done}/${totalUnique()}</strong> checked</span>`}
+function renderProjects(){let ps=selectedProjects();const q=search.value.trim().toLowerCase();if(q)ps=ps.filter(p=>{const itemText=p.items.map(([id])=>itemSearchText(id)).join(' ');return [p.name,p.group,p.stage,p.note,itemText].join(' ').toLowerCase().includes(q)});if(missingOnly.checked)ps=ps.filter(p=>p.items.some(([id])=>isMissing(id)));if(sort.value==='name')ps.sort((a,b)=>a.name.localeCompare(b.name));else if(sort.value==='stage')ps.sort((a,b)=>(stageRank[a.stage]||99)-(stageRank[b.stage]||99)||a.name.localeCompare(b.name));
+let html='',last='';for(const p of ps){if(p.group!==last){if(last)html+='</div>';html+=`<div class="sectionhead"><h2>${esc(p.group)}</h2></div><div class="projectgrid">`;last=p.group}const done=p.items.filter(([id])=>acquired[id]).length, fishCount=p.items.filter(([id])=>items[id].fish).length, pct=p.items.length?Math.round(done/p.items.length*100):0;let rows='';for(const [id,qty] of p.items){const i=items[id];if(missingOnly.checked&&!isMissing(id))continue;rows+=`<div class="row">${checkbox(id)}<div><div class="itemname">${esc(i.name)} ${qty>1?`<span class="qty">×${qty}</span>`:''}</div><div class="source">${i.fish?'<span class="pill fish">FISHING ROUTE</span> ':'<span class="pill remaining">REMAINING</span> '}${esc(i.fish?(i.fishSource||i.source):i.source)}</div>${i.note?`<div class="note">${esc(i.note)}</div>`:''}</div><a class="wiki" href="${wiki(id)}" target="_blank" rel="noopener">Wiki ↗</a></div>`}html+=`<details class="card project" ${q||projectFilter.value!=='all'?'open':''}><summary><div class="projecttop"><div><div class="projecttitle">${esc(p.name)}</div><div class="projectmeta"><span class="pill">${esc(p.stage)}</span><span class="pill fish">${fishCount} fishable</span><span class="pill">${done}/${p.items.length} checked</span></div></div><span class="chev">›</span></div></summary><div class="progress"><i style="width:${pct}%"></i></div><div class="projectnote">${esc(p.note)}</div><div class="rows">${rows}</div></details>`}
+}if(last)html+='</div>';if(!ps.length)html='<div class="card empty">No projects match the current search and filters.</div>';content.innerHTML=html;renderStats(ps.length)}
+function renderIngredients(wantFish){let ids=Object.keys(items).filter(id=>items[id].fish===wantFish);const allowed=new Set(selectedProjects().flatMap(p=>p.items.map(([id])=>id)));if(projectFilter.value!=='all')ids=ids.filter(id=>allowed.has(id));ids=ids.filter(id=>matchesText(itemSearchText(id)));if(missingOnly.checked)ids=ids.filter(isMissing);ids=sortIds(ids);const title=wantFish?'Base ingredients with a fishing route':'Still required after fishing';let html=`<div class="sectionhead"><h2>${title}</h2><span>${ids.length} items</span></div><div class="ingredientgrid">`;for(const id of ids){const i=items[id],ps=neededBy(id).filter(p=>projectFilter.value==='all'||p.id===projectFilter.value);const src=wantFish?(i.fishSource||i.source):i.source;html+=`<article class="card ingredient"><div class="row">${checkbox(id)}<div><div class="itemname">${esc(i.name)}</div><div class="projectmeta"><span class="pill ${wantFish?'fish':'remaining'}">${esc(i.type)}</span><span class="pill">${esc(i.stage)}</span></div><div class="source">${esc(src)}</div>${i.note?`<div class="note">${esc(i.note)}</div>`:''}<div class="tags">${ps.map(p=>`<span class="tag">${esc(p.name)}</span>`).join('')}</div></div><a class="wiki" href="${wiki(id)}" target="_blank" rel="noopener">Wiki ↗</a></div></article>`}html+='</div>';if(!ids.length)html=`<div class="card empty">No ${wantFish?'fishable':'remaining'} ingredients match the current search and filters.</div>`;content.innerHTML=html;renderStats(ids.length)}
+function render(){clearSearch.style.display=search.value?'block':'none';$$('.segments button').forEach(b=>b.classList.toggle('active',b.dataset.view===view));if(view==='projects')renderProjects();else renderIngredients(view==='fishable')}
+content.addEventListener('change',e=>{if(e.target.matches('.check'))setAcquired(e.target.dataset.item,e.target.checked)});
+$$('.segments button').forEach(b=>b.addEventListener('click',()=>{view=b.dataset.view;render();scrollTo({top:0,behavior:'smooth'})}));
+[search,projectFilter,sort,missingOnly].forEach(el=>el.addEventListener(el===search?'input':'change',render));
+clearSearch.addEventListener('click',()=>{search.value='';search.focus();render()});
+$('#resetChecks').addEventListener('click',()=>{if(confirm('Clear every acquired checkmark?')){acquired={};save();render()}});
+render();
+})();
+</script>
+</body></html>
