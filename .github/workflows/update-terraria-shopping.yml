@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - terraria-full-catalog
+      - terraria-shopping-cleanup
     paths:
       - 'terraria-shopping/scripts/build_data.py'
       - '.github/workflows/update-terraria-shopping.yml'
