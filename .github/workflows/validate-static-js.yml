@@ -1,0 +1,31 @@
+name: Validate static JavaScript
+
+on:
+  push:
+    paths:
+      - 'terraria-shopping/**'
+      - '.github/workflows/validate-static-js.yml'
+  pull_request:
+    paths:
+      - 'terraria-shopping/**'
+      - '.github/workflows/validate-static-js.yml'
+
+jobs:
+  terraria-shopping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Extract inline JavaScript
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          html = Path('terraria-shopping/index.html').read_text(encoding='utf-8')
+          start = html.index('<script>') + len('<script>')
+          end = html.index('</script>', start)
+          Path('/tmp/terraria-shopping.js').write_text(html[start:end], encoding='utf-8')
+          PY
+      - name: Check JavaScript syntax
+        run: node --check /tmp/terraria-shopping.js
