@@ -204,7 +204,10 @@ def canonical_plan(
 
     clean = [candidate for candidate in candidates if candidate[1] == 0]
     if not clean:
-        return {name: qty}, 1, 0
+        # A reversible/circular recipe should stop expansion at this component,
+        # not poison every parent above it and collapse the whole project to one
+        # giant self-reference.
+        return {name: qty}, 0, 0
 
     clean.sort(
         key=lambda candidate: (
