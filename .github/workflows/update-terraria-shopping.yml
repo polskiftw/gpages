@@ -42,3 +42,5 @@ jobs:
           git add terraria-shopping/data.generated.js terraria-shopping/availability.generated.js
           git commit -m "Update Terraria shopping data"
           git push
+
+# branch validation trigger
