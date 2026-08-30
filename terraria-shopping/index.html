@@ -33,7 +33,7 @@
 <div class="stats" id="stats"></div>
 <div id="content"></div>
 <section class="about">
-  <strong>Reading availability:</strong> every item and project has two separate labels. <strong>Pre-Hardmode / Hardmode</strong> tells you which world mode is required. The second label tells you the earliest actual gate or condition — boss, NPC rescue, event, moon phase, fishing method, etc.
+  <strong>Reading availability:</strong> <strong>Pre-Hardmode / Hardmode</strong> tells you which world mode is required. An additional label appears only when there is a meaningful gate or condition beyond that — boss, NPC rescue, event, moon phase, fishing method, etc.
   <div class="example"><span class="pill pre">PRE-HARDMODE</span><span class="pill">After Skeletron • Dungeon</span></div>
   means you can get it before Wall of Flesh, but not before Skeletron. A Golem drop is shown as <span class="pill hard">HARDMODE</span> <span class="pill">After Plantera • Golem drop</span>, because Golem itself is Hardmode and Plantera-gated; it does <em>not</em> say “post-Golem,” since the first Golem kill can give you the item.<br><br>
   <strong>Fishable</strong> means the base ingredient has a practical route through direct fishing, crates/lock boxes, an Angler reward, or a Shimmer conversion originating from a fishable item. Lock-box routes can still require Dungeon/Shadow keys.
@@ -166,12 +166,14 @@ const wiki=i=>W+(items[i].wiki||encodeURIComponent(items[i].name.replaceAll(' ',
 const neededBy=id=>projects.filter(p=>p.items.some(([x])=>x===id));
 const av=id=>{const a=availability[id]||['Unknown','Check source',999];return{mode:a[0],when:a[1],rank:a[2]}};
 const modeClass=mode=>mode==='Hardmode'?'hard':'pre';
-const avPills=id=>{const a=av(id);return `<span class="pill ${modeClass(a.mode)}">${esc(a.mode.toUpperCase())}</span><span class="pill">${esc(a.when)}</span>`};
-const projectPills=p=>`<span class="pill ${modeClass(p.mode)}">${esc(p.mode.toUpperCase())}</span><span class="pill">${esc(p.when)}</span>`;
+const cleanWhen=when=>String(when||'').replace(/^Available immediately(?:\s*[•/]\s*)?/,'').replace(/^After Wall of Flesh(?:\s*•\s*)?/,'').trim();
+const whenPill=when=>{const w=cleanWhen(when);return w?`<span class="pill">${esc(w)}</span>`:''};
+const avPills=id=>{const a=av(id);return `<span class="pill ${modeClass(a.mode)}">${esc(a.mode.toUpperCase())}</span>${whenPill(a.when)}`};
+const projectPills=p=>`<span class="pill ${modeClass(p.mode)}">${esc(p.mode.toUpperCase())}</span>${whenPill(p.when)}`;
 projects.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;projectFilter.appendChild(o)});
 function selectedProjects(){const id=projectFilter.value;return id==='all'?projects:projects.filter(p=>p.id===id)}
 function isMissing(id){return !acquired[id]}
-function itemSearchText(id){const i=items[id],a=av(id),ps=neededBy(id).map(p=>p.name).join(' ');return [i.name,i.fishSource||'',i.source||'',i.type,a.mode,a.when,i.note||'',ps].join(' ')}
+function itemSearchText(id){const i=items[id],a=av(id),ps=neededBy(id).map(p=>p.name).join(' ');return [i.name,i.fishSource||'',i.source||'',i.type,a.mode,cleanWhen(a.when),i.note||'',ps].join(' ')}
 function matchesText(text){const q=search.value.trim().toLowerCase();return !q||text.toLowerCase().includes(q)}
 function setAcquired(id,v){const openProjects=new Set($$('details.project[open]').map(el=>el.dataset.project));acquired[id]=!!v;save();render(openProjects)}
 function checkbox(id){return `<input class="check" type="checkbox" data-item="${id}" ${acquired[id]?'checked':''} aria-label="Mark ${esc(items[id].name)} acquired">`}
@@ -179,7 +181,7 @@ function sortIds(ids){const mode=sort.value;return [...ids].sort((a,b)=>{const A
 function renderStats(visibleCount){const all=Object.keys(items),done=all.filter(id=>acquired[id]).length,fish=all.filter(id=>items[id].fish).length,rem=all.length-fish;stats.innerHTML=`<span class="stat"><strong>${visibleCount}</strong> shown</span><span class="stat"><strong>${fish}</strong> fishable</span><span class="stat"><strong>${rem}</strong> remaining</span><span class="stat"><strong>${done}/${all.length}</strong> checked</span>`}
 function renderProjects(openProjects=new Set()){
   let ps=selectedProjects();const q=search.value.trim().toLowerCase();
-  if(q)ps=ps.filter(p=>{const itemText=p.items.map(([id])=>itemSearchText(id)).join(' ');return [p.name,p.group,p.mode,p.when,p.note,itemText].join(' ').toLowerCase().includes(q)});
+  if(q)ps=ps.filter(p=>{const itemText=p.items.map(([id])=>itemSearchText(id)).join(' ');return [p.name,p.group,p.mode,cleanWhen(p.when),p.note,itemText].join(' ').toLowerCase().includes(q)});
   if(missingOnly.checked)ps=ps.filter(p=>p.items.some(([id])=>isMissing(id)));
   if(sort.value==='name')ps.sort((a,b)=>a.name.localeCompare(b.name));else if(sort.value==='availability')ps.sort((a,b)=>a.rank-b.rank||a.name.localeCompare(b.name));
   let html='',last='';
