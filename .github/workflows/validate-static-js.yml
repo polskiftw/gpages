@@ -18,14 +18,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Extract inline JavaScript
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          html = Path('terraria-shopping/index.html').read_text(encoding='utf-8')
-          start = html.index('<script>') + len('<script>')
-          end = html.index('</script>', start)
-          Path('/tmp/terraria-shopping.js').write_text(html[start:end], encoding='utf-8')
-          PY
       - name: Check JavaScript syntax
-        run: node --check /tmp/terraria-shopping.js
+        shell: bash
+        run: |
+          found=0
+          while IFS= read -r -d '' file; do
+            found=1
+            echo "Checking $file"
+            node --check "$file"
+          done < <(find terraria-shopping -type f -name '*.js' -print0 | sort -z)
+          if [ "$found" -eq 0 ]; then
+            echo "No JavaScript files found."
+            exit 1
+          fi
+          echo "Static JavaScript syntax looks good."
