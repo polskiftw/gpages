@@ -169,7 +169,6 @@ const modeClass=mode=>mode==='Hardmode'?'hard':'pre';
 const cleanWhen=when=>String(when||'').replace(/^Available immediately(?:\s*[•/]\s*)?/,'').replace(/^After Wall of Flesh(?:\s*•\s*)?/,'').trim();
 const whenPill=when=>{const w=cleanWhen(when);return w?`<span class="pill">${esc(w)}</span>`:''};
 const avPills=id=>{const a=av(id);return `<span class="pill ${modeClass(a.mode)}">${esc(a.mode.toUpperCase())}</span>${whenPill(a.when)}`};
-const projectPills=p=>`<span class="pill ${modeClass(p.mode)}">${esc(p.mode.toUpperCase())}</span>${whenPill(p.when)}`;
 projects.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;projectFilter.appendChild(o)});
 function selectedProjects(){const id=projectFilter.value;return id==='all'?projects:projects.filter(p=>p.id===id)}
 function isMissing(id){return !acquired[id]}
@@ -187,10 +186,10 @@ function renderProjects(openProjects=new Set()){
   let html='',last='';
   for(const p of ps){
     if(p.group!==last){if(last)html+='</div>';html+=`<div class="sectionhead"><h2>${esc(p.group)}</h2></div><div class="projectgrid">`;last=p.group}
-    const done=p.items.filter(([id])=>acquired[id]).length,fishCount=p.items.filter(([id])=>items[id].fish).length,pct=p.items.length?Math.round(done/p.items.length*100):0;let rows='';
+    const fishCount=p.items.filter(([id])=>items[id].fish).length,otherCount=p.items.length-fishCount,fishDone=p.items.filter(([id])=>items[id].fish&&acquired[id]).length,otherDone=p.items.filter(([id])=>!items[id].fish&&acquired[id]).length,done=fishDone+otherDone,pct=p.items.length?Math.round(done/p.items.length*100):0;let rows='';
     for(const [id,qty] of p.items){const i=items[id];if(missingOnly.checked&&!isMissing(id))continue;rows+=`<div class="row">${checkbox(id)}<div><div class="itemname">${esc(i.name)} ${qty>1?`<span class="qty">×${qty}</span>`:''}</div><div class="itemmeta">${avPills(id)}</div><div class="source">${i.fish?'<span class="pill fish">FISHING ROUTE</span> ':'<span class="pill remaining">REMAINING</span> '}${esc(i.fish?(i.fishSource||i.source):i.source)}</div>${i.note?`<div class="note">${esc(i.note)}</div>`:''}</div><a class="wiki" href="${wiki(id)}" target="_blank" rel="noopener">Wiki ↗</a></div>`}
     const forceOpen=q||projectFilter.value!=='all'||openProjects.has(p.id);
-    html+=`<details class="card project" data-project="${p.id}" ${forceOpen?'open':''}><summary><div class="projecttop"><div><div class="projecttitle">${esc(p.name)}</div><div class="projectmeta">${projectPills(p)}<span class="pill fish">${fishCount} fishable</span><span class="pill">${done}/${p.items.length} checked</span></div></div><span class="chev">›</span></div></summary><div class="progress"><i style="width:${pct}%"></i></div><div class="projectnote">${esc(p.note)}</div><div class="rows">${rows}</div></details>`;
+    html+=`<details class="card project" data-project="${p.id}" ${forceOpen?'open':''}><summary><div class="projecttop"><div><div class="projecttitle">${esc(p.name)}</div><div class="projectmeta"><span class="pill fish">${fishDone}/${fishCount} fishable</span><span class="pill remaining">${otherDone}/${otherCount} others</span></div></div><span class="chev">›</span></div></summary><div class="progress"><i style="width:${pct}%"></i></div><div class="projectnote">${esc(p.note)}</div><div class="rows">${rows}</div></details>`;
   }
   if(last)html+='</div>';if(!ps.length)html='<div class="card empty">No projects match the current search and filters.</div>';content.innerHTML=html;renderStats(ps.length)
 }
