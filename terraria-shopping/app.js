@@ -37,8 +37,10 @@ const wikiItem=id=>W+(items[id]?.wiki||encodeURIComponent(String(items[id]?.name
 const avObject=tuple=>{const a=tuple||['Unknown','',999];return{mode:a[0],when:a[1],rank:a[2]}};
 const av=id=>avObject(availability[id]);
 const modeClass=mode=>mode==='Hardmode'?'hard':'pre';
-const cleanWhen=when=>String(when||'').replace(/^Available immediately(?:\s*[•/]\s*)?/,'').replace(/^After Wall of Flesh(?:\s*•\s*)?/,'').trim();
-const whenPill=when=>{const w=cleanWhen(when);return w?`<span class="pill">${esc(w)}</span>`:''};
+const whenParts=when=>(Array.isArray(when)?when:[when]).map(v=>String(v||'').trim()).filter(Boolean);
+const cleanWhenPart=when=>String(when||'').replace(/^Available immediately(?:\s*[•/]\s*)?/,'').replace(/^After Wall of Flesh(?:\s*•\s*)?/,'').trim();
+const cleanWhen=when=>whenParts(when).map(cleanWhenPart).filter(Boolean).join(' ');
+const whenPill=when=>whenParts(when).map(cleanWhenPart).filter(Boolean).map(w=>`<span class="pill">${esc(w)}</span>`).join('');
 const avTuplePills=tuple=>{const a=avObject(tuple);return a.mode==='Unknown'?'':`<span class="pill ${modeClass(a.mode)}">${esc(a.mode.toUpperCase())}</span>${whenPill(a.when)}`};
 const avPills=id=>avTuplePills(availability[id]);
 const entryAvPills=entry=>avTuplePills((entry.id&&availability[entry.id])||generatedAvailability[entry.name]);
@@ -138,17 +140,14 @@ function recipeOptionsHtml(name){
 }
 function shoppingRow(entry){
   if(missingOnly.checked&&!isMissing(entry.key))return'';
-  const i=entry.info, source=i?(i.fish?(i.fishSource||i.source):i.source):'';
   const meta=entryAvPills(entry);
-  const sourceHtml=source?`<div class="source">${i?.fish?'<span class="pill fish">FISHING ROUTE</span> ':''}${esc(source)}</div>`:'';
-  return`<div class="row">${checkbox(entry.key,entry.name)}<div><div class="itemname">${esc(entry.name)} ${entry.qty>1?`<span class="qty">×${entry.qty}</span>`:''}</div>${meta?`<div class="itemmeta">${meta}</div>`:''}${sourceHtml}${i?.note?`<div class="note">${esc(i.note)}</div>`:''}</div><a class="wiki" href="${entry.id?wikiItem(entry.id):wikiName(entry.name)}" target="_blank" rel="noopener">Wiki ↗</a></div>`;
+  return`<div class="row">${checkbox(entry.key,entry.name)}<div><div class="itemname">${esc(entry.name)} ${entry.qty>1?`<span class="qty">×${entry.qty}</span>`:''}</div>${meta?`<div class="itemmeta">${meta}</div>`:''}</div><a class="wiki" href="${entry.id?wikiItem(entry.id):wikiName(entry.name)}" target="_blank" rel="noopener">Wiki ↗</a></div>`;
 }
 function buildProjectBody(name){
-  const cp=curatedByName.get(name), summary=shoppingSummary(name);let rows='';
+  const summary=shoppingSummary(name);let rows='';
   for(const entry of summary.entries)rows+=shoppingRow(entry);
   if(!rows)rows='<div class="empty">Everything in this shopping list is checked.</div>';
-  const note=cp?.note?`<div class="projectnote">${esc(cp.note)}</div>`:'';
-  return note+`<div class="bodyhead">Shopping list • ${summary.total} unique item${summary.total===1?'':'s'}</div><div class="rows">${rows}</div>`+recipeOptionsHtml(name);
+  return`<div class="bodyhead">Shopping list • ${summary.total} unique item${summary.total===1?'':'s'}</div><div class="rows">${rows}</div>`+recipeOptionsHtml(name);
 }
 function projectSearchBlob(name){
   const cp=curatedByName.get(name), rs=byResult.get(name)||[];const immediate=rs.flatMap(r=>r.i||[]).map(x=>x[0]);const stations=rs.map(r=>r.s||'');
