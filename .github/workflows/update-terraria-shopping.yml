@@ -14,6 +14,7 @@ on:
       - 'terraria-shopping/scripts/recipe_revision_rules.py'
       - 'terraria-shopping/scripts/build_availability.py'
       - 'terraria-shopping/scripts/repair_availability.py'
+      - 'terraria-shopping/scripts/apply_source_priorities.py'
       - 'terraria-shopping/scripts/build_fishing.py'
       - 'terraria-shopping/scripts/build_vendors.py'
       - 'terraria-shopping/scripts/audit_data.py'
@@ -45,6 +46,8 @@ jobs:
         run: python terraria-shopping/scripts/build_availability.py
       - name: Repair acquisition source badges
         run: python terraria-shopping/scripts/repair_availability.py
+      - name: Apply direct acquisition source priorities
+        run: python terraria-shopping/scripts/apply_source_priorities.py
       - name: Audit acquisition source priority
         run: python terraria-shopping/scripts/audit_source_quality.py
       - name: Build fishing routes
