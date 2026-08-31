@@ -10,11 +10,14 @@ on:
       - terraria-full-catalog
     paths:
       - 'terraria-shopping/scripts/build_data.py'
+      - 'terraria-shopping/scripts/repair_recipe_revisions.py'
+      - 'terraria-shopping/scripts/recipe_revision_rules.py'
       - 'terraria-shopping/scripts/build_availability.py'
       - 'terraria-shopping/scripts/repair_availability.py'
       - 'terraria-shopping/scripts/build_fishing.py'
       - 'terraria-shopping/scripts/build_vendors.py'
       - 'terraria-shopping/scripts/audit_data.py'
+      - 'terraria-shopping/scripts/audit_current_data.py'
       - 'terraria-shopping/scripts/audit_platform_overrides.py'
       - '.github/workflows/update-terraria-shopping.yml'
 
@@ -32,6 +35,8 @@ jobs:
           python-version: '3.12'
       - name: Build recipe graph
         run: python terraria-shopping/scripts/build_data.py
+      - name: Resolve Desktop recipe revisions
+        run: python terraria-shopping/scripts/repair_recipe_revisions.py
       - name: Build availability badges
         run: python terraria-shopping/scripts/build_availability.py
       - name: Repair acquisition source badges
@@ -40,9 +45,9 @@ jobs:
         run: python terraria-shopping/scripts/build_fishing.py
       - name: Build vendor prices
         run: python terraria-shopping/scripts/build_vendors.py
-      - name: Audit all recipes and shopping lists
-        run: python terraria-shopping/scripts/audit_data.py
-      - name: Audit platform override ambiguity
+      - name: Audit all resolved recipes and shopping lists
+        run: python terraria-shopping/scripts/audit_current_data.py
+      - name: Audit platform override resolution
         run: python terraria-shopping/scripts/audit_platform_overrides.py
       - name: Commit generated data when changed
         shell: bash
