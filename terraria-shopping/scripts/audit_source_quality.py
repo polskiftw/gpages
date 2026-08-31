@@ -3,9 +3,9 @@
 
 Terraria 1.4.5 added many resource-carrying slime variants. Drops Cargo is useful
 for discovering those alternatives, but a new mob drop must not silently replace
-a more ordinary terrain/harvest/vendor source in the shopping UI. This audit
-prints every canonical leaf whose final badge contains a slime source so changes
-in that family are visible during the refresh workflow.
+a more ordinary terrain/harvest/vendor source in the shopping UI. Shimmer can
+cause the same presentation problem when a transmutation exists for an otherwise
+ordinary world material. This audit keeps both families visible in refresh logs.
 """
 from __future__ import annotations
 
@@ -27,17 +27,25 @@ def load() -> dict[str, list[object]]:
     return payload
 
 
+def report(label: str, rows: list[tuple[str, str]]) -> None:
+    rows.sort(key=lambda pair: pair[0].casefold())
+    print(f"{label}: {len(rows)}")
+    for name, source in rows:
+        print(f"  {name}: {source}")
+
+
 def main() -> int:
     rows = load()
     slime_rows: list[tuple[str, str]] = []
+    shimmer_rows: list[tuple[str, str]] = []
     for name, row in rows.items():
         source = str(row[2] if isinstance(row, list) and len(row) > 2 else "")
         if "Slime" in source:
             slime_rows.append((name, source))
-    slime_rows.sort(key=lambda pair: pair[0].casefold())
-    print(f"Slime-backed canonical source badges: {len(slime_rows)}")
-    for name, source in slime_rows:
-        print(f"  {name}: {source}")
+        if source.startswith("Shimmer transmutation:"):
+            shimmer_rows.append((name, source))
+    report("Slime-backed canonical source badges", slime_rows)
+    report("Shimmer-primary canonical source badges", shimmer_rows)
     return 0
 
 
