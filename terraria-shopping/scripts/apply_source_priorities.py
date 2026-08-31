@@ -22,13 +22,15 @@ PREFIX = "window.TERRARIA_GENERATED_AVAILABILITY="
 
 # These are deliberately concise primary acquisition routes. Secondary slime or
 # Shimmer methods remain valid Terraria mechanics; they simply are not the most
-# useful headline for a shopping-list row.
+# useful headline for a shopping-list row. A secondary route is retained when it
+# is genuinely useful rather than incidental (for example Conveyor Belt vendor).
 DIRECT_SOURCE_PRIORITIES: dict[str, str] = {
     # 1.4.5 resource-slime cases where Drops Cargo otherwise wins by accident.
     "Bomb": "Demolitionist / Skeleton Merchant / Pots / Chests",
     "Cloud": "Floating Islands (mine)",
     "Cobweb": "Underground / Spider Nest (harvest)",
     "Confetti": "Party Girl (NPC)",
+    "Conveyor Belt (Clockwise)": "Conveyor Slime (mob) / Steampunker (NPC)",
     "Dart Trap": "Cavern / Dungeon traps (mine)",
     "Desert Fossil": "Underground Desert (mine)",
     "Dirt Block": "World terrain (mine)",
