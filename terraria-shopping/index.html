@@ -35,7 +35,7 @@
 <section class="about">
   <strong>Projects</strong> are finished craftables — items that are not used as an ingredient in another normal recipe. <strong>Components</strong> includes every craftable item, including intermediates.<br><br>
   The default sort is <strong>unique shopping-list items needed</strong>. Quantity does not affect the ranking: 9,000 of one ingredient still counts as one unique item.<br><br>
-  Each card shows how many unique shopping-list items have a known <strong>fishing route</strong> and how many you have <strong>obtained</strong>. If none of the required items are fishable, the card says <strong>LANDLOCKED</strong> instead.<br><br>
+  Each card tracks <strong>fishing-route items</strong> separately from the non-fishable <strong>remainders</strong>. Fishing routes include direct catches, fishing crates and their contents, Angler quest rewards, and loot from fishing-spawned enemies. If none of the required items are fishable, the card says <strong>LANDLOCKED</strong> instead.<br><br>
   Open a card for the shopping list and its direct crafting recipe. Corruption/Crimson substitutions are grouped together, so swapping an equivalent world-evil ingredient does not pretend to be a separate recipe.
 </section>
 <div class="footerbuttons"><button class="textbtn" id="resetChecks">Reset acquired checks</button></div>
@@ -43,6 +43,7 @@
 </main>
 <script src="data.generated.js"></script>
 <script src="availability.generated.js"></script>
+<script src="fishing.generated.js"></script>
 <script src="enrichment-core.js"></script>
 <script src="enrichment-availability.js"></script>
 <script src="enrichment-projects.js"></script>
