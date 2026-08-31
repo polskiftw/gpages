@@ -83,6 +83,16 @@ PROGRESSION_OVERRIDES: dict[str, tuple[list[str], str, int]] = {
 SOURCE_OVERRIDES: dict[str, str] = {
     "Aetherium Block": "Shimmer + any other liquid (contact)",
     "Stone Block": "World stone (mine)",
+    "Hay": "Grass + Sickle (harvest)",
+    "Obsidian": "Water + lava (contact)",
+    "Crimsandstone Block": "Underground Desert terrain (mine)",
+    "Ebonsandstone Block": "Underground Desert terrain (mine)",
+    "Pearlsandstone Block": "Underground Desert terrain (mine)",
+    "Hardened Crimsand Block": "Underground Desert terrain (mine)",
+    "Hardened Ebonsand Block": "Underground Desert terrain (mine)",
+    "Hardened Pearlsand Block": "Underground Desert terrain (mine)",
+    "Giant Shelly Banner": "50 Giant Shelly kills",
+    "Salamander Banner": "50 Salamander kills",
     "Copper Ore": "Surface / Underground / Cavern (ore)",
     "Tin Ore": "Surface / Underground / Cavern (ore)",
     "Iron Ore": "Surface / Underground / Cavern (ore)",
@@ -200,7 +210,7 @@ PSEUDO_AVAILABILITY: dict[str, tuple[str, list[str], str, int]] = {
     "Green Jellyfish (bait)": ("Hardmode", [], "Underground / Cavern fishing", 40),
     "Pink Jellyfish (bait)": ("Pre-Hardmode", [], "Ocean fishing", 10),
     "Music Box (Ocean)": ("Hardmode", [], "Wizard (NPC) + record at Ocean", 40),
-    "Music Box (Space)": ("Hardmode", [],"Wizard (NPC) + record in Space", 40),
+    "Music Box (Space)": ("Hardmode", [], "Wizard (NPC) + record in Space", 40),
 }
 
 HARDMODE_PSEUDO_HINTS = (
