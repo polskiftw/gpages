@@ -8,6 +8,8 @@ import audit_data as audit
 import build_data as bd
 import recipe_revision_rules as revisions
 
+FISHING = audit.ROOT / "fishing.generated.js"
+
 
 def validate_revision_canaries(recipes: list[dict[str, object]]) -> None:
     # Desktop 1.4.5.0 changed Stink Potion from 1 output / 1 water to
@@ -91,6 +93,42 @@ def validate_recipe_chain_canaries(recipes: list[dict[str, object]]) -> None:
     print("Recipe-chain canary clean (Reef Piano -> Reef Block batch -> acquisition leaves)")
 
 
+def validate_landlocked_projects(payload: dict[str, object], recipes: list[dict[str, object]]) -> None:
+    """Guard the project-card LANDLOCKED classification against fishing regressions."""
+    fishing = audit.load_js(FISHING, "window.TERRARIA_GENERATED_FISHING=")
+    if not isinstance(fishing, dict):
+        raise RuntimeError("fishing.generated.js payload is not an object")
+
+    by_result: dict[str, list[dict[str, object]]] = collections.defaultdict(list)
+    for recipe in recipes:
+        by_result[str(recipe["r"])].append(recipe)
+    use_counts = bd.ingredient_use_counts(recipes)
+
+    nodes = payload.get("nodes") or []
+    endpoints = [str(node[0]) for node in nodes if isinstance(node, list) and len(node) > 2 and bool(node[2])]
+    landlocked: list[str] = []
+    fishable: list[str] = []
+    for name in endpoints:
+        leaves, cycles, _steps, cycle_to = bd.canonical_plan(name, 1, by_result, use_counts)
+        if cycles or cycle_to or not leaves:
+            raise RuntimeError(f"LANDLOCKED audit could not resolve {name}: cycles={cycles}, cycle_to={cycle_to!r}")
+        if any(leaf in fishing for leaf in leaves):
+            fishable.append(name)
+        else:
+            landlocked.append(name)
+
+    if not landlocked:
+        raise RuntimeError(
+            "LANDLOCKED regression: every endpoint project has a fishing-route leaf; "
+            "the project badge would disappear from the entire catalog"
+        )
+    print(
+        f"LANDLOCKED classification clean: {len(landlocked)} landlocked endpoint projects; "
+        f"{len(fishable)} with at least one fishing-route leaf. "
+        f"Samples: {', '.join(sorted(landlocked, key=str.casefold)[:12])}"
+    )
+
+
 def main() -> int:
     payload = audit.load_js(audit.DATA, "window.TERRARIA_RECIPE_DATA=")
     if not isinstance(payload, dict):
@@ -113,6 +151,7 @@ def main() -> int:
     validate_recipe_chain_canaries(recipes)
     audit.validate_reciprocals(recipes)
     audit.validate_shopping_lists(payload, recipes)
+    validate_landlocked_projects(payload, recipes)
     print("ALL RESOLVED DESKTOP TERRARIA RECIPE + SHOPPING DATA AUDITS PASSED")
     return 0
 
