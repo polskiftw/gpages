@@ -14,6 +14,7 @@ on:
       - 'terraria-shopping/scripts/repair_availability.py'
       - 'terraria-shopping/scripts/build_fishing.py'
       - 'terraria-shopping/scripts/build_vendors.py'
+      - 'terraria-shopping/scripts/audit_data.py'
       - '.github/workflows/update-terraria-shopping.yml'
 
 permissions:
@@ -38,6 +39,8 @@ jobs:
         run: python terraria-shopping/scripts/build_fishing.py
       - name: Build vendor prices
         run: python terraria-shopping/scripts/build_vendors.py
+      - name: Audit all recipes and shopping lists
+        run: python terraria-shopping/scripts/audit_data.py
       - name: Commit generated data when changed
         shell: bash
         run: |
