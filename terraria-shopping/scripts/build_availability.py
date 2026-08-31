@@ -3,7 +3,8 @@
 
 Recipe data tells the browser what must be collected. The Official Terraria Wiki
 Items Cargo table supplies the authoritative Hardmode-only flag for real items;
-small progression overrides add useful boss/event context for gated ingredients.
+small acquisition overrides add useful boss/event/source context for gated
+ingredients without mixing prerequisites and drop sources into one vague label.
 """
 from __future__ import annotations
 
@@ -20,64 +21,66 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 RECIPE_DATA = ROOT / "data.generated.js"
 OUT = ROOT / "availability.generated.js"
 PAGE_SIZE = 500
-USER_AGENT = "polskiftw/gpages terraria-shopping availability-badges/1.1 (GitHub Pages data refresh)"
+USER_AGENT = "polskiftw/gpages terraria-shopping availability-badges/1.2 (GitHub Pages data refresh)"
 ITEM_FIELDS = "name,hardmode"
 
-# Second-pill detail for progression-gated leaves that regularly appear in
-# larger crafting projects. Everything else still receives its mode badge from
-# the Wiki's hardmode field.
-PROGRESSION_OVERRIDES: dict[str, tuple[str, int]] = {
-    "Starfury": ("Available immediately • Floating Island", 10),
-    "Enchanted Sword": ("Available immediately • Enchanted Sword Shrine", 10),
-    "Bee Keeper": ("After Queen Bee • Jungle", 15),
-    "Muramasa": ("After Skeletron • Dungeon", 30),
-    "Hellstone": ("After Eater of Worlds / Brain of Cthulhu • Underworld", 20),
-    "Cobalt Ore": ("After Wall of Flesh • first altar tier", 40),
-    "Palladium Ore": ("After Wall of Flesh • first altar tier", 40),
-    "Mythril Ore": ("After Wall of Flesh • second altar tier", 40),
-    "Orichalcum Ore": ("After Wall of Flesh • second altar tier", 40),
-    "Adamantite Ore": ("After Wall of Flesh • third altar tier", 40),
-    "Titanium Ore": ("After Wall of Flesh • third altar tier", 40),
-    "Soul of Light": ("After Wall of Flesh • Underground Hallow", 40),
-    "Soul of Night": ("After Wall of Flesh • Underground Corruption/Crimson", 40),
-    "Soul of Flight": ("After Wall of Flesh • Wyvern", 40),
-    "Crystal Shard": ("After Wall of Flesh • Underground Hallow", 40),
-    "Cursed Flame": ("After Wall of Flesh • Corruption", 40),
-    "Ichor": ("After Wall of Flesh • Crimson", 40),
-    "Hallowed Bar": ("After any Mechanical Boss", 50),
-    "Soul of Fright": ("After Skeletron Prime", 50),
-    "Soul of Might": ("After The Destroyer", 50),
-    "Soul of Sight": ("After The Twins", 50),
-    "Chlorophyte Ore": ("After all Mechanical Bosses • Underground Jungle", 55),
-    "Seedler": ("After Plantera • Plantera drop", 60),
-    "The Horseman's Blade": ("After Plantera • Pumpkin Moon", 60),
-    "Ectoplasm": ("After Plantera • Dungeon", 60),
-    "Broken Hero Sword": ("After Plantera • Solar Eclipse", 60),
-    "Temple Key": ("After Plantera • Plantera drop", 60),
-    "Spooky Wood": ("After Plantera • Pumpkin Moon", 60),
-    "Beetle Husk": ("After Golem • Golem drop", 70),
-    "Influx Waver": ("After Golem • Martian Madness", 70),
-    "Ancient Manipulator": ("After Golem • Lunatic Cultist drop", 80),
-    "Solar Fragment": ("After Lunatic Cultist • Solar Pillar", 80),
-    "Vortex Fragment": ("After Lunatic Cultist • Vortex Pillar", 80),
-    "Nebula Fragment": ("After Lunatic Cultist • Nebula Pillar", 80),
-    "Stardust Fragment": ("After Lunatic Cultist • Stardust Pillar", 80),
-    "Luminite": ("After Moon Lord • Moon Lord drop", 90),
-    "Meowmere": ("After Moon Lord • Moon Lord drop", 90),
-    "Star Wrath": ("After Moon Lord • Moon Lord drop", 90),
+# Extra pills for progression-gated leaves that regularly appear in larger
+# crafting projects. Each list keeps prerequisites separate from the actual
+# acquisition source, e.g. ["After Plantera", "Mothron (Solar Eclipse)"].
+# Everything else still receives its broad mode badge from the Wiki's hardmode
+# field.
+PROGRESSION_OVERRIDES: dict[str, tuple[list[str], int]] = {
+    "Starfury": (["Skyware Chest / Sky Crate"], 10),
+    "Enchanted Sword": (["Enchanted Sword Shrine"], 10),
+    "Bee Keeper": (["Queen Bee (boss)"], 15),
+    "Muramasa": (["After Skeletron", "Dungeon Gold Chest"], 30),
+    "Hellstone": (["After Eater of Worlds / Brain of Cthulhu", "Underworld (ore)"], 20),
+    "Cobalt Ore": (["Tier 1 Hardmode ore"], 40),
+    "Palladium Ore": (["Tier 1 Hardmode ore"], 40),
+    "Mythril Ore": (["Tier 2 Hardmode ore"], 40),
+    "Orichalcum Ore": (["Tier 2 Hardmode ore"], 40),
+    "Adamantite Ore": (["Tier 3 Hardmode ore"], 40),
+    "Titanium Ore": (["Tier 3 Hardmode ore"], 40),
+    "Soul of Light": (["Underground Hallow enemies"], 40),
+    "Soul of Night": (["Underground evil enemies"], 40),
+    "Soul of Flight": (["Wyvern (enemy)"], 40),
+    "Crystal Shard": (["Underground Hallow"], 40),
+    "Cursed Flame": (["Corruption enemies"], 40),
+    "Ichor": (["Crimson enemies"], 40),
+    "Hallowed Bar": (["Any Mechanical Boss"], 50),
+    "Soul of Fright": (["Skeletron Prime (boss)"], 50),
+    "Soul of Might": (["The Destroyer (boss)"], 50),
+    "Soul of Sight": (["The Twins (boss)"], 50),
+    "Chlorophyte Ore": (["After all 3 Mechanical Bosses", "Underground Jungle (ore)"], 55),
+    "Seedler": (["Plantera (boss)"], 60),
+    "The Horseman's Blade": (["After Plantera", "Pumpking (Pumpkin Moon)"], 60),
+    "Ectoplasm": (["After Plantera", "Dungeon Spirit (enemy)"], 60),
+    "Broken Hero Sword": (["After Plantera", "Mothron (Solar Eclipse)"], 60),
+    "Temple Key": (["Plantera (boss)"], 60),
+    "Spooky Wood": (["After Plantera", "Pumpkin Moon enemies"], 60),
+    "Beetle Husk": (["Golem (boss)"], 70),
+    "Influx Waver": (["After Golem", "Martian Saucer (Martian Madness)"], 70),
+    "Ancient Manipulator": (["Lunatic Cultist (boss)"], 80),
+    "Solar Fragment": (["After Lunatic Cultist", "Solar Pillar"], 80),
+    "Vortex Fragment": (["After Lunatic Cultist", "Vortex Pillar"], 80),
+    "Nebula Fragment": (["After Lunatic Cultist", "Nebula Pillar"], 80),
+    "Stardust Fragment": (["After Lunatic Cultist", "Stardust Pillar"], 80),
+    "Luminite": (["Moon Lord (boss)"], 90),
+    "Meowmere": (["Moon Lord (boss)"], 90),
+    "Star Wrath": (["Moon Lord (boss)"], 90),
 }
 
 # Cargo recipe arguments sometimes use recipe-category labels or display names
 # that are not literal rows in the Items table. These are real current-PC
 # ingredients, so classify the aliases explicitly instead of letting them become
 # bare shopping-list rows.
-PSEUDO_AVAILABILITY: dict[str, tuple[str, str, int]] = {
-    "Adamantite/Titanium Bar": ("Hardmode", "After Wall of Flesh • third altar tier", 40),
-    "Blue Jellyfish (bait)": ("Pre-Hardmode", "Available immediately • Fishing Underground/Cavern", 10),
-    "Green Jellyfish (bait)": ("Hardmode", "After Wall of Flesh • Fishing Underground/Cavern", 40),
-    "Pink Jellyfish (bait)": ("Pre-Hardmode", "Available immediately • Fishing Ocean", 10),
-    "Music Box (Ocean)": ("Hardmode", "After Wall of Flesh • Wizard / record at Ocean", 40),
-    "Music Box (Space)": ("Hardmode", "After Wall of Flesh • Wizard / record in Space", 40),
+PSEUDO_AVAILABILITY: dict[str, tuple[str, list[str], int]] = {
+    "Adamantite/Titanium Bar": ("Hardmode", ["Tier 3 Hardmode bar"], 40),
+    "Blue Jellyfish (bait)": ("Pre-Hardmode", ["Underground / Cavern fishing"], 10),
+    "Green Jellyfish (bait)": ("Hardmode", ["Underground / Cavern fishing"], 40),
+    "Pink Jellyfish (bait)": ("Pre-Hardmode", ["Ocean fishing"], 10),
+    "Music Box (Ocean)": ("Hardmode", ["Wizard (NPC)", "Record at Ocean"], 40),
+    "Music Box (Space)": ("Hardmode", ["Wizard (NPC)", "Record in Space"], 40),
 }
 
 HARDMODE_PSEUDO_HINTS = (
@@ -229,14 +232,14 @@ def main() -> int:
         if mode is None:
             unresolved.append(name)
             continue
-        when, rank = PROGRESSION_OVERRIDES.get(name, ("", 40 if mode == "Hardmode" else 10))
+        labels, rank = PROGRESSION_OVERRIDES.get(name, ([], 40 if mode == "Hardmode" else 10))
         # Some Wiki item rows omit/misstate the broad Hardmode flag even when a
         # known progression gate is unambiguously post-Wall-of-Flesh. The
         # explicit milestone wins in that case. Pre-Hardmode milestones use
         # ranks below 40 and keep their Pre-Hardmode badge.
         if rank >= 40 and name in PROGRESSION_OVERRIDES:
             mode = "Hardmode"
-        rows[name] = [mode, when, rank]
+        rows[name] = [mode, labels, rank]
     if unresolved:
         print("Unresolved shopping-list names:", file=sys.stderr)
         for name in unresolved:
