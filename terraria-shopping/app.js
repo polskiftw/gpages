@@ -244,8 +244,8 @@ function projectCard(n){
   const s=shoppingSummary(n.name);
   const fish=s.fishable?`<span class="pill fish">${s.fishableObtained}/${s.fishable} FISHABLE</span>`:'<span class="pill hard">LANDLOCKED</span>';
   const remainders=fishMode?.checked?'':`<span class="pill ${s.remainderObtained===s.remainders&&s.remainders?'pre':''}">${s.remainderObtained}/${s.remainders} REMAINDERS</span>`;
-  const isFavorite=favorites.has(n.name), favorite=view==='projects'?`<button class="favorite${isFavorite?' active':''}" type="button" data-name="${esc(n.name)}" aria-pressed="${isFavorite?'true':'false'}" aria-label="${isFavorite?'Remove':'Add'} ${esc(n.name)} ${isFavorite?'from':'to'} favorites" title="${isFavorite?'Remove from':'Add to'} favorites">${isFavorite?'★':'☆'}</button>`:'';
-  return`<details class="card project" data-name="${esc(n.name)}"><summary class="projectsummary"><div class="projecttop"><div><div class="projecttitle">${esc(n.name)}</div><div class="projectmeta">${fish}${remainders}</div></div><div class="projectactions">${favorite}<span class="chev">›</span></div></div></summary><div class="projectbody" data-loaded="0"><div class="loading">Opening shopping list…</div></div></details>`;
+  const isFavorite=favorites.has(n.name), hasFavorite=view==='projects', favorite=hasFavorite?`<button class="favorite${isFavorite?' active':''}" type="button" data-name="${esc(n.name)}" aria-pressed="${isFavorite?'true':'false'}" aria-label="${isFavorite?'Remove':'Add'} ${esc(n.name)} ${isFavorite?'from':'to'} favorites" title="${isFavorite?'Remove from':'Add to'} favorites">${isFavorite?'★':'☆'}</button>`:'';
+  return`<details class="card project${hasFavorite?' hasfavorite':''}" data-name="${esc(n.name)}"><summary class="projectsummary"><div class="projecttop"><div><div class="projecttitle">${esc(n.name)}</div><div class="projectmeta">${fish}${remainders}</div></div><div class="projectactions"><span class="chev">›</span></div></div></summary>${favorite}<div class="projectbody" data-loaded="0"><div class="loading">Opening shopping list…</div></div></details>`;
 }
 function renderCatalog(openNames=new Set()){
   const base=view==='projects'?projectNodes:componentNodes;const q=search.value.trim().toLowerCase();let list=base;
@@ -255,7 +255,7 @@ function renderCatalog(openNames=new Set()){
   if(list.length>visible.length)html+=`<div class="morewrap"><button class="more" id="showMore">Show ${Math.min(PAGE,list.length-visible.length)} more • ${list.length-visible.length} remaining</button></div>`;
   if(!list.length)html=`<div class="card empty">${fishMode?.checked?'No craftables have unfinished fishing-route items in this Fish Mode snapshot.':'No craftables match the current search.'}</div>`;
   content.innerHTML=html;for(const d of $$('details.project'))if(openNames.has(d.dataset.name)){d.open=true;loadBody(d)}
-  $('#showMore')?.addEventListener('click',()=>{const keepOpen=new Set($$('details.project[open]').map(el=>el.dataset.name));shown+=PAGE;render(keepOpen)});renderStats(list.length);
+  $('#showMore')?.addEventListener('click',()=>{const keepOpen=new Set($$('details.project[open]').map(el=>el.dataset.name));shown+=PAGE;render(keepOpen)});renderStats(list.length)
 }
 function sourceSearchText(id){const i=items[id],a=av(id),ps=curatedProjects.filter(p=>p.items.some(x=>x[0]===id)).map(p=>p.name).join(' ');return[i.name,i.fishSource||'',fishingRoute(i.name),i.source||'',i.type,a.mode,cleanWhen(a.when),a.source||'',i.note||'',ps].join(' ').toLowerCase()}
 function renderSources(wantFish){
