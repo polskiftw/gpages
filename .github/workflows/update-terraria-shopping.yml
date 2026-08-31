@@ -19,6 +19,9 @@ on:
       - 'terraria-shopping/scripts/audit_data.py'
       - 'terraria-shopping/scripts/audit_current_data.py'
       - 'terraria-shopping/scripts/audit_platform_overrides.py'
+      - 'terraria-shopping/scripts/audit_curated_projects.py'
+      - 'terraria-shopping/enrichment-projects.js'
+      - 'terraria-shopping/enrichment-items-*.js'
       - '.github/workflows/update-terraria-shopping.yml'
 
 permissions:
@@ -49,6 +52,8 @@ jobs:
         run: python terraria-shopping/scripts/audit_current_data.py
       - name: Audit platform override resolution
         run: python terraria-shopping/scripts/audit_platform_overrides.py
+      - name: Audit curated project shopping lists
+        run: python terraria-shopping/scripts/audit_curated_projects.py
       - name: Commit generated data when changed
         shell: bash
         run: |
