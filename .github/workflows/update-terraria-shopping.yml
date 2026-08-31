@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - terraria-full-catalog
+      - terraria-source-coverage-audit
     paths:
       - 'terraria-shopping/scripts/build_data.py'
       - 'terraria-shopping/scripts/build_availability.py'
