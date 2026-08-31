@@ -18,12 +18,13 @@ import urllib.request
 API = "https://terraria.wiki.gg/api.php"
 OUT = pathlib.Path(__file__).resolve().parents[1] / "data.generated.js"
 PAGE_SIZE = 500
-USER_AGENT = "polskiftw/gpages terraria-shopping recipe-catalog/2.3 (GitHub Pages data refresh)"
+CURRENT_DESKTOP_VERSION = "1.4.5.8"
+USER_AGENT = "polskiftw/gpages terraria-shopping recipe-catalog/2.4 (GitHub Pages data refresh)"
 FIELDS = "result,resultid,amount,version,station,args,legacy"
 SKIP_STATIONS = {"Shimmer", "Chlorophyte Extractinator"}
 
 # A few old-gen-console / 3DS recipes currently leak through Cargo without a
-# useful legacy/version marker. This site is explicitly Desktop 1.4.5.x, so do
+# useful legacy/version marker. This site is explicitly Desktop 1.4.5.8, so do
 # not let Ocram-era craftables enter the PC graph.
 SKIP_RESULTS = {
     "Pot o' Gold",
@@ -381,7 +382,7 @@ def main() -> int:
     endpoints = [node for node in nodes if node[2]]
     payload = {
         "schema": 3,
-        "game": "Terraria Desktop 1.4.5.x",
+        "game": f"Terraria Desktop {CURRENT_DESKTOP_VERSION}",
         "generatedAt": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "source": "Official Wiki recipe data via Recipes Cargo",
         "recipeCount": len(recipes),
