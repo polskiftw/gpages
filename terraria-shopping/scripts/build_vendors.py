@@ -152,7 +152,10 @@ def fetch_vendor_prices(candidates: dict[str, str]) -> dict[str, tuple[str, str]
             if not match:
                 continue
             seller = candidates[name]
-            price = extract_vendor_price(match.group(1), seller)
+            segment = match.group(1)
+            if name in {"Bug Net", "Empty Bullet", "Spelunker Glowstick"}:
+                print(f"Vendor raw {name}: {segment!r}", file=sys.stderr)
+            price = extract_vendor_price(segment, seller)
             if price:
                 out[name] = (seller, price)
         print(
