@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
+import html
 import json
 import re
 import urllib.parse
 import urllib.request
 
 API = "https://terraria.wiki.gg/api.php"
-HEADERS = {"User-Agent": "polskiftw/gpages terraria-source-probe/1.4", "Accept": "application/json"}
+HEADERS = {"User-Agent": "polskiftw/gpages terraria-source-probe/1.5", "Accept": "application/json"}
+ITEMS = [
+    "Music Box", "Armored Cavefish", "Angler Earring", "Acorn", "Actuator",
+    "Life Crystal", "Prismatic Lacewing", "Active Stone Block", "Adhesive Bandage", "Aglet",
+]
 
 def request(**params):
     params.setdefault("format", "json")
@@ -15,19 +20,23 @@ def request(**params):
     with urllib.request.urlopen(req, timeout=45) as response:
         return json.loads(response.read().decode("utf-8"))
 
-pages = [
-    "Music Box", "Armored Cavefish", "Active Stone Block", "Acorn",
-    "Angler Earring", "Actuator", "Prismatic Lacewing", "Life Crystal",
-]
-payload = request(
-    action="query", prop="revisions", titles="|".join(pages),
-    rvprop="content", rvslots="main", redirects=1,
-)
-for page in payload.get("query", {}).get("pages", []):
-    title = page.get("title")
-    revs = page.get("revisions") or []
-    text = (((revs[0] if revs else {}).get("slots") or {}).get("main") or {}).get("content", "")
-    print("\n### PAGE", title)
-    for line in text.splitlines():
-        if re.search(r"\b(vendor|plunder|fished|drop|loot|bag loot|source|buy)\b", line, re.I):
-            print(line[:1600])
+def plain(value):
+    value = re.sub(r"<style\b[^>]*>.*?</style>", " ", value, flags=re.I | re.S)
+    value = re.sub(r"<script\b[^>]*>.*?</script>", " ", value, flags=re.I | re.S)
+    value = re.sub(r"<br\s*/?>", " / ", value, flags=re.I)
+    value = re.sub(r"<[^>]+>", " ", value)
+    value = html.unescape(value)
+    return re.sub(r"\s+", " ", value).strip()
+
+for name in ITEMS:
+    payload = request(
+        action="parse",
+        contentmodel="wikitext",
+        prop="text",
+        title=name,
+        text=f'<div class="source-probe">{{{{itemsource|{name}|sep= / }}}}</div>',
+    )
+    rendered = ((payload.get("parse") or {}).get("text") or "")
+    print("\n###", name)
+    print("PLAIN:", plain(rendered)[:4000])
+    print("HTML:", rendered[:6000].replace("\n", " "))
