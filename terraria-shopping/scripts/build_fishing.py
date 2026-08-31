@@ -5,7 +5,7 @@ An item is fishable when fishing can satisfy the shopping-list requirement by
 any supported route, not only when the item itself is a direct catch. Routes are
 built from Official Terraria Wiki data using:
   * Category:Fished items for direct catches (including crates/containers),
-  * Drops Cargo for transitive container/enemy loot,
+  * Drops Cargo for transitive container loot,
   * Angler quest sources from the generated availability dataset,
   * Blood Moon enemies that are spawned through fishing.
 
@@ -67,6 +67,10 @@ def clean_name(value: object) -> str:
     text = VERSION_PAREN.sub("", text)
     text = SPACE_RE.sub(" ", text).strip()
     return text
+
+
+def cargo_bool(value: object) -> bool:
+    return str(value or "").strip().casefold() in {"1", "true", "yes"}
 
 
 def load_availability() -> dict[str, list[object]]:
@@ -132,13 +136,18 @@ def fetch_drop_edges() -> dict[str, set[str]]:
             title = entry.get("title") or {}
             producer = clean_name(title.get("nameraw"))
             item = clean_name(title.get("item"))
-            if producer and item and producer != item:
+            is_npc = cargo_bool(title.get("isfromnpc"))
+            # Ordinary NPC/mob drops must not propagate from a same-named item.
+            # The Enchanted Sword item/enemy collision is a concrete example.
+            # Fishing-spawned Blood Moon enemies are the intentional exception.
+            allowed_producer = not is_npc or producer in BLOOD_MOON_FISHING_ENEMIES
+            if allowed_producer and producer and item and producer != item:
                 edges[producer].add(item)
         offset += len(batch)
         if len(batch) < PAGE_SIZE:
             break
         time.sleep(0.06)
-    print(f"Fetched {offset} Drops rows across {len(edges)} producers", file=sys.stderr)
+    print(f"Fetched {offset} Drops rows across {len(edges)} fishing-propagatable producers", file=sys.stderr)
     return edges
 
 
@@ -182,8 +191,8 @@ def build_routes(availability: dict[str, list[object]], direct_fished: set[str],
         elif "fishing" in source_cf:
             routes[name] = source or "Fishing"
 
-    # Propagate through loot containers and fishing-spawned enemies. First route
-    # wins because direct/category seeds are queued before derived nodes.
+    # Propagate through fished loot containers and explicitly fishing-spawned
+    # enemies. First route wins because direct seeds are queued before descendants.
     while queue:
         producer = queue.popleft()
         parent_route = graph_routes[producer]
@@ -200,8 +209,6 @@ def build_routes(availability: dict[str, list[object]], direct_fished: set[str],
 
 
 def validate(routes: dict[str, str], availability: dict[str, list[object]]) -> None:
-    # Stable regression probes for direct, container-derived, and sub-container
-    # fishing routes. Only assert probes that exist in the current shopping set.
     probes = {
         "Armored Cavefish": "direct catch",
         "Aglet": "crate-derived item",
@@ -210,6 +217,10 @@ def validate(routes: dict[str, str], availability: dict[str, list[object]]) -> N
     missing = [f"{name} ({label})" for name, label in probes.items() if name in availability and name not in routes]
     if missing:
         raise RuntimeError("Fishing-route regression: " + ", ".join(missing))
+
+    # Guard the known item/NPC same-name collision from regressing.
+    if routes.get("Nazar") == "Fishing → Enchanted Sword":
+        raise RuntimeError("Fishing-route regression: Enchanted Sword item/enemy collision leaked Nazar")
 
 
 def main() -> int:
