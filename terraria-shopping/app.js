@@ -31,7 +31,7 @@ if(!Object.keys(acquired).length){
   try{const old=JSON.parse(localStorage.getItem('terraria-shopping-progress-v1')||'{}')||{};for(const [id,v] of Object.entries(old))if(v)acquired['legacy:'+id]=true}catch(_){}
 }
 const save=()=>localStorage.setItem('terraria-shopping-progress-v2',JSON.stringify(acquired));
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[c]));
 const wikiName=name=>W+encodeURIComponent(String(name).replaceAll(' ','_'));
 const wikiItem=id=>W+(items[id]?.wiki||encodeURIComponent(String(items[id]?.name||id).replaceAll(' ','_')));
 const avObject=tuple=>{
@@ -92,8 +92,11 @@ function shoppingEntries(name){
   return entries;
 }
 function shoppingSummary(name){
-  const entries=shoppingEntries(name), total=entries.length, fishable=entries.filter(e=>e.fishable).length, obtained=entries.filter(e=>acquired[e.key]).length;
-  return{entries,total,fishable,obtained};
+  const entries=shoppingEntries(name), total=entries.length;
+  const fishableEntries=entries.filter(e=>e.fishable), remainderEntries=entries.filter(e=>!e.fishable);
+  const fishable=fishableEntries.length, remainders=remainderEntries.length;
+  const fishableObtained=fishableEntries.filter(e=>acquired[e.key]).length, remainderObtained=remainderEntries.filter(e=>acquired[e.key]).length;
+  return{entries,total,fishable,remainders,fishableObtained,remainderObtained};
 }
 function uniqueNeeded(node){const cp=curatedByName.get(node.name);return cp?cp.items.length:node.uniqueItems}
 
@@ -178,9 +181,9 @@ function nodeSort(a,b){
 }
 function projectCard(n){
   const s=shoppingSummary(n.name);
-  const fish=s.fishable?`<span class="pill fish">${s.fishable}/${s.total} FISHABLE</span>`:'<span class="pill hard">LANDLOCKED</span>';
-  const obtained=`<span class="pill ${s.obtained===s.total&&s.total?'pre':''}">${s.obtained}/${s.total} OBTAINED</span>`;
-  return`<details class="card project" data-name="${esc(n.name)}"><summary class="projectsummary"><div class="projecttop"><div><div class="projecttitle">${esc(n.name)}</div><div class="projectmeta">${fish}${obtained}</div></div><span class="chev">›</span></div></summary><div class="projectbody" data-loaded="0"><div class="loading">Opening shopping list…</div></div></details>`;
+  const fish=s.fishable?`<span class="pill fish">${s.fishableObtained}/${s.fishable} FISHABLE</span>`:'<span class="pill hard">LANDLOCKED</span>';
+  const remainders=`<span class="pill ${s.remainderObtained===s.remainders&&s.remainders?'pre':''}">${s.remainderObtained}/${s.remainders} REMAINDERS</span>`;
+  return`<details class="card project" data-name="${esc(n.name)}"><summary class="projectsummary"><div class="projecttop"><div><div class="projecttitle">${esc(n.name)}</div><div class="projectmeta">${fish}${remainders}</div></div><span class="chev">›</span></div></summary><div class="projectbody" data-loaded="0"><div class="loading">Opening shopping list…</div></div></details>`;
 }
 function renderCatalog(openNames=new Set()){
   const base=view==='projects'?projectNodes:componentNodes;const q=search.value.trim().toLowerCase();let list=base;
