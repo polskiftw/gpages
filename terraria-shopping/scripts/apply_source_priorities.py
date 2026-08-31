@@ -45,12 +45,13 @@ DIRECT_SOURCE_PRIORITIES: dict[str, str] = {
     "Spike": "Dungeon traps (mine)",
     "Wood": "Trees (chop)",
 
-    # Ordinary world materials for which Itemsource currently promotes Shimmer.
+    # Ordinary world/material interactions for which Itemsource promotes Shimmer.
     "Clay Block": "Underground deposits (mine)",
     "Crimsand Block": "Crimson Desert (mine)",
     "Ebonsand Block": "Corruption Desert (mine)",
     "Mushroom": "Forest grass (harvest)",
     "Sand Block": "Desert / Ocean (mine)",
+    "Water Bucket": "Water + Empty Bucket (collect)",
 }
 
 
