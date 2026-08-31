@@ -4,13 +4,13 @@
 Every canonical shopping-list leaf must have two distinct concepts available to
 the UI:
   * availability: mode / progression / event conditions
-  * source: the thing, place, NPC, activity, or craft station that produces it
+  * source: the thing, place, NPC, activity, or interaction that produces it
 
 The Official Terraria Wiki supplies the broad Hardmode flag, Drops Cargo supplies
 mob/container sources, and Template:Itemsource fills shop/fishing/plunder routes.
 Small explicit overrides and category rules cover world harvests, critters, quest
-rewards, and unusual interactions. The build fails if a noncraftable shopping
-leaf would otherwise ship with only a PRE/HARDMODE badge.
+rewards, and unusual interactions. The build fails if any canonical shopping
+leaf would otherwise ship without a meaningful acquisition source.
 """
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ RECIPE_DATA = ROOT / "data.generated.js"
 OUT = ROOT / "availability.generated.js"
 PAGE_SIZE = 500
 ITEMSOURCE_BATCH = 12
-USER_AGENT = "polskiftw/gpages terraria-shopping availability-badges/1.6 (GitHub Pages data refresh)"
+USER_AGENT = "polskiftw/gpages terraria-shopping availability-badges/1.7 (GitHub Pages data refresh)"
 ITEM_FIELDS = "name,hardmode"
 
 # item -> (availability conditions, acquisition source, progression rank)
@@ -81,6 +81,8 @@ PROGRESSION_OVERRIDES: dict[str, tuple[list[str], str, int]] = {
 # itemsource rendering. These are still concise because the shopping-list row is
 # meant to answer "where/how do I get this?", not reproduce the Wiki article.
 SOURCE_OVERRIDES: dict[str, str] = {
+    "Aetherium Block": "Shimmer + any other liquid (contact)",
+    "Stone Block": "World stone (mine)",
     "Copper Ore": "Surface / Underground / Cavern (ore)",
     "Tin Ore": "Surface / Underground / Cavern (ore)",
     "Iron Ore": "Surface / Underground / Cavern (ore)",
@@ -436,42 +438,121 @@ def merge_leaves(into: dict[str, int], other: dict[str, int]) -> None:
         into[name] = into.get(name, 0) + qty
 
 
-def canonical_plan(name: str, qty: int, by_result: dict[str, list[dict]], stack: frozenset[str] = frozenset(), depth: int = 0) -> tuple[dict[str, int], int, int]:
-    options = by_result.get(name) or []
+def ingredient_use_counts(recipes: list[dict]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for recipe in recipes:
+        for ingredient, _amount in recipe.get("i") or []:
+            name = str(ingredient)
+            counts[name] = counts.get(name, 0) + 1
+    return counts
+
+
+def processed_build_form(name: str) -> bool:
+    return name.endswith(" Platform") or name.endswith(" Wall")
+
+
+def reciprocal_ingredient(recipe: dict, by_result: dict[str, list[dict]]) -> str:
+    inputs = recipe.get("i") or []
+    if len(inputs) != 1:
+        return ""
+    ingredient = str(inputs[0][0])
+    ingredient_qty = max(1, int(inputs[0][1]))
+    result_qty = max(1, int(recipe.get("a") or 1))
+    result = str(recipe["r"])
+    for reverse in by_result.get(ingredient) or []:
+        reverse_inputs = reverse.get("i") or []
+        if (
+            len(reverse_inputs) == 1
+            and str(reverse_inputs[0][0]) == result
+            and max(1, int(reverse_inputs[0][1])) == result_qty
+            and max(1, int(reverse.get("a") or 1)) == ingredient_qty
+        ):
+            return ingredient
+    return ""
+
+
+def reciprocal_recipe_role(recipe: dict, by_result: dict[str, list[dict]], use_counts: dict[str, int]) -> str:
+    ingredient = reciprocal_ingredient(recipe, by_result)
+    if not ingredient:
+        return ""
+    result = str(recipe["r"])
+    result_processed = processed_build_form(result)
+    ingredient_processed = processed_build_form(ingredient)
+    if result_processed != ingredient_processed:
+        return "forward" if result_processed else "inverse"
+    result_uses = use_counts.get(result, 0)
+    ingredient_uses = use_counts.get(ingredient, 0)
+    if result_uses != ingredient_uses:
+        return "forward" if ingredient_uses > result_uses else "inverse"
+    return "ambiguous"
+
+
+def planning_options(name: str, by_result: dict[str, list[dict]], use_counts: dict[str, int]) -> list[dict]:
+    return [
+        recipe
+        for recipe in by_result.get(name) or []
+        if reciprocal_recipe_role(recipe, by_result, use_counts) not in {"inverse", "ambiguous"}
+    ]
+
+
+def canonical_plan(
+    name: str,
+    qty: int,
+    by_result: dict[str, list[dict]],
+    use_counts: dict[str, int],
+    stack: frozenset[str] = frozenset(),
+    depth: int = 0,
+) -> tuple[dict[str, int], int, int, str]:
+    options = planning_options(name, by_result, use_counts)
     if not options or depth > 48:
-        return {name: qty}, 0, 0
+        return {name: qty}, 0, 0, ""
     if name in stack:
-        return {name: qty}, 1, 0
+        return {}, 1, 0, name
     next_stack = stack | {name}
     candidates = []
+    propagated_cycle = ""
+    cycle_closed_here = False
     for recipe in options:
         batches = math.ceil(qty / max(1, int(recipe.get("a") or 1)))
         leaves: dict[str, int] = {}
-        cycles = 0
         steps = 1
+        cycle_to = ""
         for ingredient, amount in recipe.get("i") or []:
-            child, child_cycles, child_steps = canonical_plan(str(ingredient), max(1, int(amount)) * batches, by_result, next_stack, depth + 1)
+            child, _child_cycles, child_steps, child_cycle = canonical_plan(
+                str(ingredient), max(1, int(amount)) * batches, by_result, use_counts, next_stack, depth + 1
+            )
+            if child_cycle:
+                cycle_to = child_cycle
+                break
             merge_leaves(leaves, child)
-            cycles += child_cycles
             steps += child_steps
-        candidates.append((leaves, cycles, steps, recipe))
-    clean = [c for c in candidates if c[1] == 0]
-    if not clean:
-        return {name: qty}, 0, 0
-    clean.sort(key=lambda c: (
-        len(c[0]), sum(c[0].values()), c[2], str(c[3].get("s") or "").casefold(),
-        json.dumps(c[3].get("i") or [], ensure_ascii=False, separators=(",", ":")),
+        if cycle_to:
+            if cycle_to == name:
+                cycle_closed_here = True
+            elif not propagated_cycle:
+                propagated_cycle = cycle_to
+            continue
+        candidates.append((leaves, steps, recipe))
+    if not candidates:
+        if propagated_cycle and not cycle_closed_here:
+            return {}, 1, 0, propagated_cycle
+        return {name: qty}, 0, 0, ""
+    candidates.sort(key=lambda c: (
+        len(c[0]), sum(c[0].values()), c[1], str(c[2].get("s") or "").casefold(),
+        json.dumps(c[2].get("i") or [], ensure_ascii=False, separators=(",", ":")),
     ))
-    return clean[0][0], clean[0][1], clean[0][2]
+    return candidates[0][0], 0, candidates[0][1], ""
 
 
 def collect_leaf_names(data: dict) -> set[str]:
+    recipes = data.get("recipes") or []
     by_result: dict[str, list[dict]] = {}
-    for recipe in data.get("recipes") or []:
+    for recipe in recipes:
         by_result.setdefault(str(recipe["r"]), []).append(recipe)
+    use_counts = ingredient_use_counts(recipes)
     names: set[str] = set()
     for index, name in enumerate(sorted(by_result, key=str.casefold), 1):
-        leaves, _cycles, _steps = canonical_plan(name, 1, by_result)
+        leaves, _cycles, _steps, _cycle_to = canonical_plan(name, 1, by_result, use_counts)
         names.update(leaves)
         if index % 500 == 0:
             print(f"Audited {index}/{len(by_result)} craftables", file=sys.stderr)
@@ -511,7 +592,6 @@ def patterned_source(name: str) -> str:
 def main() -> int:
     data = load_recipe_data()
     leaf_names = collect_leaf_names(data)
-    craftable_names = {str(recipe["r"]) for recipe in data.get("recipes") or []}
     item_modes = fetch_item_modes()
     drop_sources = fetch_drop_sources(leaf_names)
     rows: dict[str, list[object]] = {}
@@ -543,18 +623,21 @@ def main() -> int:
             print(f"  - {name}", file=sys.stderr)
         raise RuntimeError(f"{len(unresolved)} shopping-list leaves have no availability classification")
 
-    source_gaps = [name for name, row in rows.items() if not str(row[2] or "").strip() and name not in craftable_names and name in item_modes]
+    # A leaf can still have reverse/recycling recipes in Cargo (for example
+    # Stone Wall -> Stone Block). Being technically craftable must not exempt it
+    # from answering the shopping-list question: "where do I actually get it?"
+    source_gaps = [name for name, row in rows.items() if not str(row[2] or "").strip() and name in item_modes]
     if source_gaps:
         template_sources = fetch_itemsource_sources(sorted(source_gaps, key=str.casefold))
         for name, source in template_sources.items():
             rows[name][2] = source
 
-    source_gaps = [name for name, row in rows.items() if not str(row[2] or "").strip() and name not in craftable_names]
+    source_gaps = [name for name, row in rows.items() if not str(row[2] or "").strip()]
     if source_gaps:
         print("Shopping-list leaves with no acquisition source:", file=sys.stderr)
         for name in source_gaps:
             print(f"  - {name}", file=sys.stderr)
-        raise RuntimeError(f"{len(source_gaps)} noncraftable shopping-list leaves have no source badge")
+        raise RuntimeError(f"{len(source_gaps)} shopping-list leaves have no source badge")
 
     OUT.write_text(
         "window.TERRARIA_GENERATED_AVAILABILITY=" + json.dumps(rows, ensure_ascii=False, separators=(",", ":")) + ";\n",
@@ -562,9 +645,8 @@ def main() -> int:
     )
     hard = sum(1 for row in rows.values() if row[0] == "Hardmode")
     sourced = sum(1 for row in rows.values() if row[2])
-    craft_fallback = sum(1 for name, row in rows.items() if not row[2] and name in craftable_names)
     print(
-        f"Wrote {OUT}: {len(rows)} leaves ({hard} Hardmode, {len(rows)-hard} Pre-Hardmode; {sourced} explicit sources; {craft_fallback} craft-source fallbacks; 0 status-only rows)",
+        f"Wrote {OUT}: {len(rows)} leaves ({hard} Hardmode, {len(rows)-hard} Pre-Hardmode; {sourced} sourced; 0 source gaps)",
         file=sys.stderr,
     )
     return 0
