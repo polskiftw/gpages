@@ -12,6 +12,8 @@ built from Official Terraria Wiki data using:
 When several equally short fishing paths exist, all immediate producers are kept.
 This prevents world/progression counterparts such as Wooden/Pearlwood Crates or
 Defiled/Hematic Crates from being silently reduced to whichever queue entry won.
+Very large all-crate sets are rendered as an exact crate-type count so badges stay
+usable on mobile without discarding the fact that many equivalent routes exist.
 """
 from __future__ import annotations
 
@@ -30,7 +32,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 AVAILABILITY_DATA = ROOT / "availability.generated.js"
 OUT = ROOT / "fishing.generated.js"
 PAGE_SIZE = 500
-USER_AGENT = "polskiftw/gpages terraria-shopping fishing-routes/1.1 (GitHub Pages data refresh)"
+USER_AGENT = "polskiftw/gpages terraria-shopping fishing-routes/1.2 (GitHub Pages data refresh)"
 
 BLOOD_MOON_FISHING_ENEMIES = {
     "Wandering Eye Fish",
@@ -137,9 +139,6 @@ def fetch_drop_edges() -> dict[str, set[str]]:
             producer = clean_name(title.get("nameraw"))
             item = clean_name(title.get("item"))
             is_npc = cargo_bool(title.get("isfromnpc"))
-            # Ordinary NPC/mob drops must not propagate from a same-named item.
-            # The Enchanted Sword item/enemy collision is a concrete example.
-            # Fishing-spawned Blood Moon enemies are the intentional exception.
             allowed_producer = not is_npc or producer in BLOOD_MOON_FISHING_ENEMIES
             if allowed_producer and producer and item and producer != item:
                 edges[producer].add(item)
@@ -151,7 +150,6 @@ def fetch_drop_edges() -> dict[str, set[str]]:
     return edges
 
 
-# route descriptor: (kind, immediate producer or Blood Moon root enemy)
 RouteDescriptor = tuple[str, str]
 
 
@@ -169,7 +167,10 @@ def render_graph_route(descriptors: set[RouteDescriptor]) -> str:
     if direct:
         parts.append("Fishing")
     elif fishing_producers:
-        parts.append("Fishing → " + " / ".join(fishing_producers))
+        if len(fishing_producers) > 4 and all(source.endswith(" Crate") for source in fishing_producers):
+            parts.append(f"Fishing → {len(fishing_producers)} crate types")
+        else:
+            parts.append("Fishing → " + " / ".join(fishing_producers))
     if blood_roots:
         parts.append("Blood Moon fishing → " + " / ".join(blood_roots))
     return " • ".join(parts)
@@ -180,9 +181,6 @@ def build_routes(availability: dict[str, list[object]], direct_fished: set[str],
     routes: dict[str, str] = {}
     queue: deque[str] = deque()
 
-    # Minimal graph distance determines which fishing routes are most direct.
-    # At an equal distance we merge route descriptors instead of allowing the
-    # first alphabetically queued crate/container to erase its counterparts.
     distance: dict[str, int] = {}
     descriptors: dict[str, set[RouteDescriptor]] = defaultdict(set)
 
@@ -201,8 +199,6 @@ def build_routes(availability: dict[str, list[object]], direct_fished: set[str],
     for enemy in sorted(BLOOD_MOON_FISHING_ENEMIES, key=str.casefold):
         add_seed(enemy, ("Blood Moon fishing", enemy))
 
-    # Availability already has exact/manual routes for Angler quest rewards and
-    # a few pseudo-items whose source explicitly identifies fishing.
     for name, row in availability.items():
         source = str(row[2] if isinstance(row, list) and len(row) > 2 else "")
         source_cf = source.casefold()
@@ -258,12 +254,9 @@ def validate(routes: dict[str, str], availability: dict[str, list[object]]) -> N
     if missing:
         raise RuntimeError("Fishing-route regression: " + ", ".join(missing))
 
-    # Guard the known item/NPC same-name collision from regressing.
     if "Enchanted Sword" in routes.get("Nazar", ""):
         raise RuntimeError("Fishing-route regression: Enchanted Sword item/enemy collision leaked Nazar")
 
-    # Current Desktop multi-container sentinels. These are specifically here to
-    # catch the old first-route-wins behavior and future route loss.
     expected_sources = {
         "Soul of Night": {"Defiled Crate", "Hematic Crate"},
         "Aglet": {"Wooden Crate", "Pearlwood Crate"},
@@ -291,7 +284,7 @@ def main() -> int:
     direct_wanted = sum(1 for name in routes if name in direct_fished)
     angler = sum(1 for route in routes.values() if route.startswith("Angler quest"))
     blood = sum(1 for route in routes.values() if route.startswith("Blood Moon fishing"))
-    multi = sum(1 for route in routes.values() if " / " in route)
+    multi = sum(1 for route in routes.values() if " / " in route or "crate types" in route)
     print(
         f"Fishing routes: {len(routes)}/{len(availability)} shopping leaves "
         f"({direct_wanted} direct, {angler} Angler, {blood} Blood Moon/derived, {multi} multi-source)",
