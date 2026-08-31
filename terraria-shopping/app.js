@@ -57,6 +57,10 @@ try{acquired=JSON.parse(localStorage.getItem('terraria-shopping-progress-v2')||'
 if(!Object.keys(acquired).length){
   try{const old=JSON.parse(localStorage.getItem('terraria-shopping-progress-v1')||'{}')||{};for(const [id,v] of Object.entries(old))if(v)acquired['legacy:'+id]=true}catch(_){}
 }
+let favorites=new Set();
+try{const saved=JSON.parse(localStorage.getItem('terraria-shopping-favorites-v1')||'[]');if(Array.isArray(saved))favorites=new Set(saved.map(String))}catch(_){favorites=new Set()}
+const favoriteSortSnapshot=new Set(favorites);
+const saveFavorites=()=>localStorage.setItem('terraria-shopping-favorites-v1',JSON.stringify([...favorites]));
 if(fishMode){try{fishMode.checked=localStorage.getItem('terraria-shopping-fish-mode-v1')==='1'}catch(_){}}
 let fishModeProgress=fishMode?.checked?{...acquired}:null;
 const fishModeEligibility=new Map();
@@ -229,6 +233,10 @@ function projectSearchBlob(name){
   return[name,...immediate,...stations,enrich].join(' ').toLowerCase();
 }
 function nodeSort(a,b){
+  if(view==='projects'){
+    const af=favoriteSortSnapshot.has(a.name)?1:0,bf=favoriteSortSnapshot.has(b.name)?1:0;
+    if(af!==bf)return bf-af;
+  }
   if(sort.value==='name')return a.name.localeCompare(b.name);
   return uniqueNeeded(b)-uniqueNeeded(a)||a.name.localeCompare(b.name);
 }
@@ -236,7 +244,8 @@ function projectCard(n){
   const s=shoppingSummary(n.name);
   const fish=s.fishable?`<span class="pill fish">${s.fishableObtained}/${s.fishable} FISHABLE</span>`:'<span class="pill hard">LANDLOCKED</span>';
   const remainders=fishMode?.checked?'':`<span class="pill ${s.remainderObtained===s.remainders&&s.remainders?'pre':''}">${s.remainderObtained}/${s.remainders} REMAINDERS</span>`;
-  return`<details class="card project" data-name="${esc(n.name)}"><summary class="projectsummary"><div class="projecttop"><div><div class="projecttitle">${esc(n.name)}</div><div class="projectmeta">${fish}${remainders}</div></div><span class="chev">›</span></div></summary><div class="projectbody" data-loaded="0"><div class="loading">Opening shopping list…</div></div></details>`;
+  const isFavorite=favorites.has(n.name), favorite=view==='projects'?`<button class="favorite${isFavorite?' active':''}" type="button" data-name="${esc(n.name)}" aria-pressed="${isFavorite?'true':'false'}" aria-label="${isFavorite?'Remove':'Add'} ${esc(n.name)} ${isFavorite?'from':'to'} favorites" title="${isFavorite?'Remove from':'Add to'} favorites">${isFavorite?'★':'☆'}</button>`:'';
+  return`<details class="card project" data-name="${esc(n.name)}"><summary class="projectsummary"><div class="projecttop"><div><div class="projecttitle">${esc(n.name)}</div><div class="projectmeta">${fish}${remainders}</div></div><div class="projectactions">${favorite}<span class="chev">›</span></div></div></summary><div class="projectbody" data-loaded="0"><div class="loading">Opening shopping list…</div></div></details>`;
 }
 function renderCatalog(openNames=new Set()){
   const base=view==='projects'?projectNodes:componentNodes;const q=search.value.trim().toLowerCase();let list=base;
@@ -267,6 +276,22 @@ function render(openNames=new Set()){
   if(view==='projects'||view==='components')renderCatalog(openNames);else renderSources(view==='fishable');
 }
 content.addEventListener('toggle',e=>{const d=e.target;if(d.matches?.('details.project')&&d.open)loadBody(d)},true);
+content.addEventListener('click',e=>{
+  const button=e.target.closest?.('.favorite');
+  if(!button)return;
+  e.preventDefault();
+  e.stopPropagation();
+  const name=String(button.dataset.name||'');
+  if(!name)return;
+  if(favorites.has(name))favorites.delete(name);else favorites.add(name);
+  try{saveFavorites()}catch(_){}
+  const active=favorites.has(name);
+  button.classList.toggle('active',active);
+  button.textContent=active?'★':'☆';
+  button.setAttribute('aria-pressed',active?'true':'false');
+  button.setAttribute('aria-label',`${active?'Remove':'Add'} ${name} ${active?'from':'to'} favorites`);
+  button.title=`${active?'Remove from':'Add to'} favorites`;
+});
 content.addEventListener('change',e=>{if(e.target.matches('.check'))setAcquired(e.target.dataset.key,e.target.checked)});
 $$('.segments button').forEach(b=>b.addEventListener('click',()=>{view=b.dataset.view;shown=PAGE;render();scrollTo({top:0,behavior:'smooth'})}));
 search.addEventListener('input',()=>{shown=PAGE;render()});sort.addEventListener('change',()=>render());missingOnly.addEventListener('change',()=>render(new Set($$('details.project[open]').map(el=>el.dataset.name))));
