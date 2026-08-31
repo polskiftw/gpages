@@ -11,6 +11,7 @@ on:
     paths:
       - 'terraria-shopping/scripts/build_data.py'
       - 'terraria-shopping/scripts/build_availability.py'
+      - 'terraria-shopping/scripts/build_fishing.py'
       - '.github/workflows/update-terraria-shopping.yml'
 
 permissions:
@@ -19,7 +20,7 @@ permissions:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,15 +30,17 @@ jobs:
         run: python terraria-shopping/scripts/build_data.py
       - name: Build availability badges
         run: python terraria-shopping/scripts/build_availability.py
+      - name: Build fishing routes
+        run: python terraria-shopping/scripts/build_fishing.py
       - name: Commit generated data when changed
         shell: bash
         run: |
-          if [ -z "$(git status --porcelain -- terraria-shopping/data.generated.js terraria-shopping/availability.generated.js)" ]; then
+          if [ -z "$(git status --porcelain -- terraria-shopping/data.generated.js terraria-shopping/availability.generated.js terraria-shopping/fishing.generated.js)" ]; then
             echo "Terraria data is already current."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add terraria-shopping/data.generated.js terraria-shopping/availability.generated.js
+          git add terraria-shopping/data.generated.js terraria-shopping/availability.generated.js terraria-shopping/fishing.generated.js
           git commit -m "Update Terraria shopping data"
           git push
