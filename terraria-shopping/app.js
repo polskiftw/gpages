@@ -5,6 +5,7 @@ const D=window.TERRARIA_RECIPE_DATA||{recipes:[],nodes:[],recipeCount:0,craftabl
 const E=window.TERRARIA_ENRICHMENT||{items:{},availability:{},projects:[]};
 const items=E.items||{}, availability=E.availability||{}, curatedProjects=E.projects||[];
 const generatedAvailability=window.TERRARIA_GENERATED_AVAILABILITY||{};
+const generatedFishing=window.TERRARIA_GENERATED_FISHING||{};
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const search=$('#search'), sort=$('#sort'), missingOnly=$('#missingOnly'), content=$('#content'), stats=$('#stats'), status=$('#status'), clearSearch=$('#clearSearch');
 const PAGE=80;
@@ -49,6 +50,8 @@ const sourcePill=source=>source?`<span class="pill sourcepill">${esc(source)}</s
 const avObjectPills=a=>a.mode==='Unknown'?'':`<span class="pill availability ${modeClass(a.mode)}">${esc(a.mode.toUpperCase())}</span>${whenPill(a.when)}${sourcePill(a.source)}`;
 const avTuplePills=tuple=>avObjectPills(avObject(tuple));
 const avPills=id=>avTuplePills(availability[id]);
+const fishingRoute=name=>String(generatedFishing[name]||'');
+const hasFishingRoute=(name,info=null)=>!!info?.fish||!!fishingRoute(name);
 const keyFor=(name,explicitId=null)=>explicitId?'legacy:'+explicitId:(legacyExact(name)?'legacy:'+legacyExact(name):'gen:'+name);
 const isMissing=key=>!acquired[key];
 const checkedCount=()=>Object.values(acquired).filter(Boolean).length;
@@ -83,10 +86,10 @@ function shoppingEntries(name){
   if(shoppingCache.has(name))return shoppingCache.get(name);
   const cp=curatedByName.get(name);let entries=[];
   if(cp){
-    entries=cp.items.map(([id,qty])=>{const i=items[id]||{name:id};return{id,name:i.name||id,qty:Number(qty)||1,key:keyFor(i.name||id,id),fishable:!!i.fish,info:i}});
+    entries=cp.items.map(([id,qty])=>{const i=items[id]||{name:id},itemName=i.name||id;return{id,name:itemName,qty:Number(qty)||1,key:keyFor(itemName,id),fishable:hasFishingRoute(itemName,i),info:i}});
   }else{
     const plan=planItem(name,1);
-    entries=[...plan.leaves.entries()].map(([leaf,qty])=>{const id=legacyExact(leaf),i=id?items[id]:null;return{id,name:leaf,qty,key:keyFor(leaf,id),fishable:!!i?.fish,info:i}}).sort((a,b)=>a.name.localeCompare(b.name));
+    entries=[...plan.leaves.entries()].map(([leaf,qty])=>{const id=legacyExact(leaf),i=id?items[id]:null;return{id,name:leaf,qty,key:keyFor(leaf,id),fishable:hasFishingRoute(leaf,i),info:i}}).sort((a,b)=>a.name.localeCompare(b.name));
   }
   shoppingCache.set(name,entries);
   return entries;
@@ -172,7 +175,7 @@ function buildProjectBody(name){
 }
 function projectSearchBlob(name){
   const cp=curatedByName.get(name), rs=byResult.get(name)||[];const immediate=rs.flatMap(r=>r.i||[]).map(x=>x[0]);const stations=rs.map(r=>r.s||'');
-  let enrich='';if(cp)enrich=[cp.group,cp.mode,cp.when,cp.note,...cp.items.flatMap(x=>{const i=items[x[0]]||{};return[i.name,i.source,i.fishSource,i.type,i.note]})].join(' ');
+  let enrich='';if(cp)enrich=[cp.group,cp.mode,cp.when,cp.note,...cp.items.flatMap(x=>{const i=items[x[0]]||{};return[i.name,i.source,i.fishSource,fishingRoute(i.name),i.type,i.note]})].join(' ');
   return[name,...immediate,...stations,enrich].join(' ').toLowerCase();
 }
 function nodeSort(a,b){
@@ -195,12 +198,12 @@ function renderCatalog(openNames=new Set()){
   content.innerHTML=html;for(const d of $$('details.project'))if(openNames.has(d.dataset.name)){d.open=true;loadBody(d)}
   $('#showMore')?.addEventListener('click',()=>{const keepOpen=new Set($$('details.project[open]').map(el=>el.dataset.name));shown+=PAGE;render(keepOpen)});renderStats(list.length);
 }
-function sourceSearchText(id){const i=items[id],a=av(id),ps=curatedProjects.filter(p=>p.items.some(x=>x[0]===id)).map(p=>p.name).join(' ');return[i.name,i.fishSource||'',i.source||'',i.type,a.mode,cleanWhen(a.when),a.source||'',i.note||'',ps].join(' ').toLowerCase()}
+function sourceSearchText(id){const i=items[id],a=av(id),ps=curatedProjects.filter(p=>p.items.some(x=>x[0]===id)).map(p=>p.name).join(' ');return[i.name,i.fishSource||'',fishingRoute(i.name),i.source||'',i.type,a.mode,cleanWhen(a.when),a.source||'',i.note||'',ps].join(' ').toLowerCase()}
 function renderSources(wantFish){
-  const q=search.value.trim().toLowerCase();let ids=Object.keys(items).filter(id=>!!items[id].fish===wantFish);if(q)ids=ids.filter(id=>sourceSearchText(id).includes(q));if(missingOnly.checked)ids=ids.filter(id=>isMissing(keyFor(items[id].name,id)));
+  const q=search.value.trim().toLowerCase();let ids=Object.keys(items).filter(id=>hasFishingRoute(items[id].name,items[id])===wantFish);if(q)ids=ids.filter(id=>sourceSearchText(id).includes(q));if(missingOnly.checked)ids=ids.filter(id=>isMissing(keyFor(items[id].name,id)));
   ids.sort((a,b)=>sort.value==='name'?items[a].name.localeCompare(items[b].name):av(a).rank-av(b).rank||items[a].name.localeCompare(items[b].name));
   const title=wantFish?'Ingredients with a fishing route':'Ingredients still needed on land';let html=`<div class="sectionhead"><h2>${title}</h2><span>${ids.length} items</span></div><div class="ingredientgrid">`;
-  for(const id of ids){const i=items[id],key=keyFor(i.name,id),ps=curatedProjects.filter(p=>p.items.some(x=>x[0]===id));const src=wantFish?(i.fishSource||i.source):i.source;html+=`<article class="card ingredient"><div class="row">${checkbox(key,i.name)}<div><div class="itemname">${esc(i.name)}</div><div class="itemmeta"><span class="pill">${esc(i.type)}</span>${avPills(id)}</div><div class="source">${esc(src)}</div>${i.note?`<div class="note">${esc(i.note)}</div>`:''}<div class="tags">${ps.map(p=>`<span class="tag">${esc(p.name)}</span>`).join('')}</div></div><a class="wiki" href="${wikiItem(id)}" target="_blank" rel="noopener">Wiki ↗</a></div></article>`}
+  for(const id of ids){const i=items[id],key=keyFor(i.name,id),ps=curatedProjects.filter(p=>p.items.some(x=>x[0]===id));const src=wantFish?(i.fishSource||fishingRoute(i.name)||i.source):i.source;html+=`<article class="card ingredient"><div class="row">${checkbox(key,i.name)}<div><div class="itemname">${esc(i.name)}</div><div class="itemmeta"><span class="pill">${esc(i.type)}</span>${avPills(id)}</div><div class="source">${esc(src)}</div>${i.note?`<div class="note">${esc(i.note)}</div>`:''}<div class="tags">${ps.map(p=>`<span class="tag">${esc(p.name)}</span>`).join('')}</div></div><a class="wiki" href="${wikiItem(id)}" target="_blank" rel="noopener">Wiki ↗</a></div></article>`}
   html+='</div>';if(!ids.length)html=`<div class="card empty">No ${wantFish?'fishable':'landlocked'} ingredients match.</div>`;content.innerHTML=html;renderStats(ids.length)
 }
 function renderStats(visible){
