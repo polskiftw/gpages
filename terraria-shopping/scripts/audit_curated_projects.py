@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Audit hand-curated Terraria Shopping project lists against current Desktop recipes.
 
-The browser deliberately uses curated project frontiers for a small number of
-high-value projects instead of flattening them all the way to raw acquisition
-leaves. This audit expands those curated components through the current resolved
-Desktop graph and checks that they are still equivalent to a valid/current route.
+The browser deliberately uses curated component frontiers for a small number of
+high-value projects instead of always choosing the generator's one canonical
+flattened route. A curated list is valid when its exact components can be consumed
+by *some* current Desktop recipe path for the target project. This matters for
+items with multiple modern recipes, such as Bundle of Horseshoe Balloons.
 """
 from __future__ import annotations
 
 import itertools
 import json
+import math
 import pathlib
 import re
 import sys
@@ -51,7 +53,6 @@ def load_js_json(path: pathlib.Path) -> object:
     marker = "Object.assign(window.TERRARIA_ENRICHMENT.items,"
     start = text.find(marker)
     if start < 0:
-        # Older split files may use a compact alias but remain data-only.
         match = re.search(r"Object\.assign\([^,]+,\s*(\{.*\})\s*\);?\s*$", text, flags=re.S)
         if not match:
             raise RuntimeError(f"could not find item assignment in {path.name}")
@@ -63,34 +64,18 @@ def load_js_json(path: pathlib.Path) -> object:
     return json.loads(raw)
 
 
-def add_map(into: dict[str, int], source: dict[str, int]) -> None:
-    for name, qty in source.items():
-        into[name] = into.get(name, 0) + qty
+def fmt(mapping: dict[str, int]) -> str:
+    return ", ".join(
+        f"{name} x{qty}" for name, qty in sorted(mapping.items(), key=lambda pair: pair[0].casefold()) if qty
+    ) or "(none)"
 
 
-def scaled(source: dict[str, int], qty: int) -> dict[str, int]:
-    return {name: amount * qty for name, amount in source.items()}
-
-
-def score(candidate: dict[str, int], target: dict[str, int]) -> tuple[int, int, int]:
-    names = set(candidate) | set(target)
-    missing_or_extra_names = sum(1 for name in names if bool(candidate.get(name)) != bool(target.get(name)))
-    quantity_distance = sum(abs(candidate.get(name, 0) - target.get(name, 0)) for name in names)
-    total_distance = abs(sum(candidate.values()) - sum(target.values()))
-    return missing_or_extra_names, quantity_distance, total_distance
-
-
-def best_curated_expansion(
-    project: dict[str, object],
-    item_defs: dict[str, dict[str, object]],
-    by_result: dict[str, list[dict[str, object]]],
-    use_counts: dict[str, int],
-    target: dict[str, int],
-) -> tuple[dict[str, int], list[tuple[str, str]], list[str]]:
+def frontier_variants(
+    project: dict[str, object], item_defs: dict[str, dict[str, object]]
+) -> tuple[list[tuple[dict[str, int], list[tuple[str, str]]]], list[str]]:
     fixed: dict[str, int] = {}
-    choice_groups: list[tuple[str, int, list[tuple[str, dict[str, int]]]]] = []
+    choices: list[tuple[str, int, list[str]]] = []
     unresolved: list[str] = []
-
     for item_id, raw_qty in project.get("items") or []:
         qty = max(1, int(raw_qty))
         info = item_defs.get(str(item_id))
@@ -99,59 +84,104 @@ def best_curated_expansion(
             continue
         label = str(info.get("name") or item_id)
         alternatives = NAME_ALTERNATIVES.get(label, [label])
-        viable: list[tuple[str, dict[str, int]]] = []
-        for name in alternatives:
-            if name not in by_result:
-                # A non-craftable current acquisition item is itself a valid leaf.
-                viable.append((name, {name: qty}))
-                continue
-            leaves, cycles, _steps, cycle_to = bd.canonical_plan(name, qty, by_result, use_counts)
-            if not cycles and not cycle_to and leaves:
-                viable.append((name, leaves))
-        if not viable:
-            unresolved.append(f"{item_id}={label!r} has no current graph/leaf interpretation")
-        elif len(viable) == 1:
-            add_map(fixed, viable[0][1])
+        if len(alternatives) == 1:
+            fixed[alternatives[0]] = fixed.get(alternatives[0], 0) + qty
         else:
-            choice_groups.append((label, qty, viable))
+            choices.append((label, qty, alternatives))
 
-    # Curated lists only have a handful of true alternatives. Brute force their
-    # combinations and choose the expansion closest to the target route.
-    combinations = 1
-    for _label, _qty, viable in choice_groups:
-        combinations *= len(viable)
+    combinations = math.prod(len(alts) for _label, _qty, alts in choices) if choices else 1
     if combinations > 20000:
         unresolved.append(f"too many curated alternative combinations ({combinations})")
-        return fixed, [], unresolved
+        return [], unresolved
 
-    best_map = fixed
-    best_choices: list[tuple[str, str]] = []
-    best_score = score(fixed, target)
-    pools = [group[2] for group in choice_groups]
+    variants: list[tuple[dict[str, int], list[tuple[str, str]]]] = []
+    pools = [alts for _label, _qty, alts in choices]
     for selected in itertools.product(*pools) if pools else [()]:
-        merged = dict(fixed)
-        choices: list[tuple[str, str]] = []
-        for (label, _qty, _viable), (chosen_name, leaves) in zip(choice_groups, selected):
-            add_map(merged, leaves)
-            choices.append((label, chosen_name))
-        current = score(merged, target)
-        if current < best_score:
-            best_map, best_choices, best_score = merged, choices, current
-    return best_map, best_choices, unresolved
+        inventory = dict(fixed)
+        selected_labels: list[tuple[str, str]] = []
+        for (label, qty, _alts), chosen in zip(choices, selected):
+            inventory[chosen] = inventory.get(chosen, 0) + qty
+            selected_labels.append((label, chosen))
+        variants.append((inventory, selected_labels))
+    return variants, unresolved
 
 
-def fmt(mapping: dict[str, int]) -> str:
-    return ", ".join(f"{name} x{qty}" for name, qty in sorted(mapping.items(), key=lambda x: x[0].casefold())) or "(none)"
+def consume_current_route(
+    name: str,
+    qty: int,
+    inventory: dict[str, int],
+    by_result: dict[str, list[dict[str, object]]],
+    use_counts: dict[str, int],
+    stack: frozenset[str] = frozenset(),
+    depth: int = 0,
+) -> dict[str, int] | None:
+    """Consume a curated frontier through any current forward recipe route."""
+    if qty <= 0:
+        return dict(inventory)
+
+    available = inventory.get(name, 0)
+    if available >= qty:
+        out = dict(inventory)
+        left = available - qty
+        if left:
+            out[name] = left
+        else:
+            out.pop(name, None)
+        return out
+
+    if depth > 48 or name in stack:
+        return None
+    options = bd.planning_options(name, by_result, use_counts)
+    if not options:
+        return None
+
+    next_stack = stack | {name}
+    for recipe in options:
+        batches = math.ceil(qty / max(1, int(recipe.get("a") or 1)))
+        states = [dict(inventory)]
+        for ingredient, raw_amount in recipe.get("i") or []:
+            needed = max(1, int(raw_amount)) * batches
+            next_states: list[dict[str, int]] = []
+            for state in states:
+                resolved = consume_current_route(
+                    str(ingredient), needed, state, by_result, use_counts, next_stack, depth + 1
+                )
+                if resolved is not None:
+                    next_states.append(resolved)
+            states = next_states
+            if not states:
+                break
+        for state in states:
+            return state
+    return None
+
+
+def current_route_matches_frontier(
+    project_name: str,
+    frontier: dict[str, int],
+    by_result: dict[str, list[dict[str, object]]],
+    use_counts: dict[str, int],
+) -> tuple[bool, dict[str, int] | None]:
+    remainder = consume_current_route(project_name, 1, frontier, by_result, use_counts)
+    if remainder is None:
+        return False, None
+    clean = {name: qty for name, qty in remainder.items() if qty}
+    return not clean, clean
 
 
 def main() -> int:
     payload = load_js_json(DATA)
-    assert isinstance(payload, dict)
+    if not isinstance(payload, dict):
+        raise RuntimeError("data.generated.js payload is not an object")
     recipes = payload.get("recipes") or []
-    assert isinstance(recipes, list)
+    if not isinstance(recipes, list):
+        raise RuntimeError("generated recipes is not a list")
     by_result: dict[str, list[dict[str, object]]] = defaultdict(list)
+    all_names: set[str] = set()
     for recipe in recipes:
         by_result[str(recipe["r"])].append(recipe)
+        all_names.add(str(recipe["r"]))
+        all_names.update(str(pair[0]) for pair in recipe.get("i") or [])
     use_counts = bd.ingredient_use_counts(recipes)
 
     item_defs: dict[str, dict[str, object]] = {}
@@ -169,57 +199,73 @@ def main() -> int:
     if missing_ids:
         raise RuntimeError("curated projects reference missing enrichment item IDs: " + ", ".join(missing_ids))
 
-    mismatches: list[str] = []
+    errors: list[str] = []
     virtual: list[str] = []
     for project in projects:
         name = str(project.get("name") or "")
         if not name:
-            mismatches.append("curated project with blank name")
-            continue
-        if name not in by_result:
-            # Deliberate non-craftable shopping bundles are allowed, but every
-            # listed item still has to resolve to a current item/concept.
-            virtual.append(name)
-            bad = []
-            for item_id, _qty in project.get("items") or []:
-                label = str(item_defs[str(item_id)].get("name") or item_id)
-                alternatives = NAME_ALTERNATIVES.get(label, [label])
-                if not any(alt in by_result or alt for alt in alternatives):
-                    bad.append(label)
-            if bad:
-                mismatches.append(f"{name}: virtual list has unresolved items {bad}")
-            print(f"CURATED VIRTUAL: {name} ({len(project.get('items') or [])} entries)")
+            errors.append("curated project with blank name")
             continue
 
-        target, cycles, _steps, cycle_to = bd.canonical_plan(name, 1, by_result, use_counts)
-        if cycles or cycle_to or not target:
-            mismatches.append(f"{name}: current generated target route did not resolve cleanly")
-            continue
-        curated, choices, unresolved = best_curated_expansion(project, item_defs, by_result, use_counts, target)
-        current_score = score(curated, target)
-        print(f"CURATED PROJECT: {name}")
-        if choices:
-            print("  chosen alternatives: " + "; ".join(f"{label} -> {choice}" for label, choice in choices))
-        print(f"  target expansion : {fmt(target)}")
-        print(f"  curated expansion: {fmt(curated)}")
-        print(f"  diff score       : {current_score}")
+        variants, unresolved = frontier_variants(project, item_defs)
         if unresolved:
-            for problem in unresolved:
-                print(f"  unresolved       : {problem}")
-        if unresolved or current_score != (0, 0, 0):
-            mismatches.append(
-                f"{name}: score={current_score}; unresolved={unresolved}; target=[{fmt(target)}]; curated=[{fmt(curated)}]"
+            errors.append(f"{name}: {'; '.join(unresolved)}")
+            continue
+        if name not in by_result:
+            virtual.append(name)
+            unknown = sorted(
+                {
+                    item_name
+                    for frontier, _choices in variants[:1]
+                    for item_name in frontier
+                    if item_name not in all_names
+                },
+                key=str.casefold,
             )
+            if unknown:
+                errors.append(f"{name}: virtual list contains names absent from current recipe universe: {unknown}")
+            print(f"CURATED VIRTUAL: {name} -- {fmt(variants[0][0])}")
+            continue
+
+        matched = False
+        best_remainder: dict[str, int] | None = None
+        winning_choices: list[tuple[str, str]] = []
+        winning_frontier: dict[str, int] = {}
+        for frontier, choices in variants:
+            ok, remainder = current_route_matches_frontier(name, frontier, by_result, use_counts)
+            if ok:
+                matched = True
+                winning_choices = choices
+                winning_frontier = frontier
+                break
+            if remainder is not None and (best_remainder is None or sum(remainder.values()) < sum(best_remainder.values())):
+                best_remainder = remainder
+
+        canonical, cycles, _steps, cycle_to = bd.canonical_plan(name, 1, by_result, use_counts)
+        print(f"CURATED PROJECT: {name}")
+        if winning_choices:
+            print("  chosen alternatives: " + "; ".join(f"{label} -> {choice}" for label, choice in winning_choices))
+        if matched:
+            print(f"  curated frontier : {fmt(winning_frontier)}")
+            print("  current route    : VALID")
+        else:
+            example = variants[0][0] if variants else {}
+            print(f"  curated frontier : {fmt(example)}")
+            print(f"  unconsumed       : {fmt(best_remainder or {})}")
+            print("  current route    : INVALID")
+            errors.append(f"{name}: curated components cannot exactly craft the project through any current Desktop route")
+        if not cycles and not cycle_to and canonical:
+            print(f"  canonical route  : {fmt(canonical)}")
 
     print(f"Curated project inventory: {len(projects)} total; {len(virtual)} virtual/non-craftable bundles")
     if virtual:
         print("Virtual bundles: " + ", ".join(virtual))
-    if mismatches:
-        print("Curated project mismatches needing review:", file=sys.stderr)
-        for mismatch in mismatches:
-            print("  - " + mismatch, file=sys.stderr)
-        raise RuntimeError(f"{len(mismatches)} curated project list(s) differ from current Desktop expansion")
-    print("ALL CURATED TERRARIA PROJECT LISTS MATCH CURRENT DESKTOP RECIPE EXPANSIONS")
+    if errors:
+        print("Curated project audit failures:", file=sys.stderr)
+        for error in errors:
+            print("  - " + error, file=sys.stderr)
+        raise RuntimeError(f"{len(errors)} curated project validation failure(s)")
+    print("ALL CURATED TERRARIA PROJECT LISTS ARE VALID CURRENT-DESKTOP CRAFTING FRONTIERS")
     return 0
 
 
