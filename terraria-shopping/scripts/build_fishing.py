@@ -9,9 +9,9 @@ built from Official Terraria Wiki data using:
   * Angler quest sources from the generated availability dataset,
   * Blood Moon enemies that are spawned through fishing.
 
-This intentionally stays separate from availability/source metadata: an item can
-be fishable even when its primary displayed acquisition source is a mob, chest,
-or another non-fishing route.
+When several equally short fishing paths exist, all immediate producers are kept.
+This prevents world/progression counterparts such as Wooden/Pearlwood Crates or
+Defiled/Hematic Crates from being silently reduced to whichever queue entry won.
 """
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 AVAILABILITY_DATA = ROOT / "availability.generated.js"
 OUT = ROOT / "fishing.generated.js"
 PAGE_SIZE = 500
-USER_AGENT = "polskiftw/gpages terraria-shopping fishing-routes/1.0 (GitHub Pages data refresh)"
+USER_AGENT = "polskiftw/gpages terraria-shopping fishing-routes/1.1 (GitHub Pages data refresh)"
 
 BLOOD_MOON_FISHING_ENEMIES = {
     "Wandering Eye Fish",
@@ -151,17 +151,28 @@ def fetch_drop_edges() -> dict[str, set[str]]:
     return edges
 
 
-def compact_route(parent_route: str, producer: str) -> str:
-    if parent_route == "Fishing":
-        return f"Fishing → {producer}"
-    if parent_route.startswith("Blood Moon fishing"):
-        return parent_route
-    if parent_route.startswith("Angler quest"):
-        return parent_route
-    if " → " in parent_route:
-        root = parent_route.split(" → ", 1)[0]
-        return f"{root} → {producer}"
-    return f"{parent_route} → {producer}"
+# route descriptor: (kind, immediate producer or Blood Moon root enemy)
+RouteDescriptor = tuple[str, str]
+
+
+def render_graph_route(descriptors: set[RouteDescriptor]) -> str:
+    direct = any(kind == "Fishing" and not producer for kind, producer in descriptors)
+    fishing_producers = sorted(
+        {producer for kind, producer in descriptors if kind == "Fishing" and producer},
+        key=str.casefold,
+    )
+    blood_roots = sorted(
+        {producer for kind, producer in descriptors if kind == "Blood Moon fishing" and producer},
+        key=str.casefold,
+    )
+    parts: list[str] = []
+    if direct:
+        parts.append("Fishing")
+    elif fishing_producers:
+        parts.append("Fishing → " + " / ".join(fishing_producers))
+    if blood_roots:
+        parts.append("Blood Moon fishing → " + " / ".join(blood_roots))
+    return " • ".join(parts)
 
 
 def build_routes(availability: dict[str, list[object]], direct_fished: set[str], edges: dict[str, set[str]]) -> dict[str, str]:
@@ -169,17 +180,26 @@ def build_routes(availability: dict[str, list[object]], direct_fished: set[str],
     routes: dict[str, str] = {}
     queue: deque[str] = deque()
 
-    # Direct catches are graph seeds even when they are containers rather than
-    # canonical shopping leaves, because their Drops edges can lead to leaves.
-    graph_routes: dict[str, str] = {}
-    for name in sorted(direct_fished, key=str.casefold):
-        graph_routes[name] = "Fishing"
-        queue.append(name)
+    # Minimal graph distance determines which fishing routes are most direct.
+    # At an equal distance we merge route descriptors instead of allowing the
+    # first alphabetically queued crate/container to erase its counterparts.
+    distance: dict[str, int] = {}
+    descriptors: dict[str, set[RouteDescriptor]] = defaultdict(set)
 
-    # These enemies exist specifically as fishing encounters during a Blood Moon.
+    def add_seed(name: str, descriptor: RouteDescriptor) -> None:
+        if name not in distance or 0 < distance[name]:
+            distance[name] = 0
+            descriptors[name] = {descriptor}
+            queue.append(name)
+            return
+        if descriptor not in descriptors[name]:
+            descriptors[name].add(descriptor)
+            queue.append(name)
+
+    for name in sorted(direct_fished, key=str.casefold):
+        add_seed(name, ("Fishing", ""))
     for enemy in sorted(BLOOD_MOON_FISHING_ENEMIES, key=str.casefold):
-        graph_routes[enemy] = f"Blood Moon fishing → {enemy}"
-        queue.append(enemy)
+        add_seed(enemy, ("Blood Moon fishing", enemy))
 
     # Availability already has exact/manual routes for Angler quest rewards and
     # a few pseudo-items whose source explicitly identifies fishing.
@@ -191,19 +211,39 @@ def build_routes(availability: dict[str, list[object]], direct_fished: set[str],
         elif "fishing" in source_cf:
             routes[name] = source or "Fishing"
 
-    # Propagate through fished loot containers and explicitly fishing-spawned
-    # enemies. First route wins because direct seeds are queued before descendants.
     while queue:
         producer = queue.popleft()
-        parent_route = graph_routes[producer]
+        parent_distance = distance[producer]
+        parent_descriptors = descriptors[producer]
         for item in sorted(edges.get(producer, ()), key=str.casefold):
-            if item not in graph_routes:
-                graph_routes[item] = compact_route(parent_route, producer)
+            next_distance = parent_distance + 1
+            candidate_descriptors: set[RouteDescriptor] = set()
+            if any(kind == "Fishing" for kind, _source in parent_descriptors):
+                candidate_descriptors.add(("Fishing", producer))
+            candidate_descriptors.update(
+                ("Blood Moon fishing", root)
+                for kind, root in parent_descriptors
+                if kind == "Blood Moon fishing"
+            )
+            if not candidate_descriptors:
+                continue
+
+            old_distance = distance.get(item)
+            if old_distance is None or next_distance < old_distance:
+                distance[item] = next_distance
+                descriptors[item] = set(candidate_descriptors)
                 queue.append(item)
+            elif next_distance == old_distance:
+                before = len(descriptors[item])
+                descriptors[item].update(candidate_descriptors)
+                if len(descriptors[item]) != before:
+                    queue.append(item)
 
     for name in wanted:
-        if name in graph_routes:
-            routes.setdefault(name, graph_routes[name])
+        if name in descriptors:
+            rendered = render_graph_route(descriptors[name])
+            if rendered:
+                routes.setdefault(name, rendered)
 
     return dict(sorted(routes.items(), key=lambda pair: pair[0].casefold()))
 
@@ -219,8 +259,23 @@ def validate(routes: dict[str, str], availability: dict[str, list[object]]) -> N
         raise RuntimeError("Fishing-route regression: " + ", ".join(missing))
 
     # Guard the known item/NPC same-name collision from regressing.
-    if routes.get("Nazar") == "Fishing → Enchanted Sword":
+    if "Enchanted Sword" in routes.get("Nazar", ""):
         raise RuntimeError("Fishing-route regression: Enchanted Sword item/enemy collision leaked Nazar")
+
+    # Current Desktop multi-container sentinels. These are specifically here to
+    # catch the old first-route-wins behavior and future route loss.
+    expected_sources = {
+        "Soul of Night": {"Defiled Crate", "Hematic Crate"},
+        "Aglet": {"Wooden Crate", "Pearlwood Crate"},
+        "Radar": {"Wooden Crate", "Pearlwood Crate"},
+    }
+    for name, expected in expected_sources.items():
+        if name not in availability:
+            continue
+        route = routes.get(name, "")
+        absent = sorted(source for source in expected if source not in route)
+        if absent:
+            raise RuntimeError(f"Fishing-route regression: {name} missing current source(s): {', '.join(absent)}; got {route!r}")
 
 
 def main() -> int:
@@ -236,9 +291,10 @@ def main() -> int:
     direct_wanted = sum(1 for name in routes if name in direct_fished)
     angler = sum(1 for route in routes.values() if route.startswith("Angler quest"))
     blood = sum(1 for route in routes.values() if route.startswith("Blood Moon fishing"))
+    multi = sum(1 for route in routes.values() if " / " in route)
     print(
         f"Fishing routes: {len(routes)}/{len(availability)} shopping leaves "
-        f"({direct_wanted} direct, {angler} Angler, {blood} Blood Moon/derived)",
+        f"({direct_wanted} direct, {angler} Angler, {blood} Blood Moon/derived, {multi} multi-source)",
         file=sys.stderr,
     )
     return 0
