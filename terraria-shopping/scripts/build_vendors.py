@@ -39,6 +39,7 @@ VENDOR_OVERRIDES: dict[str, tuple[str, str]] = {
     "Any Guide to Environmental Preservation": ("Dryad", "5 GC"),
 }
 
+DESKTOP_MARKER = re.compile(r"\(Desktop,\s*Console\s+and\s+Mobile\s+versions\)", re.I)
 VERSION_PAREN = re.compile(r"\((?:Desktop|Console|Mobile|Old-gen|3DS|Switch)[^)]*versions?\)", re.I)
 
 
@@ -118,16 +119,37 @@ def compact_price(value: str) -> str:
 
 
 def extract_vendor_price(value: str, seller: str) -> str:
-    clean = VERSION_PAREN.sub("", value)
-    pattern = re.compile(re.escape(seller) + r"\s*\(([^()]*)\)", flags=re.I)
-    for match in pattern.finditer(clean):
-        price = compact_price(match.group(1))
+    # Itemsource sometimes repeats the seller label and sometimes includes both
+    # current and legacy platform prices. Work from the final seller occurrence,
+    # then explicitly select Desktop/Console/Mobile when the template marks it.
+    seller_matches = list(re.finditer(re.escape(seller), value, flags=re.I))
+    if not seller_matches:
+        return ""
+    tail = value[seller_matches[-1].end():seller_matches[-1].end() + 220]
+
+    marker = DESKTOP_MARKER.search(tail)
+    if marker:
+        # Common form: `( 25 SC (Desktop, Console and Mobile versions) / 1 GC ... )`
+        before = tail[:marker.start()].rsplit("/", 1)[-1].rsplit("(", 1)[-1]
+        price = compact_price(before)
         if price:
             return price
-    seller_match = re.search(re.escape(seller), clean, flags=re.I)
-    if seller_match:
-        return compact_price(clean[seller_match.end():seller_match.end() + 120])
-    return ""
+
+        # Alternate form: `(Desktop, Console and Mobile versions) ( 1 Silver 50 Copper )`
+        after = tail[marker.end():]
+        current = re.match(r"\s*\(([^()]*)\)", after)
+        if current:
+            price = compact_price(current.group(1))
+            if price:
+                return price
+
+    # Unversioned shop source, e.g. `Goblin Tinkerer ( 5 Gold )`.
+    paren = re.search(r"\(([^()]*)\)", tail)
+    if paren:
+        price = compact_price(paren.group(1))
+        if price:
+            return price
+    return compact_price(tail)
 
 
 def fetch_vendor_prices(candidates: dict[str, str]) -> dict[str, tuple[str, str]]:
@@ -152,10 +174,7 @@ def fetch_vendor_prices(candidates: dict[str, str]) -> dict[str, tuple[str, str]
             if not match:
                 continue
             seller = candidates[name]
-            segment = match.group(1)
-            if name in {"Bug Net", "Empty Bullet", "Spelunker Glowstick"}:
-                print(f"Vendor raw {name}: {segment!r}", file=sys.stderr)
-            price = extract_vendor_price(segment, seller)
+            price = extract_vendor_price(match.group(1), seller)
             if price:
                 out[name] = (seller, price)
         print(
@@ -174,20 +193,21 @@ def validate(vendors: dict[str, tuple[str, str]], candidates: dict[str, str]) ->
             print(f"  - {name}: {candidates[name]}", file=sys.stderr)
         raise RuntimeError(f"{len(unresolved)} vendor-only shopping leaves have no seller/price metadata")
 
-    probes = {
-        "Rocket Boots": "Goblin Tinkerer",
-        "Wire": "Mechanic",
-        "Bug Net": "Merchant",
+    expected: dict[str, tuple[str, str]] = {
+        "Rocket Boots": ("Goblin Tinkerer", "5 GC"),
+        "Wire": ("Mechanic", "5 SC"),
+        "Bug Net": ("Merchant", "25 SC"),
+        "Empty Bullet": ("Arms Dealer", "5 CC"),
+        "Spelunker Glowstick": ("Skeleton Merchant", "1 SC 50 CC"),
     }
     failures: list[str] = []
-    for item, expected_seller in probes.items():
+    for item, want in expected.items():
         if item not in candidates:
             continue
-        row = vendors.get(item)
-        if not row or row[0] != expected_seller or not row[1]:
-            failures.append(item)
+        if vendors.get(item) != want:
+            failures.append(f"{item}: got {vendors.get(item)!r}, expected {want!r}")
     if failures:
-        raise RuntimeError("Vendor-price regression: " + ", ".join(failures))
+        raise RuntimeError("Vendor-price regression: " + "; ".join(failures))
 
 
 def main() -> int:
