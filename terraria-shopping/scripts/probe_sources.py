@@ -4,7 +4,7 @@ import urllib.parse
 import urllib.request
 
 API = "https://terraria.wiki.gg/api.php"
-HEADERS = {"User-Agent": "polskiftw/gpages terraria-source-probe/1.1", "Accept": "application/json"}
+HEADERS = {"User-Agent": "polskiftw/gpages terraria-source-probe/1.2", "Accept": "application/json"}
 
 def query(**params):
     params.setdefault("action", "cargoquery")
@@ -22,12 +22,10 @@ def show(label, **params):
     except Exception as exc:
         print("EXCEPTION", repr(exc))
 
-for field in ["buy", "vendor", "plunder", "fished", "type", "source", "sell", "value"]:
-    show("ITEM " + field, tables="Items", fields=f"name,{field}", where='name="Music Box"', limit=10)
+for item in ["Music Box", "Armored Cavefish", "Active Stone Block", "Aglet"]:
+    for field in ["vendor__full", "plunder__full", "fished__full", "buy"]:
+        show(f"ITEM {item} {field}", tables="Items", fields=f"name,{field}", where=f'name="{item}"', limit=10)
 
-for field in ["boss", "type", "hardmode", "environment", "friendly"]:
-    show("NPC " + field, tables="NPCs", fields=f"name,{field}", where='name="Queen Bee"', limit=10)
-
-show("DROP adhesive", tables="Drops", fields="name,item,isfromnpc", where='item="Adhesive Bandage"', limit=20)
-show("DROP music box", tables="Drops", fields="name,item,isfromnpc", where='item="Music Box"', limit=20)
-show("DROP aglet", tables="Drops", fields="name,item,isfromnpc", where='item="Aglet"', limit=20)
+for table in ["NPCs", "NPCs_NPCIDs", "NPC"]:
+    for field in ["name", "name,type", "name,environment", "name,boss"]:
+        show(f"{table} {field}", tables=table, fields=field, where='name="Queen Bee"', limit=10)
