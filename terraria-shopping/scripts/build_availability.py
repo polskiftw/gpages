@@ -22,7 +22,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 RECIPE_DATA = ROOT / "data.generated.js"
 OUT = ROOT / "availability.generated.js"
 PAGE_SIZE = 500
-USER_AGENT = "polskiftw/gpages terraria-shopping availability-badges/1.3 (GitHub Pages data refresh)"
+USER_AGENT = "polskiftw/gpages terraria-shopping availability-badges/1.4 (GitHub Pages data refresh)"
 ITEM_FIELDS = "name,hardmode"
 
 # Schema: item -> (availability conditions, acquisition source, progression rank).
@@ -246,6 +246,7 @@ def infer_pseudo_mode(name: str) -> str | None:
 def main() -> int:
     data = load_recipe_data()
     leaf_names = collect_leaf_names(data)
+    craftable_names = {str(recipe["r"]) for recipe in data.get("recipes") or []}
     item_modes = fetch_item_modes()
     rows: dict[str, list[object]] = {}
     unresolved: list[str] = []
@@ -265,10 +266,6 @@ def main() -> int:
         conditions, source, rank = PROGRESSION_OVERRIDES.get(
             name, ([], SOURCE_OVERRIDES.get(name, ""), default_rank)
         )
-        # Some Wiki item rows omit/misstate the broad Hardmode flag even when a
-        # known progression gate is unambiguously post-Wall-of-Flesh. The
-        # explicit milestone wins in that case. Pre-Hardmode milestones use
-        # ranks below 40 and keep their Pre-Hardmode badge.
         if rank >= 40 and name in PROGRESSION_OVERRIDES:
             mode = "Hardmode"
         rows[name] = [mode, conditions, source, rank]
@@ -277,6 +274,21 @@ def main() -> int:
         for name in unresolved:
             print(f"  - {name}", file=sys.stderr)
         raise RuntimeError(f"{len(unresolved)} shopping-list leaves have no availability classification")
+
+    # A status-only shopping row is not acceptable. The browser can derive a
+    # craft source for recipe-cycle leaves, so only noncraftable leaves require
+    # an explicit generated source here. Fail closed so future game/wiki updates
+    # cannot silently reintroduce rows with only PRE/HARDMODE badges.
+    source_gaps = [
+        name for name, row in rows.items()
+        if not str(row[2] or "").strip() and name not in craftable_names
+    ]
+    if source_gaps:
+        print("Shopping-list leaves with no acquisition source:", file=sys.stderr)
+        for name in source_gaps:
+            print(f"  - {name}", file=sys.stderr)
+        raise RuntimeError(f"{len(source_gaps)} noncraftable shopping-list leaves have no source badge")
+
     OUT.write_text(
         "window.TERRARIA_GENERATED_AVAILABILITY="
         + json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
@@ -285,9 +297,10 @@ def main() -> int:
     )
     hard = sum(1 for row in rows.values() if row[0] == "Hardmode")
     sourced = sum(1 for row in rows.values() if row[2])
+    craft_fallback = sum(1 for name, row in rows.items() if not row[2] and name in craftable_names)
     print(
         f"Wrote {OUT}: {len(rows)} leaves ({hard} Hardmode, {len(rows)-hard} Pre-Hardmode; "
-        f"{sourced} explicit sources)",
+        f"{sourced} explicit sources; {craft_fallback} craft-source fallbacks; 0 status-only rows)",
         file=sys.stderr,
     )
     return 0
