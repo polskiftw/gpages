@@ -8,9 +8,9 @@ the UI:
 
 The Official Terraria Wiki supplies the broad Hardmode flag, Drops Cargo supplies
 mob/container sources, and Template:Itemsource fills shop/fishing/plunder routes.
-Small explicit overrides keep important progression gates concise and fix source
-classes the Wiki templates do not model well. The build fails if a noncraftable
-shopping leaf would otherwise ship with only a PRE/HARDMODE badge.
+Small explicit overrides and category rules cover world harvests, critters, quest
+rewards, and unusual interactions. The build fails if a noncraftable shopping
+leaf would otherwise ship with only a PRE/HARDMODE badge.
 """
 from __future__ import annotations
 
@@ -30,9 +30,10 @@ RECIPE_DATA = ROOT / "data.generated.js"
 OUT = ROOT / "availability.generated.js"
 PAGE_SIZE = 500
 ITEMSOURCE_BATCH = 12
-USER_AGENT = "polskiftw/gpages terraria-shopping availability-badges/1.5 (GitHub Pages data refresh)"
+USER_AGENT = "polskiftw/gpages terraria-shopping availability-badges/1.6 (GitHub Pages data refresh)"
 ITEM_FIELDS = "name,hardmode"
 
+# item -> (availability conditions, acquisition source, progression rank)
 PROGRESSION_OVERRIDES: dict[str, tuple[list[str], str, int]] = {
     "Starfury": ([], "Skyware Chest / Sky Crate", 10),
     "Enchanted Sword": ([], "Enchanted Sword Shrine", 10),
@@ -76,6 +77,9 @@ PROGRESSION_OVERRIDES: dict[str, tuple[list[str], str, int]] = {
     "Star Wrath": ([], "Moon Lord (boss)", 90),
 }
 
+# Exact sources for world harvests and mechanics that are clearer than a generic
+# itemsource rendering. These are still concise because the shopping-list row is
+# meant to answer "where/how do I get this?", not reproduce the Wiki article.
 SOURCE_OVERRIDES: dict[str, str] = {
     "Copper Ore": "Surface / Underground / Cavern (ore)",
     "Tin Ore": "Surface / Underground / Cavern (ore)",
@@ -102,6 +106,43 @@ SOURCE_OVERRIDES: dict[str, str] = {
     "Fireblossom": "Underworld ash (harvest)",
     "Shiverthorn": "Snow / Ice (harvest)",
     "Truffle Worm": "Glowing Mushroom biome (catch)",
+    "Blue Berries": "Surface grass / Jungle grass (harvest)",
+    "Coral": "Ocean (harvest)",
+    "Green Mushroom": "Underground / Cavern (harvest)",
+    "Teal Mushroom": "Underground / Cavern (harvest)",
+    "Orange Bloodroot": "Underground / Cavern dirt (harvest)",
+    "Lime Kelp": "Underground / Cavern water (harvest)",
+    "Pink Prickly Pear": "Desert cactus (harvest)",
+    "Sky Blue Flower": "Jungle grass (harvest)",
+    "Yellow Marigold": "Surface grass (harvest)",
+    "Vile Mushroom": "Corruption grass (harvest)",
+    "Vicious Mushroom": "Crimson grass (harvest)",
+    "Nature's Gift": "Underground Jungle (harvest)",
+    "Pink Ice Block": "Hallow ice (mine)",
+    "Purple Ice Block": "Corruption ice (mine)",
+    "Red Ice Block": "Crimson ice (mine)",
+    "Silt Block": "Underground / Cavern (mine)",
+    "Vine Rope": "Vines + Plant Fiber Cordage (harvest)",
+    "Living Fire Block": "Hardmode Underworld mobs",
+    "Gold Chest": "Underground / Cavern chest (mine after empty)",
+    "Golden Chest": "Flying Dutchman / Pirate mobs",
+    "Ivy Chest": "Underground Jungle chest (mine after empty)",
+    "Shadow Chest": "Underworld chest (mine after empty)",
+    "Web Covered Chest": "Spider Nest chest (mine after empty)",
+    "Fishing Bobber": "Angler quest",
+    "Gel Dye": "Dye Trader (Strange Plant reward)",
+    "Shifting Sands Dye": "Dye Trader (Strange Plant reward)",
+    "Gentleman's Magnificent Beard": "Gentleman's Beard (grow while equipped)",
+    "Lava Absorbant Sponge": "Lava fishing",
+    "Honey Absorbant Sponge": "Angler quest (Bumblebee Tuna)",
+    "Heroicis' Wings (Inactive)": "Platinum Coin in Oasis water",
+    "Cattiva": "Rescue distressed Cattiva (surface daytime)",
+    "Foxparks": "Rescue distressed Foxparks (surface daytime)",
+    "Digtoise": "Sleeping Digtoise (Underground Desert)",
+    "Faeling": "Aether (catch)",
+    "Pupfish": "Desert water (catch)",
+    "Pufferfish": "Ocean (catch)",
+    # Angler quest rewards are not consistently represented by Itemsource.
     "Angler Earring": "Angler quest",
     "Tackle Box": "Angler quest",
     "High Test Fishing Line": "Angler quest",
@@ -115,6 +156,8 @@ SOURCE_OVERRIDES: dict[str, str] = {
     "Super Absorbant Sponge": "Angler quest",
 }
 
+# Recipe-category aliases are not literal Items rows and therefore have no Wiki
+# item page to query. Give each category a real acquisition route.
 PSEUDO_SOURCES: dict[str, str] = {
     "Any Adamantite Bar": "Adamantite / Titanium Ore (smelt)",
     "Any Balloon": "Skyware Chest / Sky Crate",
@@ -178,6 +221,33 @@ NPC_VENDORS = {
     "Dye Trader", "Witch Doctor", "Steampunker", "Cyborg", "Truffle",
     "Party Girl", "Pirate", "Santa Claus", "Tavernkeep", "Zoologist",
     "Golfer", "Princess",
+}
+
+GEM_CRITTER_RE = re.compile(r"^(Amber|Amethyst|Diamond|Emerald|Ruby|Sapphire|Topaz) (Bunny|Squirrel)$")
+GOLD_CRITTERS = {
+    "Gold Bird", "Gold Bunny", "Gold Butterfly", "Gold Dragonfly", "Gold Frog",
+    "Gold Goldfish", "Gold Grasshopper", "Gold Ladybug", "Gold Mouse",
+    "Gold Seahorse", "Gold Squirrel", "Gold Water Strider",
+}
+BUTTERFLY_CRITTERS = {
+    "Julia Butterfly", "Monarch Butterfly", "Purple Emperor Butterfly",
+    "Red Admiral Butterfly", "Sulphur Butterfly", "Tree Nymph Butterfly",
+    "Ulysses Butterfly", "Zebra Swallowtail Butterfly",
+}
+DRAGONFLY_CRITTERS = {
+    "Black Dragonfly", "Blue Dragonfly", "Green Dragonfly", "Orange Dragonfly",
+    "Red Dragonfly", "Yellow Dragonfly",
+}
+FAIRY_CRITTERS = {"Blue Fairy", "Green Fairy", "Pink Fairy"}
+LAVA_CRITTERS = {"Hell Butterfly", "Lavafly", "Magma Snail"}
+GENERIC_CRITTERS = {
+    "Bird", "Black Scorpion", "Blue Jay", "Blue Macaw", "Buggy", "Bunny",
+    "Cardinal", "Duck", "Firefly", "Frog", "Glowing Snail", "Goldfish",
+    "Grasshopper", "Gray Cockatiel", "Grebe", "Grubby", "Jungle Turtle",
+    "Ladybug", "Lightning Bug", "Maggot", "Mallard Duck", "Mouse", "Owl",
+    "Penguin", "Rat", "Red Squirrel", "Scarlet Macaw", "Scorpion", "Seagull",
+    "Seahorse", "Sluggy", "Snail", "Squirrel", "Stinkbug", "Toucan", "Turtle",
+    "Water Strider", "Yellow Cockatiel",
 }
 
 GENERIC_ITEMSOURCE = {"Plundering", "Looting", "Drop", "Drops", "Shimmer", "Shimmer transmutation"}
@@ -419,7 +489,23 @@ def patterned_source(name: str) -> str:
         return "Wizard (NPC)"
     if name.startswith("Music Box ("):
         return "Record matching music track"
-    return PSEUDO_SOURCES.get(name, "")
+    if name in PSEUDO_SOURCES:
+        return PSEUDO_SOURCES[name]
+    if GEM_CRITTER_RE.match(name):
+        return "Underground gem critter (catch)"
+    if name in GOLD_CRITTERS:
+        return "Gold critter (catch)"
+    if name in LAVA_CRITTERS:
+        return "Underworld critter (catch)"
+    if name in BUTTERFLY_CRITTERS:
+        return "Butterfly critter (catch)"
+    if name in DRAGONFLY_CRITTERS:
+        return "Dragonfly critter (catch)"
+    if name in FAIRY_CRITTERS:
+        return "Fairy critter (catch)"
+    if name in GENERIC_CRITTERS:
+        return "World critter (catch)"
+    return ""
 
 
 def main() -> int:
