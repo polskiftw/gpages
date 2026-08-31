@@ -12,6 +12,7 @@ on:
     paths:
       - 'terraria-shopping/scripts/build_data.py'
       - 'terraria-shopping/scripts/build_availability.py'
+      - 'terraria-shopping/scripts/probe_sources.py'
       - '.github/workflows/update-terraria-shopping.yml'
 
 permissions:
@@ -26,6 +27,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Probe source Cargo fields
+        run: python terraria-shopping/scripts/probe_sources.py
       - name: Build recipe graph
         run: python terraria-shopping/scripts/build_data.py
       - name: Build availability badges
