@@ -11,6 +11,17 @@ const itemNameFor=pill=>{
   clone.querySelectorAll('.qty').forEach(el=>el.remove());
   return norm(clone.textContent);
 };
+const dedupeTreasureBag=source=>{
+  const parts=norm(source).split(/\s*\/\s*/).filter(Boolean);
+  const bosses=new Set(parts.map(part=>{
+    const match=part.match(/^(.+?)\s*\(boss\)$/i);
+    return match?norm(match[1]).toLowerCase():null;
+  }).filter(Boolean));
+  return parts.filter(part=>{
+    const match=part.match(/^Treasure Bag \((.+)\)$/i);
+    return !match||!bosses.has(norm(match[1]).toLowerCase());
+  }).join(' / ');
+};
 const vendorOnly=(source,seller)=>{
   const clean=norm(source).replace(/\s*\(NPC\)\s*$/i,'').trim();
   return clean.toLowerCase()===norm(seller).toLowerCase();
@@ -25,7 +36,8 @@ const killSource=source=>/\b(?:mob|mobs|boss|bosses|mini-boss|pillar)\b/i.test(s
 function decoratePill(pill){
   if(pill.dataset.sourceSemantic==='1')return;
   pill.dataset.sourceSemantic='1';
-  const name=itemNameFor(pill), source=norm(pill.textContent), vendor=vendors[name];
+  const name=itemNameFor(pill), source=dedupeTreasureBag(pill.textContent), vendor=vendors[name];
+  if(source!==norm(pill.textContent))pill.textContent=source;
   if(Array.isArray(vendor)&&vendor.length>=2&&vendorOnly(source,vendor[0])){
     pill.textContent=`${vendor[0]} • ${vendor[1]}`;
     pill.classList.add('source-purchase');
