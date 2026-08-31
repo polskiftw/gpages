@@ -7,7 +7,7 @@ const items=E.items||{}, availability=E.availability||{}, curatedProjects=E.proj
 const generatedAvailability=window.TERRARIA_GENERATED_AVAILABILITY||{};
 const generatedFishing=window.TERRARIA_GENERATED_FISHING||{};
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const search=$('#search'), sort=$('#sort'), missingOnly=$('#missingOnly'), content=$('#content'), stats=$('#stats'), status=$('#status'), clearSearch=$('#clearSearch');
+const search=$('#search'), sort=$('#sort'), missingOnly=$('#missingOnly'), fishMode=$('#fishMode'), content=$('#content'), stats=$('#stats'), status=$('#status'), clearSearch=$('#clearSearch');
 const PAGE=80;
 let view='projects', shown=PAGE;
 
@@ -31,6 +31,9 @@ try{acquired=JSON.parse(localStorage.getItem('terraria-shopping-progress-v2')||'
 if(!Object.keys(acquired).length){
   try{const old=JSON.parse(localStorage.getItem('terraria-shopping-progress-v1')||'{}')||{};for(const [id,v] of Object.entries(old))if(v)acquired['legacy:'+id]=true}catch(_){}
 }
+if(fishMode){try{fishMode.checked=localStorage.getItem('terraria-shopping-fish-mode-v1')==='1'}catch(_){}}
+let fishModeProgress=fishMode?.checked?{...acquired}:null;
+const fishModeEligibility=new Map();
 const save=()=>localStorage.setItem('terraria-shopping-progress-v2',JSON.stringify(acquired));
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const wikiName=name=>W+encodeURIComponent(String(name).replaceAll(' ','_'));
@@ -93,6 +96,17 @@ function shoppingEntries(name){
   }
   shoppingCache.set(name,entries);
   return entries;
+}
+function hasMissingFishAtSnapshot(name){
+  if(!fishModeProgress)return true;
+  if(fishModeEligibility.has(name))return fishModeEligibility.get(name);
+  const eligible=shoppingEntries(name).some(entry=>entry.fishable&&!fishModeProgress[entry.key]);
+  fishModeEligibility.set(name,eligible);
+  return eligible;
+}
+function resetFishModeSnapshot(){
+  fishModeProgress=fishMode?.checked?{...acquired}:null;
+  fishModeEligibility.clear();
 }
 function shoppingSummary(name){
   const entries=shoppingEntries(name), total=entries.length;
@@ -190,11 +204,11 @@ function projectCard(n){
 }
 function renderCatalog(openNames=new Set()){
   const base=view==='projects'?projectNodes:componentNodes;const q=search.value.trim().toLowerCase();let list=base;
-  if(q)list=list.filter(n=>projectSearchBlob(n.name).includes(q));list=[...list].sort(nodeSort);
+  if(q)list=list.filter(n=>projectSearchBlob(n.name).includes(q));if(fishMode?.checked)list=list.filter(n=>hasMissingFishAtSnapshot(n.name));list=[...list].sort(nodeSort);
   const visible=list.slice(0,shown),label=view==='projects'?'Projects':'All craftable items';
   let html=`<div class="sectionhead"><h2>${label}</h2><span>${list.length} matches</span></div><div class="projectgrid">${visible.map(projectCard).join('')}</div>`;
   if(list.length>visible.length)html+=`<div class="morewrap"><button class="more" id="showMore">Show ${Math.min(PAGE,list.length-visible.length)} more • ${list.length-visible.length} remaining</button></div>`;
-  if(!list.length)html='<div class="card empty">No craftables match the current search.</div>';
+  if(!list.length)html=`<div class="card empty">${fishMode?.checked?'No craftables have unfinished fishing-route items in this Fish Mode snapshot.':'No craftables match the current search.'}</div>`;
   content.innerHTML=html;for(const d of $$('details.project'))if(openNames.has(d.dataset.name)){d.open=true;loadBody(d)}
   $('#showMore')?.addEventListener('click',()=>{const keepOpen=new Set($$('details.project[open]').map(el=>el.dataset.name));shown+=PAGE;render(keepOpen)});renderStats(list.length);
 }
@@ -220,8 +234,9 @@ content.addEventListener('toggle',e=>{const d=e.target;if(d.matches?.('details.p
 content.addEventListener('change',e=>{if(e.target.matches('.check'))setAcquired(e.target.dataset.key,e.target.checked)});
 $$('.segments button').forEach(b=>b.addEventListener('click',()=>{view=b.dataset.view;shown=PAGE;render();scrollTo({top:0,behavior:'smooth'})}));
 search.addEventListener('input',()=>{shown=PAGE;render()});sort.addEventListener('change',()=>render());missingOnly.addEventListener('change',()=>render(new Set($$('details.project[open]').map(el=>el.dataset.name))));
+fishMode?.addEventListener('change',()=>{try{localStorage.setItem('terraria-shopping-fish-mode-v1',fishMode.checked?'1':'0')}catch(_){}resetFishModeSnapshot();shown=PAGE;render(new Set($$('details.project[open]').map(el=>el.dataset.name)))});
 clearSearch.addEventListener('click',()=>{search.value='';search.focus();shown=PAGE;render()});
-$('#resetChecks').addEventListener('click',()=>{if(confirm('Clear every acquired checkmark?')){acquired={};save();render()}});
+$('#resetChecks').addEventListener('click',()=>{if(confirm('Clear every acquired checkmark?')){acquired={};save();resetFishModeSnapshot();render()}});
 const stamp=D.generatedAt?new Date(D.generatedAt).toLocaleString():null;$('#dataLine').textContent=graphReady?`Official Wiki recipe data • updated ${stamp}`:`Source data checked ${E.checked||'recently'} • full recipe data pending`;
 render();
 })();
