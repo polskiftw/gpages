@@ -185,6 +185,7 @@ PSEUDO_SOURCES: dict[str, str] = {
     "Any Sand Block": "Sand biomes (mine)",
     "Any Sandstorm Balloon": "Sandstorm in a Balloon variant (craft)",
     "Any Scorpion": "Scorpion critter (catch)",
+    "Any Seashell or Starfish": "Ocean beach / underwater (collect)",
     "Any Silver Bar": "Silver / Tungsten Ore (smelt)",
     "Any Snail": "Snail critter (catch)",
     "Any Squirrel": "Squirrel critter (catch)",
