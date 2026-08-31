@@ -2,7 +2,10 @@
 """Run the full Terraria Shopping audit against the resolved Desktop recipe set."""
 from __future__ import annotations
 
+import collections
+
 import audit_data as audit
+import build_data as bd
 import recipe_revision_rules as revisions
 
 
@@ -46,6 +49,48 @@ def validate_revision_canaries(recipes: list[dict[str, object]]) -> None:
     print("Desktop 1.4.5 revision canaries clean (Stink Potion, Unholy Arrow, Gold Watch)")
 
 
+def validate_recipe_chain_canaries(recipes: list[dict[str, object]]) -> None:
+    """Catch parser/planner bugs that recipe-table parity alone cannot detect."""
+    # Reef Piano is a compact test of three things at once:
+    #   * a normal multi-ingredient parent recipe;
+    #   * an intermediate whose useful recipe outputs a 15-item batch; and
+    #   * competing reversible Platform/Wall recipes that must not be followed
+    #     backward when flattening a shopping list.
+    audit.require_recipe(
+        recipes,
+        "Reef Piano",
+        1,
+        {"Reef Block": 15, "Bone": 4, "Book": 1},
+        station_contains="Sawmill",
+    )
+    audit.require_recipe(
+        recipes,
+        "Reef Block",
+        15,
+        {"Stone Block": 15, "Coral": 1, "Any Seashell or Starfish": 1},
+    )
+
+    by_result: dict[str, list[dict[str, object]]] = collections.defaultdict(list)
+    for recipe in recipes:
+        by_result[str(recipe["r"])].append(recipe)
+    leaves, cycles, _steps, cycle_to = bd.canonical_plan(
+        "Reef Piano", 1, by_result, bd.ingredient_use_counts(recipes)
+    )
+    expected = {
+        "Stone Block": 15,
+        "Coral": 1,
+        "Any Seashell or Starfish": 1,
+        "Bone": 4,
+        "Book": 1,
+    }
+    if cycles or cycle_to or leaves != expected:
+        raise RuntimeError(
+            "Reef Piano flattened shopping-list sentinel failed; "
+            f"expected {expected}, got {leaves}, cycles={cycles}, cycle_to={cycle_to!r}"
+        )
+    print("Recipe-chain canary clean (Reef Piano -> Reef Block batch -> acquisition leaves)")
+
+
 def main() -> int:
     payload = audit.load_js(audit.DATA, "window.TERRARIA_RECIPE_DATA=")
     if not isinstance(payload, dict):
@@ -65,6 +110,7 @@ def main() -> int:
     audit.validate_live_cargo(recipes, preferred_raw)
     audit.validate_current_version_canaries(recipes)
     validate_revision_canaries(recipes)
+    validate_recipe_chain_canaries(recipes)
     audit.validate_reciprocals(recipes)
     audit.validate_shopping_lists(payload, recipes)
     print("ALL RESOLVED DESKTOP TERRARIA RECIPE + SHOPPING DATA AUDITS PASSED")
