@@ -16,6 +16,30 @@ const nodes=Array.isArray(D.nodes)?D.nodes:[];
 const graphReady=recipes.length>0&&nodes.length>0;
 const byResult=new Map();
 for(const r of recipes){if(!byResult.has(r.r))byResult.set(r.r,[]);byResult.get(r.r).push(r)}
+const ingredientUseCount=new Map();
+for(const r of recipes)for(const pair of r.i||[]){const name=String(pair[0]);ingredientUseCount.set(name,(ingredientUseCount.get(name)||0)+1)}
+const reciprocalRoleCache=new WeakMap();
+const processedBuildForm=name=>/\b(?:Platform|Wall)$/.test(String(name));
+function reciprocalIngredient(recipe){
+  const input=recipe.i||[];
+  if(input.length!==1)return'';
+  const ingredient=String(input[0][0]), ingredientQty=Math.max(1,Number(input[0][1])||1), resultQty=Math.max(1,Number(recipe.a)||1), result=String(recipe.r);
+  const reverse=(byResult.get(ingredient)||[]).some(r=>{const ri=r.i||[];return ri.length===1&&String(ri[0][0])===result&&Math.max(1,Number(ri[0][1])||1)===resultQty&&Math.max(1,Number(r.a)||1)===ingredientQty});
+  return reverse?ingredient:'';
+}
+function reciprocalRecipeRole(recipe){
+  if(reciprocalRoleCache.has(recipe))return reciprocalRoleCache.get(recipe);
+  const ingredient=reciprocalIngredient(recipe);
+  if(!ingredient){reciprocalRoleCache.set(recipe,'');return''}
+  const result=String(recipe.r), resultProcessed=processedBuildForm(result), ingredientProcessed=processedBuildForm(ingredient);
+  let role='ambiguous';
+  if(resultProcessed!==ingredientProcessed)role=resultProcessed?'forward':'inverse';
+  else{
+    const resultUses=ingredientUseCount.get(result)||0, ingredientUses=ingredientUseCount.get(ingredient)||0;
+    if(resultUses!==ingredientUses)role=ingredientUses>resultUses?'forward':'inverse';
+  }
+  reciprocalRoleCache.set(recipe,role);return role;
+}
 const nodeMap=new Map(nodes.map(n=>[n[0],{name:n[0],uniqueItems:Number(n[1])||0,endpoint:!!n[2]}]));
 const curatedByName=new Map(curatedProjects.map(p=>[p.name,p]));
 const legacyNameIds=new Map();
@@ -35,7 +59,7 @@ if(fishMode){try{fishMode.checked=localStorage.getItem('terraria-shopping-fish-m
 let fishModeProgress=fishMode?.checked?{...acquired}:null;
 const fishModeEligibility=new Map();
 const save=()=>localStorage.setItem('terraria-shopping-progress-v2',JSON.stringify(acquired));
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[c]));
 const wikiName=name=>W+encodeURIComponent(String(name).replaceAll(' ','_'));
 const wikiItem=id=>W+(items[id]?.wiki||encodeURIComponent(String(items[id]?.name||id).replaceAll(' ','_')));
 const avObject=tuple=>{
@@ -69,25 +93,30 @@ function mergeLeaves(into,from){for(const [name,qty] of from)addQty(into,name,qt
 function totalQty(map){let n=0;for(const q of map.values())n+=q;return n}
 
 function planItem(name,qty=1,stack=new Set(),depth=0){
-  const options=byResult.get(name)||[];
+  const allOptions=byResult.get(name)||[];
+  const options=allOptions.filter(recipe=>{const role=reciprocalRecipeRole(recipe);return role!=='inverse'&&role!=='ambiguous'});
   if(!options.length||depth>48)return{leaves:new Map([[name,qty]]),cycles:0,steps:0};
-  if(stack.has(name))return{leaves:new Map([[name,qty]]),cycles:1,steps:0};
+  if(stack.has(name))return{leaves:new Map(),cycles:1,steps:0,cycleTo:name};
   const next=new Set(stack);next.add(name);
-  const candidates=[];
+  const candidates=[];let propagatedCycle='',cycleClosedHere=false;
   for(const recipe of options){
     const batches=Math.ceil(qty/Math.max(1,Number(recipe.a)||1));
-    const leaves=new Map();let cycles=0,steps=1;
+    const leaves=new Map();let steps=1,cycleTo='';
     for(const pair of recipe.i||[]){
       const childName=String(pair[0]), childQty=Math.max(1,Number(pair[1])||1)*batches;
       const child=planItem(childName,childQty,next,depth+1);
-      mergeLeaves(leaves,child.leaves);cycles+=child.cycles;steps+=child.steps;
+      if(child.cycleTo){cycleTo=child.cycleTo;break}
+      mergeLeaves(leaves,child.leaves);steps+=child.steps;
     }
-    candidates.push({leaves,cycles,steps,recipe});
+    if(cycleTo){if(cycleTo===name)cycleClosedHere=true;else propagatedCycle=propagatedCycle||cycleTo;continue}
+    candidates.push({leaves,cycles:0,steps,recipe});
   }
-  const clean=candidates.filter(c=>c.cycles===0);
-  if(!clean.length)return{leaves:new Map([[name,qty]]),cycles:0,steps:0};
-  clean.sort((a,b)=>a.leaves.size-b.leaves.size||totalQty(a.leaves)-totalQty(b.leaves)||a.steps-b.steps||String(a.recipe.s).localeCompare(String(b.recipe.s))||JSON.stringify(a.recipe.i).localeCompare(JSON.stringify(b.recipe.i)));
-  return clean[0];
+  if(!candidates.length){
+    if(propagatedCycle&&!cycleClosedHere)return{leaves:new Map(),cycles:1,steps:0,cycleTo:propagatedCycle};
+    return{leaves:new Map([[name,qty]]),cycles:0,steps:0};
+  }
+  candidates.sort((a,b)=>a.leaves.size-b.leaves.size||totalQty(a.leaves)-totalQty(b.leaves)||a.steps-b.steps||String(a.recipe.s).localeCompare(String(b.recipe.s))||JSON.stringify(a.recipe.i).localeCompare(JSON.stringify(b.recipe.i)));
+  return candidates[0];
 }
 function shoppingEntries(name){
   if(shoppingCache.has(name))return shoppingCache.get(name);
