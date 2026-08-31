@@ -11,16 +11,37 @@ const itemNameFor=pill=>{
   clone.querySelectorAll('.qty').forEach(el=>el.remove());
   return norm(clone.textContent);
 };
-const dedupeTreasureBag=source=>{
-  const parts=norm(source).split(/\s*\/\s*/).filter(Boolean);
-  const bosses=new Set(parts.map(part=>{
-    const match=part.match(/^(.+?)\s*\(boss\)$/i);
-    return match?norm(match[1]).toLowerCase():null;
-  }).filter(Boolean));
-  return parts.filter(part=>{
-    const match=part.match(/^Treasure Bag \((.+)\)$/i);
-    return !match||!bosses.has(norm(match[1]).toLowerCase());
-  }).join(' / ');
+const sourceParts=source=>norm(source).split(/\s*\/\s*/).filter(Boolean);
+const treasureBagBoss=part=>{
+  const match=norm(part).match(/^Treasure Bag \((.+)\)$/i);
+  return match?norm(match[1]):'';
+};
+const requiresExpert=source=>{
+  const parts=sourceParts(source);
+  return parts.length>0&&parts.every(part=>!!treasureBagBoss(part));
+};
+const normalizeTreasureBags=source=>{
+  const seen=new Set();
+  const parts=[];
+  for(const part of sourceParts(source)){
+    const boss=treasureBagBoss(part);
+    const clean=boss?`${boss} (boss)`:norm(part);
+    const key=clean.toLowerCase();
+    if(seen.has(key))continue;
+    seen.add(key);
+    parts.push(clean);
+  }
+  return parts.join(' / ');
+};
+const addDifficultyBadge=(pill,label,kind)=>{
+  const meta=pill.parentElement;
+  if(!meta||meta.querySelector(`.pill.difficulty-${kind}`))return;
+  const badge=document.createElement('span');
+  badge.className=`pill availability difficulty-${kind}`;
+  badge.textContent=label;
+  const mode=meta.querySelector('.pill.availability');
+  if(mode)mode.insertAdjacentElement('afterend',badge);
+  else pill.insertAdjacentElement('beforebegin',badge);
 };
 const vendorOnly=(source,seller)=>{
   const clean=norm(source).replace(/\s*\(NPC\)\s*$/i,'').trim();
@@ -36,8 +57,9 @@ const killSource=source=>/\b(?:mob|mobs|boss|bosses|mini-boss|pillar)\b/i.test(s
 function decoratePill(pill){
   if(pill.dataset.sourceSemantic==='1')return;
   pill.dataset.sourceSemantic='1';
-  const name=itemNameFor(pill), source=dedupeTreasureBag(pill.textContent), vendor=vendors[name];
-  if(source!==norm(pill.textContent))pill.textContent=source;
+  const name=itemNameFor(pill), rawSource=norm(pill.textContent), expert=requiresExpert(rawSource), source=normalizeTreasureBags(rawSource), vendor=vendors[name];
+  if(expert)addDifficultyBadge(pill,'EXPERT','expert');
+  if(source!==rawSource)pill.textContent=source;
   if(Array.isArray(vendor)&&vendor.length>=2&&vendorOnly(source,vendor[0])){
     pill.textContent=`${vendor[0]} • ${vendor[1]}`;
     pill.classList.add('source-purchase');
