@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 import json
+import re
 import urllib.parse
 import urllib.request
 
 API = "https://terraria.wiki.gg/api.php"
-HEADERS = {"User-Agent": "polskiftw/gpages terraria-source-probe/1.3", "Accept": "application/json"}
+HEADERS = {"User-Agent": "polskiftw/gpages terraria-source-probe/1.4", "Accept": "application/json"}
 
 def request(**params):
     params.setdefault("format", "json")
@@ -14,19 +15,19 @@ def request(**params):
     with urllib.request.urlopen(req, timeout=45) as response:
         return json.loads(response.read().decode("utf-8"))
 
-def show(label, **params):
-    print("\n###", label)
-    try:
-        print(json.dumps(request(**params), ensure_ascii=False, indent=2))
-    except Exception as exc:
-        print("EXCEPTION", repr(exc))
-
-for table in ["Items", "Drops", "NPCs"]:
-    show(f"FIELDS {table}", action="cargofields", table=table)
-
-for item in ["Music Box", "Armored Cavefish", "Active Stone Block", "Aglet"]:
-    for field in ["vendor__full", "plunder__full", "fished__full", "buy"]:
-        show(
-            f"ITEM {item} {field}", action="cargoquery", tables="Items",
-            fields=f"name,{field}", where=f'name="{item}"', limit=10,
-        )
+pages = [
+    "Music Box", "Armored Cavefish", "Active Stone Block", "Acorn",
+    "Angler Earring", "Actuator", "Prismatic Lacewing", "Life Crystal",
+]
+payload = request(
+    action="query", prop="revisions", titles="|".join(pages),
+    rvprop="content", rvslots="main", redirects=1,
+)
+for page in payload.get("query", {}).get("pages", []):
+    title = page.get("title")
+    revs = page.get("revisions") or []
+    text = (((revs[0] if revs else {}).get("slots") or {}).get("main") or {}).get("content", "")
+    print("\n### PAGE", title)
+    for line in text.splitlines():
+        if re.search(r"\b(vendor|plunder|fished|drop|loot|bag loot|source|buy)\b", line, re.I):
+            print(line[:1600])
