@@ -30,7 +30,7 @@ RECIPE_DATA = ROOT / "data.generated.js"
 OUT = ROOT / "availability.generated.js"
 PAGE_SIZE = 500
 ITEMSOURCE_BATCH = 12
-USER_AGENT = "polskiftw/gpages terraria-shopping availability-badges/1.7 (GitHub Pages data refresh)"
+USER_AGENT = "polskiftw/gpages terraria-shopping availability-badges/1.8 (GitHub Pages data refresh)"
 ITEM_FIELDS = "name,hardmode"
 
 # item -> (availability conditions, acquisition source, progression rank)
@@ -200,7 +200,7 @@ PSEUDO_AVAILABILITY: dict[str, tuple[str, list[str], str, int]] = {
     "Green Jellyfish (bait)": ("Hardmode", [], "Underground / Cavern fishing", 40),
     "Pink Jellyfish (bait)": ("Pre-Hardmode", [], "Ocean fishing", 10),
     "Music Box (Ocean)": ("Hardmode", [], "Wizard (NPC) + record at Ocean", 40),
-    "Music Box (Space)": ("Hardmode", [], "Wizard (NPC) + record in Space", 40),
+    "Music Box (Space)": ("Hardmode", [],"Wizard (NPC) + record in Space", 40),
 }
 
 HARDMODE_PSEUDO_HINTS = (
@@ -253,7 +253,7 @@ GENERIC_CRITTERS = {
     "Water Strider", "Yellow Cockatiel",
 }
 
-GENERIC_ITEMSOURCE = {"Plundering", "Looting", "Drop", "Drops", "Shimmer", "Shimmer transmutation"}
+GENERIC_ITEMSOURCE = {"Plundering", "Looting", "Drop", "Drops", "Crafting", "By hand", "Shimmer"}
 VERSION_PAREN = re.compile(r"\((?:Desktop|Console|Mobile|Old-gen|3DS|Switch)[^)]*versions?\)", re.I)
 COIN_PAREN = re.compile(r"\([^)]*(?:Platinum|Gold|Silver|Copper|\bPC\b|\bGC\b|\bSC\b|\bCC\b)[^)]*\)", re.I)
 
@@ -389,22 +389,48 @@ def dedupe_double_phrase(value: str) -> str:
     return value
 
 
-def clean_itemsource_primary(value: str) -> str:
+def source_is_recipe_like(value: str, recipe_inputs: set[str]) -> bool:
+    """Return True when an Itemsource fragment is merely a recipe/decraft route."""
+    value = re.sub(r"\s+", " ", value).strip()
+    if not value:
+        return False
+    if re.search(r"\(\s*@\s*[^)]*\)", value) or " @ " in value:
+        return True
+    core = re.sub(r"\s*\([^)]*\)\s*$", "", value).strip()
+    folded = core.casefold()
+    for ingredient in recipe_inputs:
+        ingredient_folded = ingredient.casefold()
+        if folded == ingredient_folded:
+            return True
+        if re.match(rf"^\d+(?:\.\d+)?\s+{re.escape(ingredient)}(?:\s|$)", core, flags=re.I):
+            return True
+    if re.match(r"^\d+(?:\.\d+)?\s+.*\b(?:Platform|Wall)\b", core, flags=re.I):
+        return True
+    return False
+
+
+def clean_itemsource_primary(value: str, recipe_inputs: set[str] | None = None) -> str:
+    recipe_inputs = recipe_inputs or set()
     value = VERSION_PAREN.sub("", value)
     value = COIN_PAREN.sub("", value)
     value = re.sub(r"\s+", " ", value).strip(" /:")
     if not value:
         return ""
     parts = [re.sub(r"\s+", " ", part).strip(" /:") for part in re.split(r"\s+/\s+", value)]
-    primary = dedupe_double_phrase(next((p for p in parts if p), ""))
-    if not primary or primary in GENERIC_ITEMSOURCE or primary.startswith("Shimmer transmutation"):
-        return ""
-    if primary in NPC_VENDORS:
-        primary += " (NPC)"
-    return primary[:120]
+    for part in parts:
+        primary = dedupe_double_phrase(part)
+        primary = re.sub(r"^Shimmer\s+Shimmer transmutation\s*:\s*", "Shimmer transmutation: ", primary, flags=re.I)
+        if not primary or primary in GENERIC_ITEMSOURCE:
+            continue
+        if source_is_recipe_like(primary, recipe_inputs):
+            continue
+        if primary in NPC_VENDORS:
+            primary += " (NPC)"
+        return primary[:120]
+    return ""
 
 
-def fetch_itemsource_sources(names: list[str]) -> dict[str, str]:
+def fetch_itemsource_sources(names: list[str], recipe_inputs_by_result: dict[str, set[str]]) -> dict[str, str]:
     out: dict[str, str] = {}
     for start in range(0, len(names), ITEMSOURCE_BATCH):
         batch = names[start:start + ITEMSOURCE_BATCH]
@@ -423,11 +449,11 @@ def fetch_itemsource_sources(names: list[str]) -> dict[str, str]:
             marker = f"TSRC{index:02d}"
             match = re.search(rf"@@{marker}START@@(.*?)@@{marker}END@@", plain, flags=re.S)
             if match:
-                source = clean_itemsource_primary(match.group(1))
+                source = clean_itemsource_primary(match.group(1), recipe_inputs_by_result.get(name, set()))
                 if source:
                     out[name] = source
         print(
-            f"Itemsource fallback {min(start + len(batch), len(names))}/{len(names)}; resolved {len(out)}",
+            f"Itemsource acquisition fallback {min(start + len(batch), len(names))}/{len(names)}; resolved {len(out)}",
             file=sys.stderr,
         )
         time.sleep(0.12)
@@ -592,6 +618,10 @@ def patterned_source(name: str) -> str:
 
 def main() -> int:
     data = load_recipe_data()
+    recipes = data.get("recipes") or []
+    recipe_inputs_by_result: dict[str, set[str]] = {}
+    for recipe in recipes:
+        recipe_inputs_by_result.setdefault(str(recipe["r"]), set()).update(str(pair[0]) for pair in recipe.get("i") or [])
     leaf_names = collect_leaf_names(data)
     item_modes = fetch_item_modes()
     drop_sources = fetch_drop_sources(leaf_names)
@@ -629,7 +659,7 @@ def main() -> int:
     # from answering the shopping-list question: "where do I actually get it?"
     source_gaps = [name for name, row in rows.items() if not str(row[2] or "").strip() and name in item_modes]
     if source_gaps:
-        template_sources = fetch_itemsource_sources(sorted(source_gaps, key=str.casefold))
+        template_sources = fetch_itemsource_sources(sorted(source_gaps, key=str.casefold), recipe_inputs_by_result)
         for name, source in template_sources.items():
             rows[name][2] = source
 
@@ -640,6 +670,16 @@ def main() -> int:
             print(f"  - {name}", file=sys.stderr)
         raise RuntimeError(f"{len(source_gaps)} shopping-list leaves have no source badge")
 
+    suspicious = [
+        name for name, row in rows.items()
+        if name in item_modes and source_is_recipe_like(str(row[2] or ""), recipe_inputs_by_result.get(name, set()))
+    ]
+    if suspicious:
+        print("Shopping-list leaves whose source badge is still a recipe/decraft route:", file=sys.stderr)
+        for name in suspicious:
+            print(f"  - {name}: {rows[name][2]}", file=sys.stderr)
+        raise RuntimeError(f"{len(suspicious)} shopping-list leaves still use recipe-like source badges")
+
     OUT.write_text(
         "window.TERRARIA_GENERATED_AVAILABILITY=" + json.dumps(rows, ensure_ascii=False, separators=(",", ":")) + ";\n",
         encoding="utf-8",
@@ -647,7 +687,7 @@ def main() -> int:
     hard = sum(1 for row in rows.values() if row[0] == "Hardmode")
     sourced = sum(1 for row in rows.values() if row[2])
     print(
-        f"Wrote {OUT}: {len(rows)} leaves ({hard} Hardmode, {len(rows)-hard} Pre-Hardmode; {sourced} sourced; 0 source gaps)",
+        f"Wrote {OUT}: {len(rows)} leaves ({hard} Hardmode, {len(rows)-hard} Pre-Hardmode; {sourced} sourced; 0 source gaps; 0 recipe-like sources)",
         file=sys.stderr,
     )
     return 0
