@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""Audit acquisition badges for sources likely to displace ordinary acquisition.
+"""Audit acquisition-source priority for canonical Terraria shopping leaves.
 
-Terraria 1.4.5 added many resource-carrying slime variants. Drops Cargo is useful
-for discovering those alternatives, but a new mob drop must not silently replace
-a more ordinary terrain/harvest/vendor source in the shopping UI. Shimmer can
-cause the same presentation problem when a transmutation exists for an otherwise
-ordinary world material. This audit keeps both families visible in refresh logs.
+Drops Cargo and Itemsource can surface valid but secondary methods before the
+ordinary way a player gets a material. Terraria 1.4.5 resource slimes and Shimmer
+routes make this especially visible. Direct-source priorities are therefore a
+published invariant, while remaining slime/Shimmer-backed rows are logged for
+future review.
 """
 from __future__ import annotations
 
 import json
 import pathlib
+
+from apply_source_priorities import DIRECT_SOURCE_PRIORITIES
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 AVAILABILITY = ROOT / "availability.generated.js"
@@ -36,6 +38,20 @@ def report(label: str, rows: list[tuple[str, str]]) -> None:
 
 def main() -> int:
     rows = load()
+
+    wrong_priorities: list[tuple[str, str, str]] = []
+    for name, expected in DIRECT_SOURCE_PRIORITIES.items():
+        row = rows.get(name)
+        actual = str(row[2] if isinstance(row, list) and len(row) > 2 else "")
+        if actual != expected:
+            wrong_priorities.append((name, expected, actual))
+    if wrong_priorities:
+        print("Direct acquisition source priorities regressed:")
+        for name, expected, actual in wrong_priorities:
+            print(f"  {name}: expected {expected!r}; got {actual!r}")
+        raise RuntimeError(f"{len(wrong_priorities)} direct acquisition source priorities regressed")
+    print(f"Direct acquisition source priorities clean: {len(DIRECT_SOURCE_PRIORITIES)} canonical leaves")
+
     slime_rows: list[tuple[str, str]] = []
     shimmer_rows: list[tuple[str, str]] = []
     for name, row in rows.items():
@@ -44,8 +60,8 @@ def main() -> int:
             slime_rows.append((name, source))
         if source.startswith("Shimmer transmutation:"):
             shimmer_rows.append((name, source))
-    report("Slime-backed canonical source badges", slime_rows)
-    report("Shimmer-primary canonical source badges", shimmer_rows)
+    report("Remaining slime-backed canonical source badges", slime_rows)
+    report("Remaining Shimmer-primary canonical source badges", shimmer_rows)
     return 0
 
 
