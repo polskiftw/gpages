@@ -177,15 +177,17 @@ function entryAvPills(entry){
   return avObjectPills(a);
 }
 function shoppingRow(entry){
+  if(fishMode?.checked&&!entry.fishable)return'';
   if(missingOnly.checked&&!isMissing(entry.key))return'';
   const meta=entryAvPills(entry);
   return`<div class="row">${checkbox(entry.key,entry.name)}<div><div class="itemname">${esc(entry.name)} ${entry.qty>1?`<span class="qty">×${entry.qty}</span>`:''}</div>${meta?`<div class="itemmeta">${meta}</div>`:''}</div><a class="wiki" href="${entry.id?wikiItem(entry.id):wikiName(entry.name)}" target="_blank" rel="noopener">Wiki ↗</a></div>`;
 }
 function buildProjectBody(name){
-  const summary=shoppingSummary(name);let rows='';
-  for(const entry of summary.entries)rows+=shoppingRow(entry);
-  if(!rows)rows='<div class="empty">Everything in this shopping list is checked.</div>';
-  return`<div class="bodyhead">Shopping list • ${summary.total} unique item${summary.total===1?'':'s'}</div><div class="rows">${rows}</div>`+recipeOptionsHtml(name);
+  const summary=shoppingSummary(name), entries=fishMode?.checked?summary.entries.filter(e=>e.fishable):summary.entries;let rows='';
+  for(const entry of entries)rows+=shoppingRow(entry);
+  if(!rows)rows=`<div class="empty">${fishMode?.checked?'All fishing-route items are checked.':'Everything in this shopping list is checked.'}</div>`;
+  const label=fishMode?.checked?'Fishing list':'Shopping list';
+  return`<div class="bodyhead">${label} • ${entries.length} unique item${entries.length===1?'':'s'}</div><div class="rows">${rows}</div>`+recipeOptionsHtml(name);
 }
 function projectSearchBlob(name){
   const cp=curatedByName.get(name), rs=byResult.get(name)||[];const immediate=rs.flatMap(r=>r.i||[]).map(x=>x[0]);const stations=rs.map(r=>r.s||'');
@@ -199,7 +201,7 @@ function nodeSort(a,b){
 function projectCard(n){
   const s=shoppingSummary(n.name);
   const fish=s.fishable?`<span class="pill fish">${s.fishableObtained}/${s.fishable} FISHABLE</span>`:'<span class="pill hard">LANDLOCKED</span>';
-  const remainders=`<span class="pill ${s.remainderObtained===s.remainders&&s.remainders?'pre':''}">${s.remainderObtained}/${s.remainders} REMAINDERS</span>`;
+  const remainders=fishMode?.checked?'':`<span class="pill ${s.remainderObtained===s.remainders&&s.remainders?'pre':''}">${s.remainderObtained}/${s.remainders} REMAINDERS</span>`;
   return`<details class="card project" data-name="${esc(n.name)}"><summary class="projectsummary"><div class="projecttop"><div><div class="projecttitle">${esc(n.name)}</div><div class="projectmeta">${fish}${remainders}</div></div><span class="chev">›</span></div></summary><div class="projectbody" data-loaded="0"><div class="loading">Opening shopping list…</div></div></details>`;
 }
 function renderCatalog(openNames=new Set()){
