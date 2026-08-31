@@ -47,6 +47,32 @@ const vendorOnly=(source,seller)=>{
   const clean=norm(source).replace(/\s*\(NPC\)\s*$/i,'').trim();
   return clean.toLowerCase()===norm(seller).toLowerCase();
 };
+const COINS={
+  PC:['Platinum Coin','platinum'],
+  GC:['Gold Coin','gold'],
+  SC:['Silver Coin','silver'],
+  CC:['Copper Coin','copper']
+};
+const priceParts=price=>{
+  const parts=[];
+  const re=/(\d+)\s*(PC|GC|SC|CC)\b/gi;
+  let match;
+  while((match=re.exec(norm(price)))){
+    const code=match[2].toUpperCase(), coin=COINS[code];
+    if(coin)parts.push({amount:Number(match[1]),label:coin[0],kind:coin[1]});
+  }
+  return parts;
+};
+const addPriceBadges=(pill,price)=>{
+  let anchor=pill;
+  for(const coin of priceParts(price)){
+    const badge=document.createElement('span');
+    badge.className=`pill coin-price coin-${coin.kind}`;
+    badge.textContent=`${coin.label} (${coin.amount})`;
+    anchor.insertAdjacentElement('afterend',badge);
+    anchor=badge;
+  }
+};
 const fishingSource=(name,source)=>{
   if(/\bfishing\b/i.test(source)||/\bAngler\b.*\b(?:quest|reward)\b/i.test(source))return true;
   const route=String(fishing[name]||'');
@@ -61,8 +87,9 @@ function decoratePill(pill){
   if(expert)addDifficultyBadge(pill,'EXPERT','expert');
   if(source!==rawSource)pill.textContent=source;
   if(Array.isArray(vendor)&&vendor.length>=2&&vendorOnly(source,vendor[0])){
-    pill.textContent=`${vendor[0]} • ${vendor[1]}`;
+    pill.textContent=vendor[0];
     pill.classList.add('source-purchase');
+    addPriceBadges(pill,vendor[1]);
     return;
   }
   if(fishingSource(name,source)){
