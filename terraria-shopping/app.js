@@ -40,6 +40,8 @@ function reciprocalRecipeRole(recipe){
   }
   reciprocalRoleCache.set(recipe,role);return role;
 }
+const planningRecipes=name=>(byResult.get(name)||[]).filter(recipe=>{const role=reciprocalRecipeRole(recipe);return role!=='inverse'&&role!=='ambiguous'});
+const displayRecipes=name=>(byResult.get(name)||[]).filter(recipe=>reciprocalRecipeRole(recipe)!=='inverse');
 const nodeMap=new Map(nodes.map(n=>[n[0],{name:n[0],uniqueItems:Number(n[1])||0,endpoint:!!n[2]}]));
 const curatedByName=new Map(curatedProjects.map(p=>[p.name,p]));
 const legacyNameIds=new Map();
@@ -74,7 +76,7 @@ const cleanWhenPart=when=>String(when||'').replace(/^Available immediately(?:\s*
 const cleanWhen=when=>whenParts(when).map(cleanWhenPart).filter(Boolean).join(' ');
 const whenPill=when=>whenParts(when).map(cleanWhenPart).filter(Boolean).map(w=>`<span class="pill availability">${esc(w)}</span>`).join('');
 const sourcePill=source=>source?`<span class="pill sourcepill">${esc(source)}</span>`:'';
-const avObjectPills=a=>a.mode==='Unknown'?'':`<span class="pill availability ${modeClass(a.mode)}">${esc(a.mode.toUpperCase())}</span>${whenPill(a.when)}${sourcePill(a.source)}`;
+const avObjectPills=a=>{const source=sourcePill(a.source);return a.mode==='Unknown'?source:`<span class="pill availability ${modeClass(a.mode)}">${esc(a.mode.toUpperCase())}</span>${whenPill(a.when)}${source}`};
 const fishingRoute=name=>String(generatedFishing[name]||'');
 const fishingRouteFor=(name,info=null)=>fishingRoute(name)||String(info?.fishSource||'');
 const avPills=(id,preferFishing=false)=>{
@@ -93,8 +95,7 @@ function mergeLeaves(into,from){for(const [name,qty] of from)addQty(into,name,qt
 function totalQty(map){let n=0;for(const q of map.values())n+=q;return n}
 
 function planItem(name,qty=1,stack=new Set(),depth=0){
-  const allOptions=byResult.get(name)||[];
-  const options=allOptions.filter(recipe=>{const role=reciprocalRecipeRole(recipe);return role!=='inverse'&&role!=='ambiguous'});
+  const options=planningRecipes(name);
   if(!options.length||depth>48)return{leaves:new Map([[name,qty]]),cycles:0,steps:0};
   if(stack.has(name))return{leaves:new Map(),cycles:1,steps:0,cycleTo:name};
   const next=new Set(stack);next.add(name);
@@ -170,9 +171,9 @@ function normalizedRecipeKey(r){
   const ingredients=(r.i||[]).map(([name,qty])=>[evilMap.get(String(name))?.token||String(name),Number(qty)||1]).sort((a,b)=>a[0].localeCompare(b[0])||a[1]-b[1]);
   return JSON.stringify([Number(r.a)||1,station,ingredients]);
 }
-function groupedRecipes(name){
-  const groups=new Map();
-  for(const r of byResult.get(name)||[]){const key=normalizedRecipeKey(r);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r)}
+function groupedRecipes(name,planning=false){
+  const groups=new Map(), source=planning?planningRecipes(name):displayRecipes(name);
+  for(const r of source){const key=normalizedRecipeKey(r);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r)}
   return [...groups.values()];
 }
 function displayStation(variants){
@@ -197,7 +198,7 @@ function recipeOptionsHtml(name){
   return`<div class="bodyhead">${label}</div><div class="recipebox">${groups.map(variants=>{const r=variants[0];return`<div class="recipeopt"><strong>${esc(name)}${Number(r.a)>1?` ×${Number(r.a)}`:''}</strong> <span class="pill">${esc(displayStation(variants))}</span><div class="recipeingredients">${(r.i||[]).map(pair=>{const x=displayIngredient(pair,variants);return`${esc(x.name)}${x.qty>1?` ×${x.qty}`:''}`}).join(' • ')}</div></div>`}).join('')}</div>`;
 }
 function fallbackSourceForName(name){
-  const groups=groupedRecipes(name);
+  const groups=groupedRecipes(name,true);
   if(!groups.length)return'';
   const stations=[...new Set(groups.map(displayStation).filter(Boolean))];
   if(!stations.length)return'';
@@ -223,7 +224,7 @@ function buildProjectBody(name){
   return`<div class="bodyhead">${label} • ${entries.length} unique item${entries.length===1?'':'s'}</div><div class="rows">${rows}</div>`+recipeOptionsHtml(name);
 }
 function projectSearchBlob(name){
-  const cp=curatedByName.get(name), rs=byResult.get(name)||[];const immediate=rs.flatMap(r=>r.i||[]).map(x=>x[0]);const stations=rs.map(r=>r.s||'');
+  const cp=curatedByName.get(name), rs=displayRecipes(name);const immediate=rs.flatMap(r=>r.i||[]).map(x=>x[0]);const stations=rs.map(r=>r.s||'');
   let enrich='';if(cp)enrich=[cp.group,cp.mode,cp.when,cp.note,...cp.items.flatMap(x=>{const i=items[x[0]]||{};return[i.name,i.source,i.fishSource,fishingRoute(i.name),i.type,i.note]})].join(' ');
   return[name,...immediate,...stations,enrich].join(' ').toLowerCase();
 }
