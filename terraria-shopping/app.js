@@ -51,10 +51,14 @@ const cleanWhen=when=>whenParts(when).map(cleanWhenPart).filter(Boolean).join(' 
 const whenPill=when=>whenParts(when).map(cleanWhenPart).filter(Boolean).map(w=>`<span class="pill availability">${esc(w)}</span>`).join('');
 const sourcePill=source=>source?`<span class="pill sourcepill">${esc(source)}</span>`:'';
 const avObjectPills=a=>a.mode==='Unknown'?'':`<span class="pill availability ${modeClass(a.mode)}">${esc(a.mode.toUpperCase())}</span>${whenPill(a.when)}${sourcePill(a.source)}`;
-const avTuplePills=tuple=>avObjectPills(avObject(tuple));
-const avPills=id=>avTuplePills(availability[id]);
 const fishingRoute=name=>String(generatedFishing[name]||'');
-const hasFishingRoute=(name,info=null)=>!!info?.fish||!!fishingRoute(name);
+const fishingRouteFor=(name,info=null)=>fishingRoute(name)||String(info?.fishSource||'');
+const avPills=(id,preferFishing=false)=>{
+  const a=av(id), i=items[id];
+  if(preferFishing){const route=fishingRouteFor(i?.name||'',i);if(route)a.source=route}
+  return avObjectPills(a);
+};
+const hasFishingRoute=(name,info=null)=>!!info?.fish||!!fishingRouteFor(name,info);
 const keyFor=(name,explicitId=null)=>explicitId?'legacy:'+explicitId:(legacyExact(name)?'legacy:'+legacyExact(name):'gen:'+name);
 const isMissing=key=>!acquired[key];
 const checkedCount=()=>Object.values(acquired).filter(Boolean).length;
@@ -172,8 +176,8 @@ function fallbackSourceForName(name){
 }
 function entryAvPills(entry){
   const tuple=(entry.id&&availability[entry.id])||generatedAvailability[entry.name];
-  const a=avObject(tuple);
-  if(!a.source)a.source=fallbackSourceForName(entry.name);
+  const a=avObject(tuple), route=entry.fishable?fishingRouteFor(entry.name,entry.info):'';
+  if(route)a.source=route;else if(!a.source)a.source=fallbackSourceForName(entry.name);
   return avObjectPills(a);
 }
 function shoppingRow(entry){
@@ -219,7 +223,7 @@ function renderSources(wantFish){
   const q=search.value.trim().toLowerCase();let ids=Object.keys(items).filter(id=>hasFishingRoute(items[id].name,items[id])===wantFish);if(q)ids=ids.filter(id=>sourceSearchText(id).includes(q));if(missingOnly.checked)ids=ids.filter(id=>isMissing(keyFor(items[id].name,id)));
   ids.sort((a,b)=>sort.value==='name'?items[a].name.localeCompare(items[b].name):av(a).rank-av(b).rank||items[a].name.localeCompare(items[b].name));
   const title=wantFish?'Ingredients with a fishing route':'Ingredients still needed on land';let html=`<div class="sectionhead"><h2>${title}</h2><span>${ids.length} items</span></div><div class="ingredientgrid">`;
-  for(const id of ids){const i=items[id],key=keyFor(i.name,id),ps=curatedProjects.filter(p=>p.items.some(x=>x[0]===id));const src=wantFish?(i.fishSource||fishingRoute(i.name)||i.source):i.source;html+=`<article class="card ingredient"><div class="row">${checkbox(key,i.name)}<div><div class="itemname">${esc(i.name)}</div><div class="itemmeta"><span class="pill">${esc(i.type)}</span>${avPills(id)}</div><div class="source">${esc(src)}</div>${i.note?`<div class="note">${esc(i.note)}</div>`:''}<div class="tags">${ps.map(p=>`<span class="tag">${esc(p.name)}</span>`).join('')}</div></div><a class="wiki" href="${wikiItem(id)}" target="_blank" rel="noopener">Wiki ↗</a></div></article>`}
+  for(const id of ids){const i=items[id],key=keyFor(i.name,id),ps=curatedProjects.filter(p=>p.items.some(x=>x[0]===id));const src=wantFish?(fishingRouteFor(i.name,i)||i.source):i.source;html+=`<article class="card ingredient"><div class="row">${checkbox(key,i.name)}<div><div class="itemname">${esc(i.name)}</div><div class="itemmeta"><span class="pill">${esc(i.type)}</span>${avPills(id,wantFish)}</div><div class="source">${esc(src)}</div>${i.note?`<div class="note">${esc(i.note)}</div>`:''}<div class="tags">${ps.map(p=>`<span class="tag">${esc(p.name)}</span>`).join('')}</div></div><a class="wiki" href="${wikiItem(id)}" target="_blank" rel="noopener">Wiki ↗</a></div></article>`}
   html+='</div>';if(!ids.length)html=`<div class="card empty">No ${wantFish?'fishable':'landlocked'} ingredients match.</div>`;content.innerHTML=html;renderStats(ids.length)
 }
 function renderStats(visible){
