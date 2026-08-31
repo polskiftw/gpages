@@ -28,6 +28,7 @@
       <option value="name">Name A–Z</option>
     </select>
     <label class="missing"><input id="missingOnly" type="checkbox"> Only missing ingredients</label>
+    <label class="missing"><input id="fishMode" type="checkbox"> Fish mode</label>
   </div>
 </div>
 <div class="stats" id="stats"></div>
@@ -37,6 +38,7 @@
   <strong>Projects</strong> are finished craftables — items that are not used as an ingredient in another normal recipe. <strong>Components</strong> includes every craftable item, including intermediates.<br><br>
   The default sort is <strong>unique shopping-list items needed</strong>. Quantity does not affect the ranking: 9,000 of one ingredient still counts as one unique item.<br><br>
   Each card tracks <strong>fishing-route items</strong> separately from the non-fishable <strong>remainders</strong>. Fishing routes include direct catches, fishing crates and their contents, Angler quest rewards, and loot from fishing-spawned enemies. If none of the required items are fishable, the card says <strong>LANDLOCKED</strong> instead.<br><br>
+  <strong>Fish mode</strong> shows only project/component cards that still had an unchecked fishing-route item when the mode was enabled. A card stays visible if you check its last fishing item, so it cannot vanish under your finger; reload the page or toggle Fish mode off and back on when you want the filter recalculated.<br><br>
   Acquisition badges use color by method: <strong>blue</strong> for fishing, <strong>red</strong> for killing an enemy or boss, and <strong>gold</strong> for vendor purchases. Purchase badges show the seller and base shop price.<br><br>
   Open a card for the shopping list and its direct crafting recipe. Corruption/Crimson substitutions are grouped together, so swapping an equivalent world-evil ingredient does not pretend to be a separate recipe.
 </section>
