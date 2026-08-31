@@ -26,6 +26,7 @@ SKIP_STATIONS = {"Shimmer", "Chlorophyte Extractinator"}
 # useful legacy/version marker. This site is explicitly Desktop 1.4.5.x, so do
 # not let Ocram-era craftables enter the PC graph.
 SKIP_RESULTS = {
+    "Pot o' Gold",
     "Sharanga",
     "Sparkly Wings",
     "Suspicious Looking Skull",
@@ -222,9 +223,6 @@ def canonical_plan(
 
     clean = [candidate for candidate in candidates if candidate[1] == 0]
     if not clean:
-        # A reversible/circular recipe should stop expansion at this component,
-        # not poison every parent above it and collapse the whole project to one
-        # giant self-reference.
         return {name: qty}, 0, 0
 
     clean.sort(

@@ -1,17 +1,24 @@
 #!/usr/bin/env python3
-"""Build availability and source badges for Terraria Shopping list entries.
+"""Build availability and acquisition-source badges for Terraria Shopping.
 
-Recipe data tells the browser what must be collected. The Official Terraria Wiki
-Items Cargo table supplies the broad Hardmode-only flag for real items; curated
-source overrides add concise acquisition context. Availability conditions and the
-actual acquisition source are stored separately so the UI can style them as
-separate concepts.
+Every canonical shopping-list leaf must have two distinct concepts available to
+the UI:
+  * availability: mode / progression / event conditions
+  * source: the thing, place, NPC, activity, or craft station that produces it
+
+The Official Terraria Wiki supplies the broad Hardmode flag, Drops Cargo supplies
+mob/container sources, and Template:Itemsource fills shop/fishing/plunder routes.
+Small explicit overrides and category rules cover world harvests, critters, quest
+rewards, and unusual interactions. The build fails if a noncraftable shopping
+leaf would otherwise ship with only a PRE/HARDMODE badge.
 """
 from __future__ import annotations
 
+import html
 import json
 import math
 import pathlib
+import re
 import sys
 import time
 import urllib.parse
@@ -22,13 +29,11 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 RECIPE_DATA = ROOT / "data.generated.js"
 OUT = ROOT / "availability.generated.js"
 PAGE_SIZE = 500
-USER_AGENT = "polskiftw/gpages terraria-shopping availability-badges/1.3 (GitHub Pages data refresh)"
+ITEMSOURCE_BATCH = 12
+USER_AGENT = "polskiftw/gpages terraria-shopping availability-badges/1.6 (GitHub Pages data refresh)"
 ITEM_FIELDS = "name,hardmode"
 
-# Schema: item -> (availability conditions, acquisition source, progression rank).
-# The mode badge is still supplied by the Wiki's Hardmode field. Event names are
-# availability conditions, while the mob/boss/container/etc. that actually
-# produces the item is the source.
+# item -> (availability conditions, acquisition source, progression rank)
 PROGRESSION_OVERRIDES: dict[str, tuple[list[str], str, int]] = {
     "Starfury": ([], "Skyware Chest / Sky Crate", 10),
     "Enchanted Sword": ([], "Enchanted Sword Shrine", 10),
@@ -51,8 +56,10 @@ PROGRESSION_OVERRIDES: dict[str, tuple[list[str], str, int]] = {
     "Soul of Fright": ([], "Skeletron Prime (boss)", 50),
     "Soul of Might": ([], "The Destroyer (boss)", 50),
     "Soul of Sight": ([], "The Twins (boss)", 50),
+    "Life Fruit": (["After any Mechanical Boss"], "Underground Jungle (harvest)", 50),
     "Chlorophyte Ore": (["After all 3 Mechanical Bosses"], "Underground Jungle (ore)", 55),
     "Seedler": ([], "Plantera (boss)", 60),
+    "Prismatic Lacewing": (["After Plantera"], "Surface Hallow at night (catch)", 60),
     "The Horseman's Blade": (["After Plantera", "Pumpkin Moon (EVENT)"], "Pumpking (boss)", 60),
     "Ectoplasm": (["After Plantera"], "Dungeon Spirit (mob)", 60),
     "Broken Hero Sword": (["After Plantera", "Solar Eclipse (EVENT)"], "Mothron (mob)", 60),
@@ -70,10 +77,9 @@ PROGRESSION_OVERRIDES: dict[str, tuple[list[str], str, int]] = {
     "Star Wrath": ([], "Moon Lord (boss)", 90),
 }
 
-# Common raw shopping leaves which have no useful progression override but do
-# need a concise source badge. Craftable cycle-stops (such as Cinder Wall) are
-# handled client-side from their recipe station, so this table is for genuine
-# world/drop/harvest sources.
+# Exact sources for world harvests and mechanics that are clearer than a generic
+# itemsource rendering. These are still concise because the shopping-list row is
+# meant to answer "where/how do I get this?", not reproduce the Wiki article.
 SOURCE_OVERRIDES: dict[str, str] = {
     "Copper Ore": "Surface / Underground / Cavern (ore)",
     "Tin Ore": "Surface / Underground / Cavern (ore)",
@@ -99,12 +105,92 @@ SOURCE_OVERRIDES: dict[str, str] = {
     "Waterleaf": "Desert sand (harvest)",
     "Fireblossom": "Underworld ash (harvest)",
     "Shiverthorn": "Snow / Ice (harvest)",
+    "Truffle Worm": "Glowing Mushroom biome (catch)",
+    "Blue Berries": "Surface grass / Jungle grass (harvest)",
+    "Coral": "Ocean (harvest)",
+    "Green Mushroom": "Underground / Cavern (harvest)",
+    "Teal Mushroom": "Underground / Cavern (harvest)",
+    "Orange Bloodroot": "Underground / Cavern dirt (harvest)",
+    "Lime Kelp": "Underground / Cavern water (harvest)",
+    "Pink Prickly Pear": "Desert cactus (harvest)",
+    "Sky Blue Flower": "Jungle grass (harvest)",
+    "Yellow Marigold": "Surface grass (harvest)",
+    "Vile Mushroom": "Corruption grass (harvest)",
+    "Vicious Mushroom": "Crimson grass (harvest)",
+    "Nature's Gift": "Underground Jungle (harvest)",
+    "Pink Ice Block": "Hallow ice (mine)",
+    "Purple Ice Block": "Corruption ice (mine)",
+    "Red Ice Block": "Crimson ice (mine)",
+    "Silt Block": "Underground / Cavern (mine)",
+    "Vine Rope": "Vines + Plant Fiber Cordage (harvest)",
+    "Living Fire Block": "Hardmode Underworld mobs",
+    "Gold Chest": "Underground / Cavern chest (mine after empty)",
+    "Golden Chest": "Flying Dutchman / Pirate mobs",
+    "Ivy Chest": "Underground Jungle chest (mine after empty)",
+    "Shadow Chest": "Underworld chest (mine after empty)",
+    "Web Covered Chest": "Spider Nest chest (mine after empty)",
+    "Fishing Bobber": "Angler quest",
+    "Gel Dye": "Dye Trader (Strange Plant reward)",
+    "Shifting Sands Dye": "Dye Trader (Strange Plant reward)",
+    "Gentleman's Magnificent Beard": "Gentleman's Beard (grow while equipped)",
+    "Lava Absorbant Sponge": "Lava fishing",
+    "Honey Absorbant Sponge": "Angler quest (Bumblebee Tuna)",
+    "Heroicis' Wings (Inactive)": "Platinum Coin in Oasis water",
+    "Cattiva": "Rescue distressed Cattiva (surface daytime)",
+    "Foxparks": "Rescue distressed Foxparks (surface daytime)",
+    "Digtoise": "Sleeping Digtoise (Underground Desert)",
+    "Faeling": "Aether (catch)",
+    "Pupfish": "Desert water (catch)",
+    "Pufferfish": "Ocean (catch)",
+    # Angler quest rewards are not consistently represented by Itemsource.
+    "Angler Earring": "Angler quest",
+    "Tackle Box": "Angler quest",
+    "High Test Fishing Line": "Angler quest",
+    "Fisherman's Pocket Guide": "Angler quest",
+    "Weather Radio": "Angler quest",
+    "Sextant": "Angler quest",
+    "Angler Hat": "Angler quest",
+    "Angler Vest": "Angler quest",
+    "Angler Pants": "Angler quest",
+    "Bottomless Water Bucket": "Angler quest",
+    "Super Absorbant Sponge": "Angler quest",
 }
 
-# Cargo recipe arguments sometimes use recipe-category labels or display names
-# that are not literal rows in the Items table. These are real current-PC
-# ingredients, so classify the aliases explicitly instead of letting them become
-# bare shopping-list rows.
+# Recipe-category aliases are not literal Items rows and therefore have no Wiki
+# item page to query. Give each category a real acquisition route.
+PSEUDO_SOURCES: dict[str, str] = {
+    "Any Adamantite Bar": "Adamantite / Titanium Ore (smelt)",
+    "Any Balloon": "Skyware Chest / Sky Crate",
+    "Any Bird": "Bird critter (catch)",
+    "Any Blizzard Balloon": "Blizzard in a Balloon variant (craft)",
+    "Any Butterfly": "Butterfly critter (catch)",
+    "Any Cobalt Bar": "Cobalt / Palladium Ore (smelt)",
+    "Any Cockatiel": "Cockatiel critter (catch)",
+    "Any Dragonfly": "Dragonfly critter (catch)",
+    "Any Duck": "Duck critter (catch)",
+    "Any Firefly": "Firefly critter (catch)",
+    "Any Fruit": "Trees (shake / chop)",
+    "Any Gem Critter": "Gem critter (catch)",
+    "Any Gold Bar": "Gold / Platinum Ore (smelt)",
+    "Any Guide to Critter Companionship": "Zoologist (NPC)",
+    "Any Guide to Environmental Preservation": "Dryad (NPC)",
+    "Any Iron Bar": "Iron / Lead Ore (smelt)",
+    "Any Jungle Bug": "Jungle bug critter (catch)",
+    "Any Macaw": "Macaw critter (catch)",
+    "Any Magic Mirror": "Underground / Frozen Chest",
+    "Any Mythril Bar": "Mythril / Orichalcum Ore (smelt)",
+    "Any Pressure Plate": "World traps / Mechanic (NPC)",
+    "Any Sand Block": "Sand biomes (mine)",
+    "Any Sandstorm Balloon": "Sandstorm in a Balloon variant (craft)",
+    "Any Scorpion": "Scorpion critter (catch)",
+    "Any Silver Bar": "Silver / Tungsten Ore (smelt)",
+    "Any Snail": "Snail critter (catch)",
+    "Any Squirrel": "Squirrel critter (catch)",
+    "Any Stone Block": "Stone (mine)",
+    "Any Turtle": "Turtle critter (catch)",
+    "Any Wood": "Trees (chop)",
+}
+
 PSEUDO_AVAILABILITY: dict[str, tuple[str, list[str], str, int]] = {
     "Adamantite/Titanium Bar": ("Hardmode", [], "Tier 3 Hardmode bar (craft)", 40),
     "Blue Jellyfish (bait)": ("Pre-Hardmode", [], "Underground / Cavern fishing", 10),
@@ -120,20 +206,76 @@ HARDMODE_PSEUDO_HINTS = (
     "Luminite", "Fragment",
 )
 
+BOSS_NAMES = {
+    "King Slime", "Eye of Cthulhu", "Eater of Worlds", "Brain of Cthulhu",
+    "Queen Bee", "Skeletron", "Deerclops", "Wall of Flesh", "Queen Slime",
+    "The Destroyer", "Skeletron Prime", "The Twins", "Plantera", "Golem",
+    "Duke Fishron", "Empress of Light", "Lunatic Cultist", "Moon Lord",
+    "Dark Mage", "Ogre", "Betsy", "Flying Dutchman", "Mourning Wood",
+    "Pumpking", "Everscream", "Santa-NK1", "Ice Queen", "Martian Saucer",
+}
 
-def request_json(params: dict[str, object], retries: int = 4) -> dict:
-    url = API + "?" + urllib.parse.urlencode(params)
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+NPC_VENDORS = {
+    "Merchant", "Traveling Merchant", "Skeleton Merchant", "Wizard", "Mechanic",
+    "Dryad", "Goblin Tinkerer", "Demolitionist", "Arms Dealer", "Painter",
+    "Dye Trader", "Witch Doctor", "Steampunker", "Cyborg", "Truffle",
+    "Party Girl", "Pirate", "Santa Claus", "Tavernkeep", "Zoologist",
+    "Golfer", "Princess",
+}
+
+GEM_CRITTER_RE = re.compile(r"^(Amber|Amethyst|Diamond|Emerald|Ruby|Sapphire|Topaz) (Bunny|Squirrel)$")
+GOLD_CRITTERS = {
+    "Gold Bird", "Gold Bunny", "Gold Butterfly", "Gold Dragonfly", "Gold Frog",
+    "Gold Goldfish", "Gold Grasshopper", "Gold Ladybug", "Gold Mouse",
+    "Gold Seahorse", "Gold Squirrel", "Gold Water Strider",
+}
+BUTTERFLY_CRITTERS = {
+    "Julia Butterfly", "Monarch Butterfly", "Purple Emperor Butterfly",
+    "Red Admiral Butterfly", "Sulphur Butterfly", "Tree Nymph Butterfly",
+    "Ulysses Butterfly", "Zebra Swallowtail Butterfly",
+}
+DRAGONFLY_CRITTERS = {
+    "Black Dragonfly", "Blue Dragonfly", "Green Dragonfly", "Orange Dragonfly",
+    "Red Dragonfly", "Yellow Dragonfly",
+}
+FAIRY_CRITTERS = {"Blue Fairy", "Green Fairy", "Pink Fairy"}
+LAVA_CRITTERS = {"Hell Butterfly", "Lavafly", "Magma Snail"}
+GENERIC_CRITTERS = {
+    "Bird", "Black Scorpion", "Blue Jay", "Blue Macaw", "Buggy", "Bunny",
+    "Cardinal", "Duck", "Firefly", "Frog", "Glowing Snail", "Goldfish",
+    "Grasshopper", "Gray Cockatiel", "Grebe", "Grubby", "Jungle Turtle",
+    "Ladybug", "Lightning Bug", "Maggot", "Mallard Duck", "Mouse", "Owl",
+    "Penguin", "Rat", "Red Squirrel", "Scarlet Macaw", "Scorpion", "Seagull",
+    "Seahorse", "Sluggy", "Snail", "Squirrel", "Stinkbug", "Toucan", "Turtle",
+    "Water Strider", "Yellow Cockatiel",
+}
+
+GENERIC_ITEMSOURCE = {"Plundering", "Looting", "Drop", "Drops", "Shimmer", "Shimmer transmutation"}
+VERSION_PAREN = re.compile(r"\((?:Desktop|Console|Mobile|Old-gen|3DS|Switch)[^)]*versions?\)", re.I)
+COIN_PAREN = re.compile(r"\([^)]*(?:Platinum|Gold|Silver|Copper|\bPC\b|\bGC\b|\bSC\b|\bCC\b)[^)]*\)", re.I)
+
+
+def request_json(params: dict[str, object], retries: int = 4, post: bool = False) -> dict:
+    encoded = urllib.parse.urlencode(params).encode("utf-8")
+    if post:
+        req = urllib.request.Request(API, data=encoded, headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
+        })
+    else:
+        url = API + "?" + encoded.decode("ascii")
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
     last: Exception | None = None
     for attempt in range(retries):
         try:
-            with urllib.request.urlopen(req, timeout=45) as response:
+            with urllib.request.urlopen(req, timeout=60) as response:
                 return json.loads(response.read().decode("utf-8"))
-        except Exception as exc:  # pragma: no cover - network path
+        except Exception as exc:
             last = exc
             if attempt + 1 < retries:
                 time.sleep(2 ** attempt)
-    raise RuntimeError(f"Cargo request failed after {retries} attempts: {last}")
+    raise RuntimeError(f"Wiki request failed after {retries} attempts: {last}")
 
 
 def load_recipe_data() -> dict:
@@ -153,13 +295,8 @@ def fetch_item_modes() -> dict[str, bool]:
     offset = 0
     while True:
         payload = request_json({
-            "action": "cargoquery",
-            "tables": "Items",
-            "fields": ITEM_FIELDS,
-            "limit": PAGE_SIZE,
-            "offset": offset,
-            "format": "json",
-            "formatversion": "2",
+            "action": "cargoquery", "tables": "Items", "fields": ITEM_FIELDS,
+            "limit": PAGE_SIZE, "offset": offset, "format": "json", "formatversion": "2",
         })
         batch = payload.get("cargoquery") or []
         if not isinstance(batch, list):
@@ -169,17 +306,129 @@ def fetch_item_modes() -> dict[str, bool]:
         for entry in batch:
             title = entry.get("title") or {}
             name = str(title.get("name") or "").strip()
-            if not name:
-                continue
-            modes[name] = modes.get(name, False) or cargo_bool(title.get("hardmode"))
+            if name:
+                modes[name] = modes.get(name, False) or cargo_bool(title.get("hardmode"))
         offset += len(batch)
         print(f"Fetched {offset} Items rows; mapped {len(modes)} names", file=sys.stderr)
         if len(batch) < PAGE_SIZE:
             break
-        time.sleep(0.15)
+        time.sleep(0.1)
     if len(modes) < 4000:
         raise RuntimeError(f"Only {len(modes)} item names returned by Items Cargo")
     return modes
+
+
+def fetch_drop_sources(wanted: set[str]) -> dict[str, str]:
+    rows: dict[str, list[tuple[str, bool]]] = {}
+    offset = 0
+    while True:
+        payload = request_json({
+            "action": "cargoquery", "tables": "Drops", "fields": "nameraw,item,isfromnpc",
+            "limit": PAGE_SIZE, "offset": offset, "format": "json", "formatversion": "2",
+        })
+        batch = payload.get("cargoquery") or []
+        if not isinstance(batch, list):
+            raise RuntimeError("Unexpected Drops Cargo response")
+        if not batch:
+            break
+        for entry in batch:
+            title = entry.get("title") or {}
+            item = str(title.get("item") or "").strip()
+            producer = str(title.get("nameraw") or "").strip()
+            if item in wanted and producer:
+                rows.setdefault(item, []).append((producer, cargo_bool(title.get("isfromnpc"))))
+        offset += len(batch)
+        if len(batch) < PAGE_SIZE:
+            break
+        time.sleep(0.08)
+    print(f"Fetched {offset} Drops rows; matched sources for {len(rows)} shopping leaves", file=sys.stderr)
+    out: dict[str, str] = {}
+    for item, producers in rows.items():
+        seen: set[str] = set()
+        labels: list[str] = []
+        for producer, is_npc in producers:
+            key = producer.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            if is_npc:
+                labels.append(f"{producer} ({'boss' if producer in BOSS_NAMES else 'mob'})")
+            else:
+                labels.append(producer)
+            if len(labels) >= 2:
+                break
+        if labels:
+            out[item] = " / ".join(labels)
+    return out
+
+
+def html_to_plain(value: str) -> str:
+    value = re.sub(
+        r"<img\b[^>]*\balt=(?:\"([^\"]*)\"|'([^']*)')[^>]*>",
+        lambda m: " " + html.unescape(m.group(1) or m.group(2) or "") + " ",
+        value,
+        flags=re.I,
+    )
+    value = re.sub(r"</li\s*>", " / ", value, flags=re.I)
+    value = re.sub(r"<br\s*/?>", " / ", value, flags=re.I)
+    value = re.sub(r"<style\b[^>]*>.*?</style>", " ", value, flags=re.I | re.S)
+    value = re.sub(r"<script\b[^>]*>.*?</script>", " ", value, flags=re.I | re.S)
+    value = re.sub(r"<[^>]+>", " ", value)
+    return re.sub(r"\s+", " ", html.unescape(value)).strip()
+
+
+def dedupe_double_phrase(value: str) -> str:
+    words = value.split()
+    if len(words) >= 2 and len(words) % 2 == 0:
+        half = len(words) // 2
+        if [w.casefold() for w in words[:half]] == [w.casefold() for w in words[half:]]:
+            return " ".join(words[:half])
+    return value
+
+
+def clean_itemsource_primary(value: str) -> str:
+    value = VERSION_PAREN.sub("", value)
+    value = COIN_PAREN.sub("", value)
+    value = re.sub(r"\s+", " ", value).strip(" /:")
+    if not value:
+        return ""
+    parts = [re.sub(r"\s+", " ", part).strip(" /:") for part in re.split(r"\s+/\s+", value)]
+    primary = dedupe_double_phrase(next((p for p in parts if p), ""))
+    if not primary or primary in GENERIC_ITEMSOURCE or primary.startswith("Shimmer transmutation"):
+        return ""
+    if primary in NPC_VENDORS:
+        primary += " (NPC)"
+    return primary[:120]
+
+
+def fetch_itemsource_sources(names: list[str]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for start in range(0, len(names), ITEMSOURCE_BATCH):
+        batch = names[start:start + ITEMSOURCE_BATCH]
+        chunks = []
+        for index, name in enumerate(batch):
+            marker = f"TSRC{index:02d}"
+            chunks.append(f"@@{marker}START@@{{{{itemsource|{name}|sep= / }}}}@@{marker}END@@")
+        payload = request_json({
+            "action": "parse", "contentmodel": "wikitext", "prop": "text",
+            "title": "Terraria Shopping source audit", "text": "\n".join(chunks),
+            "format": "json", "formatversion": "2",
+        }, post=True)
+        rendered = str((payload.get("parse") or {}).get("text") or "")
+        plain = html_to_plain(rendered)
+        for index, name in enumerate(batch):
+            marker = f"TSRC{index:02d}"
+            match = re.search(rf"@@{marker}START@@(.*?)@@{marker}END@@", plain, flags=re.S)
+            if match:
+                source = clean_itemsource_primary(match.group(1))
+                if source:
+                    out[name] = source
+        print(
+            f"Itemsource fallback {min(start + len(batch), len(names))}/{len(names)}; resolved {len(out)}",
+            file=sys.stderr,
+        )
+        time.sleep(0.12)
+    return out
 
 
 def merge_leaves(into: dict[str, int], other: dict[str, int]) -> None:
@@ -187,13 +436,7 @@ def merge_leaves(into: dict[str, int], other: dict[str, int]) -> None:
         into[name] = into.get(name, 0) + qty
 
 
-def canonical_plan(
-    name: str,
-    qty: int,
-    by_result: dict[str, list[dict]],
-    stack: frozenset[str] = frozenset(),
-    depth: int = 0,
-) -> tuple[dict[str, int], int, int]:
+def canonical_plan(name: str, qty: int, by_result: dict[str, list[dict]], stack: frozenset[str] = frozenset(), depth: int = 0) -> tuple[dict[str, int], int, int]:
     options = by_result.get(name) or []
     if not options or depth > 48:
         return {name: qty}, 0, 0
@@ -207,9 +450,7 @@ def canonical_plan(
         cycles = 0
         steps = 1
         for ingredient, amount in recipe.get("i") or []:
-            child, child_cycles, child_steps = canonical_plan(
-                str(ingredient), max(1, int(amount)) * batches, by_result, next_stack, depth + 1
-            )
+            child, child_cycles, child_steps = canonical_plan(str(ingredient), max(1, int(amount)) * batches, by_result, next_stack, depth + 1)
             merge_leaves(leaves, child)
             cycles += child_cycles
             steps += child_steps
@@ -243,10 +484,36 @@ def infer_pseudo_mode(name: str) -> str | None:
     return None
 
 
+def patterned_source(name: str) -> str:
+    if name == "Music Box":
+        return "Wizard (NPC)"
+    if name.startswith("Music Box ("):
+        return "Record matching music track"
+    if name in PSEUDO_SOURCES:
+        return PSEUDO_SOURCES[name]
+    if GEM_CRITTER_RE.match(name):
+        return "Underground gem critter (catch)"
+    if name in GOLD_CRITTERS:
+        return "Gold critter (catch)"
+    if name in LAVA_CRITTERS:
+        return "Underworld critter (catch)"
+    if name in BUTTERFLY_CRITTERS:
+        return "Butterfly critter (catch)"
+    if name in DRAGONFLY_CRITTERS:
+        return "Dragonfly critter (catch)"
+    if name in FAIRY_CRITTERS:
+        return "Fairy critter (catch)"
+    if name in GENERIC_CRITTERS:
+        return "World critter (catch)"
+    return ""
+
+
 def main() -> int:
     data = load_recipe_data()
     leaf_names = collect_leaf_names(data)
+    craftable_names = {str(recipe["r"]) for recipe in data.get("recipes") or []}
     item_modes = fetch_item_modes()
+    drop_sources = fetch_drop_sources(leaf_names)
     rows: dict[str, list[object]] = {}
     unresolved: list[str] = []
     for name in sorted(leaf_names, key=str.casefold):
@@ -262,13 +529,11 @@ def main() -> int:
             unresolved.append(name)
             continue
         default_rank = 40 if mode == "Hardmode" else 10
-        conditions, source, rank = PROGRESSION_OVERRIDES.get(
-            name, ([], SOURCE_OVERRIDES.get(name, ""), default_rank)
-        )
-        # Some Wiki item rows omit/misstate the broad Hardmode flag even when a
-        # known progression gate is unambiguously post-Wall-of-Flesh. The
-        # explicit milestone wins in that case. Pre-Hardmode milestones use
-        # ranks below 40 and keep their Pre-Hardmode badge.
+        if name in PROGRESSION_OVERRIDES:
+            conditions, source, rank = PROGRESSION_OVERRIDES[name]
+        else:
+            conditions, rank = [], default_rank
+            source = SOURCE_OVERRIDES.get(name) or patterned_source(name) or drop_sources.get(name, "")
         if rank >= 40 and name in PROGRESSION_OVERRIDES:
             mode = "Hardmode"
         rows[name] = [mode, conditions, source, rank]
@@ -277,17 +542,29 @@ def main() -> int:
         for name in unresolved:
             print(f"  - {name}", file=sys.stderr)
         raise RuntimeError(f"{len(unresolved)} shopping-list leaves have no availability classification")
+
+    source_gaps = [name for name, row in rows.items() if not str(row[2] or "").strip() and name not in craftable_names and name in item_modes]
+    if source_gaps:
+        template_sources = fetch_itemsource_sources(sorted(source_gaps, key=str.casefold))
+        for name, source in template_sources.items():
+            rows[name][2] = source
+
+    source_gaps = [name for name, row in rows.items() if not str(row[2] or "").strip() and name not in craftable_names]
+    if source_gaps:
+        print("Shopping-list leaves with no acquisition source:", file=sys.stderr)
+        for name in source_gaps:
+            print(f"  - {name}", file=sys.stderr)
+        raise RuntimeError(f"{len(source_gaps)} noncraftable shopping-list leaves have no source badge")
+
     OUT.write_text(
-        "window.TERRARIA_GENERATED_AVAILABILITY="
-        + json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
-        + ";\n",
+        "window.TERRARIA_GENERATED_AVAILABILITY=" + json.dumps(rows, ensure_ascii=False, separators=(",", ":")) + ";\n",
         encoding="utf-8",
     )
     hard = sum(1 for row in rows.values() if row[0] == "Hardmode")
     sourced = sum(1 for row in rows.values() if row[2])
+    craft_fallback = sum(1 for name, row in rows.items() if not row[2] and name in craftable_names)
     print(
-        f"Wrote {OUT}: {len(rows)} leaves ({hard} Hardmode, {len(rows)-hard} Pre-Hardmode; "
-        f"{sourced} explicit sources)",
+        f"Wrote {OUT}: {len(rows)} leaves ({hard} Hardmode, {len(rows)-hard} Pre-Hardmode; {sourced} explicit sources; {craft_fallback} craft-source fallbacks; 0 status-only rows)",
         file=sys.stderr,
     )
     return 0
