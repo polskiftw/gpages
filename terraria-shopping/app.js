@@ -34,16 +34,21 @@ const save=()=>localStorage.setItem('terraria-shopping-progress-v2',JSON.stringi
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const wikiName=name=>W+encodeURIComponent(String(name).replaceAll(' ','_'));
 const wikiItem=id=>W+(items[id]?.wiki||encodeURIComponent(String(items[id]?.name||id).replaceAll(' ','_')));
-const avObject=tuple=>{const a=tuple||['Unknown','',999];return{mode:a[0],when:a[1],rank:a[2]}};
+const avObject=tuple=>{
+  const a=tuple||['Unknown',[],'',999];
+  if(a.length>=4)return{mode:a[0],when:a[1],source:String(a[2]||''),rank:Number(a[3])||999};
+  return{mode:a[0],when:a[1],source:'',rank:Number(a[2])||999};
+};
 const av=id=>avObject(availability[id]);
 const modeClass=mode=>mode==='Hardmode'?'hard':'pre';
 const whenParts=when=>(Array.isArray(when)?when:[when]).map(v=>String(v||'').trim()).filter(Boolean);
 const cleanWhenPart=when=>String(when||'').replace(/^Available immediately(?:\s*[•/]\s*)?/,'').replace(/^After Wall of Flesh(?:\s*•\s*)?/,'').trim();
 const cleanWhen=when=>whenParts(when).map(cleanWhenPart).filter(Boolean).join(' ');
-const whenPill=when=>whenParts(when).map(cleanWhenPart).filter(Boolean).map(w=>`<span class="pill">${esc(w)}</span>`).join('');
-const avTuplePills=tuple=>{const a=avObject(tuple);return a.mode==='Unknown'?'':`<span class="pill ${modeClass(a.mode)}">${esc(a.mode.toUpperCase())}</span>${whenPill(a.when)}`};
+const whenPill=when=>whenParts(when).map(cleanWhenPart).filter(Boolean).map(w=>`<span class="pill availability">${esc(w)}</span>`).join('');
+const sourcePill=source=>source?`<span class="pill sourcepill">${esc(source)}</span>`:'';
+const avObjectPills=a=>a.mode==='Unknown'?'':`<span class="pill availability ${modeClass(a.mode)}">${esc(a.mode.toUpperCase())}</span>${whenPill(a.when)}${sourcePill(a.source)}`;
+const avTuplePills=tuple=>avObjectPills(avObject(tuple));
 const avPills=id=>avTuplePills(availability[id]);
-const entryAvPills=entry=>avTuplePills((entry.id&&availability[entry.id])||generatedAvailability[entry.name]);
 const keyFor=(name,explicitId=null)=>explicitId?'legacy:'+explicitId:(legacyExact(name)?'legacy:'+legacyExact(name):'gen:'+name);
 const isMissing=key=>!acquired[key];
 const checkedCount=()=>Object.values(acquired).filter(Boolean).length;
@@ -138,6 +143,19 @@ function recipeOptionsHtml(name){
   const label=groups.length===1?'Recipe':'Recipes';
   return`<div class="bodyhead">${label}</div><div class="recipebox">${groups.map(variants=>{const r=variants[0];return`<div class="recipeopt"><strong>${esc(name)}${Number(r.a)>1?` ×${Number(r.a)}`:''}</strong> <span class="pill">${esc(displayStation(variants))}</span><div class="recipeingredients">${(r.i||[]).map(pair=>{const x=displayIngredient(pair,variants);return`${esc(x.name)}${x.qty>1?` ×${x.qty}`:''}`}).join(' • ')}</div></div>`}).join('')}</div>`;
 }
+function fallbackSourceForName(name){
+  const groups=groupedRecipes(name);
+  if(!groups.length)return'';
+  const stations=[...new Set(groups.map(displayStation).filter(Boolean))];
+  if(!stations.length)return'';
+  return `${stations[0]} (craft)`;
+}
+function entryAvPills(entry){
+  const tuple=(entry.id&&availability[entry.id])||generatedAvailability[entry.name];
+  const a=avObject(tuple);
+  if(!a.source)a.source=fallbackSourceForName(entry.name);
+  return avObjectPills(a);
+}
 function shoppingRow(entry){
   if(missingOnly.checked&&!isMissing(entry.key))return'';
   const meta=entryAvPills(entry);
@@ -174,7 +192,7 @@ function renderCatalog(openNames=new Set()){
   content.innerHTML=html;for(const d of $$('details.project'))if(openNames.has(d.dataset.name)){d.open=true;loadBody(d)}
   $('#showMore')?.addEventListener('click',()=>{const keepOpen=new Set($$('details.project[open]').map(el=>el.dataset.name));shown+=PAGE;render(keepOpen)});renderStats(list.length);
 }
-function sourceSearchText(id){const i=items[id],a=av(id),ps=curatedProjects.filter(p=>p.items.some(x=>x[0]===id)).map(p=>p.name).join(' ');return[i.name,i.fishSource||'',i.source||'',i.type,a.mode,cleanWhen(a.when),i.note||'',ps].join(' ').toLowerCase()}
+function sourceSearchText(id){const i=items[id],a=av(id),ps=curatedProjects.filter(p=>p.items.some(x=>x[0]===id)).map(p=>p.name).join(' ');return[i.name,i.fishSource||'',i.source||'',i.type,a.mode,cleanWhen(a.when),a.source||'',i.note||'',ps].join(' ').toLowerCase()}
 function renderSources(wantFish){
   const q=search.value.trim().toLowerCase();let ids=Object.keys(items).filter(id=>!!items[id].fish===wantFish);if(q)ids=ids.filter(id=>sourceSearchText(id).includes(q));if(missingOnly.checked)ids=ids.filter(id=>isMissing(keyFor(items[id].name,id)));
   ids.sort((a,b)=>sort.value==='name'?items[a].name.localeCompare(items[b].name):av(a).rank-av(b).rank||items[a].name.localeCompare(items[b].name));
