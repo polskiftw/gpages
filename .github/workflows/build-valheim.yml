@@ -1,0 +1,77 @@
+name: Build Valheim Mods
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'valheim-ward-hit-sound/**'
+      - '.github/workflows/build-valheim.yml'
+  workflow_dispatch:
+
+jobs:
+  ward-hit-sound:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare compile references
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $project = Join-Path $env:GITHUB_WORKSPACE 'valheim-ward-hit-sound'
+          $lib = Join-Path $project 'lib'
+          $stubDir = Join-Path $env:RUNNER_TEMP 'unity-stub'
+          New-Item -ItemType Directory -Force -Path $lib | Out-Null
+          New-Item -ItemType Directory -Force -Path $stubDir | Out-Null
+
+          $url = 'https://thunderstore.io/package/download/denikson/BepInExPack_Valheim/5.4.2350/'
+          Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\bepinex.zip"
+          Expand-Archive -Path "$env:RUNNER_TEMP\bepinex.zip" -DestinationPath "$env:RUNNER_TEMP\bepinex"
+
+          $bep = Get-ChildItem -Path "$env:RUNNER_TEMP\bepinex" -Recurse -File -Filter 'BepInEx.dll' | Select-Object -First 1
+          if (-not $bep) { throw 'Could not find BepInEx.dll in BepInEx pack' }
+          Copy-Item $bep.FullName (Join-Path $lib 'BepInEx.dll')
+
+          @'
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net472</TargetFramework>
+              <AssemblyName>UnityEngine</AssemblyName>
+              <RootNamespace>UnityEngine</RootNamespace>
+              <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+              <Deterministic>true</Deterministic>
+            </PropertyGroup>
+          </Project>
+          '@ | Set-Content -Path (Join-Path $stubDir 'UnityEngineStub.csproj') -Encoding UTF8
+
+          @'
+          namespace UnityEngine
+          {
+              public class Object { }
+              public class Component : Object { }
+              public class Behaviour : Component { }
+              public class MonoBehaviour : Behaviour { }
+          }
+          '@ | Set-Content -Path (Join-Path $stubDir 'UnityEngineStub.cs') -Encoding UTF8
+
+          dotnet build (Join-Path $stubDir 'UnityEngineStub.csproj') -c Release
+          Copy-Item (Join-Path $stubDir 'bin\Release\net472\UnityEngine.dll') (Join-Path $lib 'UnityEngine.dll')
+
+      - name: Build Ward Hit Sound Toggle
+        shell: pwsh
+        run: dotnet build .\valheim-ward-hit-sound\WardHitSoundToggle.csproj -c Release
+
+      - name: Verify DLL
+        shell: pwsh
+        run: |
+          $dll = '.\valheim-ward-hit-sound\bin\Release\net472\WardHitSoundToggle.dll'
+          if (-not (Test-Path $dll)) { throw "Build output missing: $dll" }
+          Get-FileHash $dll -Algorithm SHA256
+
+      - name: Upload Ward Hit Sound Toggle
+        uses: actions/upload-artifact@v4
+        with:
+          name: WardHitSoundToggle
+          path: valheim-ward-hit-sound/bin/Release/net472/WardHitSoundToggle.dll
+          if-no-files-found: error
