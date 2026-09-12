@@ -9,6 +9,9 @@ on:
       - '.github/workflows/build-valheim.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   ward-hit-sound:
     runs-on: windows-latest
@@ -69,9 +72,22 @@ jobs:
           if (-not (Test-Path $dll)) { throw "Build output missing: $dll" }
           Get-FileHash $dll -Algorithm SHA256
 
-      - name: Upload Ward Hit Sound Toggle
-        uses: actions/upload-artifact@v4
-        with:
-          name: WardHitSoundToggle
-          path: valheim-ward-hit-sound/bin/Release/net472/WardHitSoundToggle.dll
-          if-no-files-found: error
+      - name: Publish DLL to gpages
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $source = '.\valheim-ward-hit-sound\bin\Release\net472\WardHitSoundToggle.dll'
+          $dest = '.\valheim\ward-hit-sound\WardHitSoundToggle.dll'
+          Copy-Item -Force $source $dest
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "valheim/ward-hit-sound/WardHitSoundToggle.dll"
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host 'Published DLL is already current.'
+            exit 0
+          }
+
+          git commit -m "Publish WardHitSoundToggle.dll"
+          git push
