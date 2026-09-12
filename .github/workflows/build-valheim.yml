@@ -78,14 +78,21 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $source = '.\valheim-ward-hit-sound\bin\Release\net472\WardHitSoundToggle.dll'
           $dest = '.\valheim\ward-hit-sound\WardHitSoundToggle.dll'
+          $page = '.\valheim\ward-hit-sound\index.html'
           Copy-Item -Force $source $dest
+
+          $html = Get-Content -Raw $page
+          $html = $html.Replace('https://nightly.link/polskiftw/gpages/workflows/validate-static-js/main/WardHitSoundToggle.zip', 'WardHitSoundToggle.dll')
+          $html = $html.Replace('No GitHub account required. The ZIP contains <code>WardHitSoundToggle.dll</code>.', 'Direct download from this GPages site. No account required.')
+          $html = $html.Replace('<li>Extract <code>WardHitSoundToggle.dll</code>.</li>', '<li>Download <code>WardHitSoundToggle.dll</code>.</li>')
+          Set-Content -Path $page -Value $html -NoNewline
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- "valheim/ward-hit-sound/WardHitSoundToggle.dll"
+          git add -- "valheim/ward-hit-sound/WardHitSoundToggle.dll" "valheim/ward-hit-sound/index.html"
           git diff --cached --quiet
           if ($LASTEXITCODE -eq 0) {
-            Write-Host 'Published DLL is already current.'
+            Write-Host 'Published DLL and page are already current.'
             exit 0
           }
 
