@@ -16,7 +16,7 @@ namespace HammerEverythingMod
     {
         public const string PluginGuid = "claire.valheim.hammereverything";
         public const string PluginName = "Hammer Everything";
-        public const string PluginVersion = "1.4.5";
+        public const string PluginVersion = "1.4.6";
 
         private static readonly BindingFlags AnyInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -86,6 +86,16 @@ namespace HammerEverythingMod
             "Vagon",
             "PrivateArea"
         };
+
+        // World/location props whose prefab root sits below the visible base.
+        // Only Player.PlacePiece is adjusted; naturally spawned copies are untouched.
+        private static readonly HashSet<string> GroundAlignedPrefabNames =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "barrell",
+                "CastleKit_brazier",
+                "prop_piece_brazierfloor01"
+            };
 
         private static readonly HashSet<string> HardBlockedNames =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -537,6 +547,8 @@ namespace HammerEverythingMod
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, object> _managedPrefabObjects =
             new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, float> _placementLiftByPrefab =
+            new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<Type, object> _emptyDropTables =
             new Dictionary<Type, object>();
         private readonly HashSet<string> _unpricedPrefabNames =
@@ -595,6 +607,8 @@ namespace HammerEverythingMod
         private Type _pieceTableType;
         private Type _byUsagePieceListType;
         private Type _dropOnDestroyedType;
+        private Type _rigidbodyType;
+        private Type _floatingType;
 
         private Type _unityObjectType;
         private Type _gameObjectType;
@@ -880,6 +894,18 @@ namespace HammerEverythingMod
 
             if (existingNames.Contains(name))
                 return false;
+
+            // Valheim currently ships two prefabs named Cage Floor 1x1.
+            // iron_floor_1x1_v2 is the live Hammer piece; the older hidden
+            // iron_floor_1x1 has a bad placement origin when exposed beside it.
+            // Do not add the superseded duplicate when the live variant exists.
+            if (string.Equals(name, "iron_floor_1x1", StringComparison.OrdinalIgnoreCase) &&
+                existingNames.Contains("iron_floor_1x1_v2"))
+            {
+                if (_verboseLogging.Value)
+                    Logger.LogInfo("Skipped superseded duplicate prefab: iron_floor_1x1 (using iron_floor_1x1_v2).");
+                return false;
+            }
 
             if (blocked.Contains(name) || HardBlockedNames.Contains(name))
                 return false;
@@ -1208,22 +1234,35 @@ namespace HammerEverythingMod
                 return;
 
             ResolveTypes();
-            if (_pieceTableType == null || _byUsagePieceListType == null)
+            if (_pieceTableType == null ||
+                _byUsagePieceListType == null ||
+                _pieceType == null ||
+                _playerType == null ||
+                _vector3Type == null ||
+                _quaternionType == null)
+            {
                 return;
+            }
 
             try
             {
-                _harmony = _harmony ?? new Harmony(PluginGuid + ".buildcategory");
+                _harmony = _harmony ?? new Harmony(PluginGuid + ".runtime");
 
                 MethodInfo updateAvailable = FindInstanceMethod(_pieceTableType, "UpdateAvailable");
                 MethodInfo updateAvailableTags = FindInstanceMethod(_byUsagePieceListType, "UpdateAvailableTags");
                 MethodInfo getTagDisplayName = FindInstanceMethod(_byUsagePieceListType, "GetTagDisplayName");
                 MethodInfo getAvailablePiecesWithTag = FindInstanceMethod(_byUsagePieceListType, "GetAvailablePiecesWithTag");
+                MethodInfo pieceAwake = FindInstanceMethod(_pieceType, "Awake");
+                MethodInfo pieceSetCreator = FindPieceSetCreatorMethod();
+                MethodInfo playerPlacePiece = FindPlayerPlacePieceMethod();
 
                 if (updateAvailable == null ||
                     updateAvailableTags == null ||
                     getTagDisplayName == null ||
-                    getAvailablePiecesWithTag == null)
+                    getAvailablePiecesWithTag == null ||
+                    pieceAwake == null ||
+                    pieceSetCreator == null ||
+                    playerPlacePiece == null)
                 {
                     return;
                 }
@@ -1255,8 +1294,26 @@ namespace HammerEverythingMod
                         nameof(UsageListGetAvailablePiecesWithTagPrefix),
                         AnyStatic)));
 
+                _harmony.Patch(
+                    pieceAwake,
+                    postfix: new HarmonyMethod(typeof(HammerEverything).GetMethod(
+                        nameof(PieceAwakePostfix),
+                        AnyStatic)));
+
+                _harmony.Patch(
+                    pieceSetCreator,
+                    postfix: new HarmonyMethod(typeof(HammerEverything).GetMethod(
+                        nameof(PieceSetCreatorPostfix),
+                        AnyStatic)));
+
+                _harmony.Patch(
+                    playerPlacePiece,
+                    prefix: new HarmonyMethod(typeof(HammerEverything).GetMethod(
+                        nameof(PlayerPlacePiecePrefix),
+                        AnyStatic)));
+
                 _categoryPatchesInstalled = true;
-                Logger.LogInfo("Installed Valheim 1.0 build-menu category hooks.");
+                Logger.LogInfo("Installed Valheim 1.0 build-menu and placement hooks.");
             }
             catch (Exception ex)
             {
@@ -1272,6 +1329,21 @@ namespace HammerEverythingMod
                 if (_verboseLogging != null && _verboseLogging.Value)
                     Logger.LogWarning($"Build-menu category hooks not ready: {ex.GetType().Name}: {ex.Message}");
             }
+        }
+
+        private static void PieceAwakePostfix(object __instance)
+        {
+            _instance?.FinalizeManagedPlacedPiece(__instance);
+        }
+
+        private static void PieceSetCreatorPostfix(object __instance)
+        {
+            _instance?.FinalizeManagedPlacedPiece(__instance);
+        }
+
+        private static void PlayerPlacePiecePrefix(object[] __args)
+        {
+            _instance?.AdjustGroundAlignedPlacement(__args);
         }
 
         private static void PieceTableUpdateAvailablePrefix(object __instance)
@@ -1751,6 +1823,61 @@ namespace HammerEverythingMod
             }
 
             return null;
+        }
+
+        private MethodInfo FindPlayerPlacePieceMethod()
+        {
+            if (_playerType == null || _pieceType == null || _vector3Type == null || _quaternionType == null)
+                return null;
+
+            foreach (MethodInfo method in _playerType.GetMethods(AnyInstance))
+            {
+                if (!string.Equals(method.Name, "PlacePiece", StringComparison.Ordinal))
+                    continue;
+
+                ParameterInfo[] parameters = method.GetParameters();
+                if (parameters.Length != 5)
+                    continue;
+
+                if (parameters[0].ParameterType == _pieceType &&
+                    parameters[1].ParameterType == _vector3Type &&
+                    parameters[2].ParameterType == _quaternionType &&
+                    parameters[3].ParameterType == typeof(bool) &&
+                    parameters[4].ParameterType == typeof(bool))
+                {
+                    return method;
+                }
+            }
+
+            return null;
+        }
+
+        private MethodInfo FindPieceSetCreatorMethod()
+        {
+            if (_pieceType == null)
+                return null;
+
+            MethodInfo fallback = null;
+
+            foreach (MethodInfo method in _pieceType.GetMethods(AnyInstance))
+            {
+                if (!string.Equals(method.Name, "SetCreator", StringComparison.Ordinal))
+                    continue;
+
+                ParameterInfo[] parameters = method.GetParameters();
+                if (parameters.Length < 1 || parameters[0].ParameterType != typeof(long))
+                    continue;
+
+                // Valheim 1.0 uses (long, PlatformUserID); prefer the current
+                // two-argument contract but retain compatibility with older builds.
+                if (parameters.Length == 2)
+                    return method;
+
+                if (parameters.Length == 1)
+                    fallback = method;
+            }
+
+            return fallback;
         }
 
         private static MethodInfo FindInstanceMethod(Type type, string name)
@@ -2412,6 +2539,192 @@ namespace HammerEverythingMod
             _playerRefreshed = true;
         }
 
+        private void AdjustGroundAlignedPlacement(object[] args)
+        {
+            if (args == null || args.Length < 2 || args[0] == null || args[1] == null)
+                return;
+
+            object piece = args[0];
+            object prefab = GetPropertyValue(piece, "gameObject");
+            string name = NormalizeInstanceName(GetUnityName(prefab));
+
+            if (string.IsNullOrEmpty(name) || !GroundAlignedPrefabNames.Contains(name))
+                return;
+
+            float lift = GetGroundAlignmentLift(prefab, name);
+            if (lift <= 0.001f)
+                return;
+
+            object pos = args[1];
+            float x = GetSingleMember(pos, "x");
+            float y = GetSingleMember(pos, "y");
+            float z = GetSingleMember(pos, "z");
+
+            if (!AreFinite(x, y, z))
+                return;
+
+            // __args is writable in Harmony. Changing the boxed Vector3 here
+            // changes the position passed to Player.PlacePiece before the
+            // network prefab is instantiated, so the corrected height persists.
+            args[1] = CreateVector3(x, y + lift, z);
+
+            if (_verboseLogging != null && _verboseLogging.Value)
+                Logger.LogInfo($"Ground-aligned placement: {name} +{lift:0.###}m.");
+        }
+
+        private float GetGroundAlignmentLift(object prefab, string prefabName)
+        {
+            if (_placementLiftByPrefab.TryGetValue(prefabName, out float cached))
+                return cached;
+
+            float lift = 0f;
+
+            try
+            {
+                object transform = GetPropertyValue(prefab, "transform");
+                object rootPosition = GetPropertyValue(transform, "position");
+                float rootY = GetSingleMember(rootPosition, "y");
+
+                if (TryGetVisualBounds(
+                        prefab,
+                        out float minX,
+                        out float minY,
+                        out float minZ,
+                        out float maxX,
+                        out float maxY,
+                        out float maxZ))
+                {
+                    float candidate = rootY - minY;
+
+                    // These are small ground props. A huge value means a renderer
+                    // child is not suitable for placement alignment, so fail safe.
+                    if (AreFinite(candidate) && candidate > 0.001f && candidate <= 3f)
+                        lift = candidate;
+                }
+            }
+            catch (Exception ex)
+            {
+                if (_verboseLogging != null && _verboseLogging.Value)
+                    Logger.LogDebug($"Placement lift measurement skipped for {prefabName}: {ex.GetType().Name}: {ex.Message}");
+            }
+
+            _placementLiftByPrefab[prefabName] = lift;
+            return lift;
+        }
+
+        private void FinalizeManagedPlacedPiece(object piece)
+        {
+            if (piece == null)
+                return;
+
+            object gameObject = GetPropertyValue(piece, "gameObject");
+            string name = NormalizeInstanceName(GetUnityName(gameObject));
+
+            if (string.IsNullOrEmpty(name) || !_managedPrefabNames.Contains(name))
+                return;
+
+            bool isPrefab =
+                _managedPrefabObjects.TryGetValue(name, out object prefab) &&
+                ReferenceEquals(prefab, gameObject);
+
+            if (isPrefab)
+                return;
+
+            MethodInfo getCreator = piece.GetType().GetMethod(
+                "GetCreator",
+                AnyInstance,
+                binder: null,
+                types: Type.EmptyTypes,
+                modifiers: null);
+
+            if (getCreator == null)
+                return;
+
+            object creatorValue = getCreator.Invoke(piece, null);
+            long creator = creatorValue == null
+                ? 0L
+                : Convert.ToInt64(creatorValue, CultureInfo.InvariantCulture);
+
+            if (creator == 0L)
+                return;
+
+            if (_pieceAddedByUs.Contains(name))
+                SetFieldIfExists(piece, "m_canBeRemoved", true);
+
+            NeutralizeDropOnDestroyedLoot(gameObject);
+            StabilizePlayerBuiltPhysics(gameObject, name);
+        }
+
+        private void StabilizePlayerBuiltPhysics(object gameObject, string prefabName)
+        {
+            if (gameObject == null ||
+                string.IsNullOrEmpty(prefabName) ||
+                !_pieceAddedByUs.Contains(prefabName))
+            {
+                return;
+            }
+
+            ResolveTypes();
+
+            try
+            {
+                object zero = _vector3Type == null ? null : CreateVector3(0f, 0f, 0f);
+
+                if (_rigidbodyType != null)
+                {
+                    object rawBodies = InvokeInstanceWithOptionalTail(
+                        gameObject,
+                        "GetComponentsInChildren",
+                        _rigidbodyType,
+                        true);
+
+                    if (rawBodies is IEnumerable bodies)
+                    {
+                        foreach (object body in bodies)
+                        {
+                            if (body == null)
+                                continue;
+
+                            if (zero != null)
+                            {
+                                SetPropertyIfExists(body, "velocity", zero);
+                                SetPropertyIfExists(body, "linearVelocity", zero);
+                                SetPropertyIfExists(body, "angularVelocity", zero);
+                            }
+
+                            SetPropertyIfExists(body, "useGravity", false);
+                            SetPropertyIfExists(body, "isKinematic", true);
+                        }
+                    }
+                }
+
+                // Floating applies buoyancy/force to world-prop rigidbodies.
+                // It belongs on natural barrels, not on a Hammer-built copy.
+                if (_floatingType != null)
+                {
+                    object rawFloating = InvokeInstanceWithOptionalTail(
+                        gameObject,
+                        "GetComponentsInChildren",
+                        _floatingType,
+                        true);
+
+                    if (rawFloating is IEnumerable floatingComponents)
+                    {
+                        foreach (object floating in floatingComponents)
+                        {
+                            if (floating != null)
+                                SetPropertyIfExists(floating, "enabled", false);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (_verboseLogging != null && _verboseLogging.Value)
+                    Logger.LogDebug($"Player-built physics stabilization skipped for {prefabName}: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
         private void UpdateRemovalStateForPlacedProps()
         {
             if (_managedPrefabNames.Count == 0 || _pieceType == null)
@@ -2483,7 +2796,10 @@ namespace HammerEverythingMod
                     // object is deleted. Neutralize only the player-built clone's
                     // drop table instead.
                     if (playerBuilt)
+                    {
                         NeutralizeDropOnDestroyedLoot(gameObject);
+                        StabilizePlayerBuiltPhysics(gameObject, name);
+                    }
                 }
             }
             catch (Exception ex)
@@ -2575,6 +2891,10 @@ namespace HammerEverythingMod
                 _byUsagePieceListType = FindLoadedType("ByUsagePieceList");
             if (_dropOnDestroyedType == null)
                 _dropOnDestroyedType = FindLoadedType("DropOnDestroyed");
+            if (_rigidbodyType == null)
+                _rigidbodyType = FindLoadedType("UnityEngine.Rigidbody");
+            if (_floatingType == null)
+                _floatingType = FindLoadedType("Floating");
 
             if (_unityObjectType == null)
                 _unityObjectType = FindLoadedType("UnityEngine.Object");
