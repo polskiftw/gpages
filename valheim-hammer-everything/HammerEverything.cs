@@ -16,7 +16,7 @@ namespace HammerEverythingMod
     {
         public const string PluginGuid = "claire.valheim.hammereverything";
         public const string PluginName = "Hammer Everything";
-        public const string PluginVersion = "1.4.4";
+        public const string PluginVersion = "1.4.5";
 
         private static readonly BindingFlags AnyInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -1281,6 +1281,7 @@ namespace HammerEverythingMod
 
         private static void PieceTableUpdateAvailablePostfix(object __instance)
         {
+            _instance?.EnsureManagedPiecesAvailable(__instance);
             _instance?.PrepareCustomCategorySlot(__instance, clearCustomList: false);
             _instance?.PopulateCustomCategoryList(__instance);
             _instance?.EnsurePieceTableCategoryMetadata(__instance);
@@ -1383,6 +1384,43 @@ namespace HammerEverythingMod
             {
                 if (_verboseLogging != null && _verboseLogging.Value)
                     Logger.LogDebug($"Custom category capacity refresh skipped: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        private void EnsureManagedPiecesAvailable(object pieceTable)
+        {
+            // Valheim 1.0 rebuilds m_availablePieces as a flat HashSet<Piece>
+            // using the player's normal discovery/requirement gates. Hidden
+            // prefabs to which we add Piece at runtime can therefore be present
+            // in Hammer.m_pieces yet disappear from every menu if one of our
+            // curated recipe materials is not known. Hammer Everything already
+            // decided these prefabs are safe and intentionally registered them,
+            // so keep them visible while leaving their real build costs intact.
+            if (pieceTable == null ||
+                _lastHammerPieceTable == null ||
+                !ReferenceEquals(pieceTable, _lastHammerPieceTable) ||
+                _managedPrefabObjects.Count == 0 ||
+                _pieceType == null)
+            {
+                return;
+            }
+
+            object rawAvailable = GetFieldValue(pieceTable, "m_availablePieces");
+            if (rawAvailable == null)
+                return;
+
+            foreach (object prefab in _managedPrefabObjects.Values)
+            {
+                object piece = GetComponent(prefab, _pieceType);
+                if (piece == null)
+                    continue;
+
+                // Reassert the private category in case registration happened
+                // before the 1.0 menu hooks were ready.
+                if (_categoryPatchesInstalled)
+                    AssignCustomBuildCategory(piece);
+
+                AddCollectionItemIfMissing(rawAvailable, piece);
             }
         }
 
