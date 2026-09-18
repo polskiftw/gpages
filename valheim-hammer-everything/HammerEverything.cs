@@ -16,7 +16,7 @@ namespace HammerEverythingMod
     {
         public const string PluginGuid = "claire.valheim.hammereverything";
         public const string PluginName = "Hammer Everything";
-        public const string PluginVersion = "1.3.0";
+        public const string PluginVersion = "1.3.1";
 
         private static readonly BindingFlags AnyInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -179,7 +179,101 @@ namespace HammerEverythingMod
                 // entries below are only fallbacks if a future game build leaves
                 // the component present but strips its serialized recipe.
                 { "dvergrprops_wood_floor", Recipe(Ingredient("Wood", 2)) },
-                { "dvergrprops_wood_stair", Recipe(Ingredient("Wood", 2)) }
+                { "dvergrprops_wood_stair", Recipe(Ingredient("Wood", 2)) },
+
+                // Decorative stone statues. These prefabs have no Piece component
+                // in vanilla, so there is no developer recipe to preserve.
+                { "StatueCorgi", Recipe(Ingredient("Stone", 5)) },
+                { "StatueDeer", Recipe(Ingredient("Stone", 5)) },
+                { "StatueHare", Recipe(Ingredient("Stone", 5)) },
+                { "StatueSeed", Recipe(Ingredient("Stone", 5)) },
+                { "StatueEvil", Recipe(Ingredient("Stone", 8)) },
+                { "StatueFreya", Recipe(Ingredient("Stone", 20)) },
+                { "StatueFreya_broken_left", Recipe(Ingredient("Stone", 10)) },
+                { "StatueFreya_broken_right", Recipe(Ingredient("Stone", 10)) },
+                { "StatueThor", Recipe(Ingredient("Stone", 20)) },
+                { "StatueThor_broken_bottom", Recipe(Ingredient("Stone", 10)) },
+                { "StatueThor_broken_top", Recipe(Ingredient("Stone", 10)) },
+
+                // Morkhalla / Deep North location props. These costs deliberately
+                // use the biome's normal material vocabulary rather than generic
+                // Wood/Stone-only placeholders.
+                { "Morkhalla_Banner1", Recipe(Ingredient("ElakingHairBundle", 4), Ingredient("Stone", 2)) },
+                { "Morkhalla_Banner2", Recipe(Ingredient("ElakingHairBundle", 4), Ingredient("Stone", 2)) },
+                { "Morkhalla_Bedroll1", Recipe(Ingredient("ElakingHairBundle", 4), Ingredient("WolfPelt", 2)) },
+                { "Morkhalla_Bedroll2", Recipe(Ingredient("ElakingHairBundle", 4), Ingredient("WolfPelt", 2)) },
+                { "Morkhalla_Bench", Recipe(Ingredient("Frostwood", 6), Ingredient("Iron", 1)) },
+                { "Morkhalla_bridge_davinci", Recipe(Ingredient("Frostwood", 24), Ingredient("FlametalNew", 2), Ingredient("Gold", 2)) },
+                { "Morkhalla_Chain", Recipe(Ingredient("Iron", 4)) },
+
+                // Fallback only; current vanilla already has a real Ancient Chest
+                // recipe, which ConfigureCraftingRecipe preserves before consulting
+                // this table.
+                { "Morkhalla_ChestAncient", Recipe(Ingredient("Wood", 10), Ingredient("Tar", 2), Ingredient("BlackMetal", 6)) },
+
+                { "Morkhalla_coal_pile_memorial", Recipe(Ingredient("Coal", 10), Ingredient("Stone", 4)) },
+                { "Morkhalla_Floor_2x2", Recipe(Ingredient("Stone", 4)) },
+                { "Morkhalla_Floor_4x4", Recipe(Ingredient("Stone", 8)) },
+                { "Morkhalla_Floor_4x4_broken01", Recipe(Ingredient("Stone", 4)) },
+                { "Morkhalla_Floor_4x4_broken02", Recipe(Ingredient("Stone", 4)) },
+
+                { "Morkhalla_GateDoor", Recipe(Ingredient("Frostwood", 12), Ingredient("Iron", 4)) },
+                { "Morkhalla_GateDoor02", Recipe(Ingredient("Frostwood", 12), Ingredient("Iron", 4)) },
+                { "Morkhalla_GateDoor03", Recipe(Ingredient("Stone", 12), Ingredient("Iron", 4)) },
+                { "Morkhalla_jotun_gate", Recipe(Ingredient("Stone", 24), Ingredient("Gold", 4)) },
+                { "Morkborg_gate", Recipe(Ingredient("Stone", 24), Ingredient("Gold", 4)) },
+
+                { "Morkhalla_giant_railing", Recipe(Ingredient("Stone", 6), Ingredient("Iron", 2)) },
+                { "Morkhalla_giant_railing_corner", Recipe(Ingredient("Stone", 6), Ingredient("Iron", 2)) },
+                { "Morkhalla_giant_railing_deco", Recipe(Ingredient("Stone", 4), Ingredient("Iron", 1)) },
+                { "Morkhalla_giant_railing_half", Recipe(Ingredient("Stone", 3), Ingredient("Iron", 1)) },
+                { "Morkhalla_giant_railing_single", Recipe(Ingredient("Stone", 2), Ingredient("Iron", 1)) },
+                { "Morkhalla_giant_railing_torch", Recipe(Ingredient("Stone", 3), Ingredient("Iron", 1), Ingredient("FrostCore", 1)) },
+                { "Morkhalla_giant_railing_torch_unlit", Recipe(Ingredient("Stone", 3), Ingredient("Iron", 1)) },
+
+                { "Morkhalla_rubble_trashpile", Recipe(Ingredient("Stone", 4), Ingredient("Frostwood", 4)) },
+
+                { "Morkhalla_Rug_corner", Recipe(Ingredient("ElakingHairBundle", 3)) },
+                { "Morkhalla_Rug_end1", Recipe(Ingredient("ElakingHairBundle", 2)) },
+                { "Morkhalla_Rug_end2", Recipe(Ingredient("ElakingHairBundle", 2)) },
+                { "Morkhalla_Rug_middle", Recipe(Ingredient("ElakingHairBundle", 4)) },
+                { "Morkhalla_Rug_stair", Recipe(Ingredient("ElakingHairBundle", 4)) },
+
+                { "Morkhalla_Stairs_giant_railing", Recipe(Ingredient("Stone", 8), Ingredient("Iron", 2)) },
+                { "Morkhalla_Stairs_giant_short", Recipe(Ingredient("Stone", 8)) },
+                { "Morkhalla_Stairs_giant_short_broken1", Recipe(Ingredient("Stone", 4)) },
+                { "Morkhalla_Stairs_giant_short_broken2", Recipe(Ingredient("Stone", 4)) },
+
+                { "Morkhalla_StatuePieceArmL", Recipe(Ingredient("Stone", 6)) },
+                { "Morkhalla_StatuePieceArmR", Recipe(Ingredient("Stone", 6)) },
+                { "Morkhalla_StatuePieceFace", Recipe(Ingredient("Stone", 6)) },
+                { "Morkhalla_StatuePieceFeet", Recipe(Ingredient("Stone", 6)) },
+                { "Morkhalla_StatuePieceHorn", Recipe(Ingredient("Stone", 6)) },
+                { "Morkhalla_StatuePieceHorn2", Recipe(Ingredient("Stone", 6)) },
+                { "Morkhalla_StatuePieceLegs", Recipe(Ingredient("Stone", 6)) },
+                { "Morkhalla_StatuePieceSword", Recipe(Ingredient("Stone", 6)) },
+                { "Morkhalla_StatuePieceTorso", Recipe(Ingredient("Stone", 6)) },
+
+                { "Morkhalla_StatuePieceArmL_big", Recipe(Ingredient("Stone", 16)) },
+                { "Morkhalla_StatuePieceArmR_big", Recipe(Ingredient("Stone", 16)) },
+                { "Morkhalla_StatuePieceFace_big", Recipe(Ingredient("Stone", 16)) },
+                { "Morkhalla_StatuePieceFeet_big", Recipe(Ingredient("Stone", 16)) },
+                { "Morkhalla_StatuePieceHorn_big", Recipe(Ingredient("Stone", 16)) },
+                { "Morkhalla_StatuePieceHorn2_big", Recipe(Ingredient("Stone", 16)) },
+                { "Morkhalla_StatuePieceLegs_big", Recipe(Ingredient("Stone", 16)) },
+                { "Morkhalla_StatuePieceSword_big", Recipe(Ingredient("Stone", 16)) },
+                { "Morkhalla_StatuePieceTorso_big", Recipe(Ingredient("Stone", 16)) },
+
+                { "Morkhalla_StatueSword", Recipe(Ingredient("Stone", 20)) },
+                { "Morkhalla_StatueSword_hanging", Recipe(Ingredient("Stone", 12), Ingredient("Iron", 2)) },
+
+                // Current vanilla already has a Black Marble Pile recipe. This is
+                // a future-proof fallback only.
+                { "Morkhalla_Stonepile", Recipe(Ingredient("BlackMarble", 50)) },
+
+                { "Morkhalla_Stool", Recipe(Ingredient("Frostwood", 3), Ingredient("Iron", 1)) },
+                { "Morkhalla_Table", Recipe(Ingredient("Frostwood", 6), Ingredient("Iron", 2)) },
+                { "Morkhalla_WallChain1", Recipe(Ingredient("Stone", 8), Ingredient("Iron", 4)) }
             };
 
         private readonly Stopwatch _pollTimer = Stopwatch.StartNew();
@@ -500,8 +594,8 @@ namespace HammerEverythingMod
             if (_useCraftingCosts.Value && _unpricedPrefabNames.Count > 0)
             {
                 Logger.LogWarning(
-                    $"{_unpricedPrefabNames.Count} added prefab(s) had neither a developer recipe nor a curated 1.3 recipe. " +
-                    "Their original resource state was left untouched rather than inventing a generic cost.");
+                    $"{_unpricedPrefabNames.Count} added prefab(s) had neither a developer recipe nor a curated 1.3.1 recipe. " +
+                    $"Their original resource state was left untouched rather than inventing a generic cost. Missing: {FormatUnpricedPrefabNames()}");
             }
         }
 
@@ -815,6 +909,22 @@ namespace HammerEverythingMod
                 parts[i] = $"{recipe[i].Amount}x {recipe[i].ItemPrefab}";
 
             return string.Join(", ", parts);
+        }
+
+        private string FormatUnpricedPrefabNames()
+        {
+            if (_unpricedPrefabNames.Count == 0)
+                return "(none)";
+
+            List<string> names = new List<string>(_unpricedPrefabNames);
+            names.Sort(StringComparer.OrdinalIgnoreCase);
+
+            const int maxNames = 40;
+            if (names.Count <= maxNames)
+                return string.Join(", ", names);
+
+            return string.Join(", ", names.GetRange(0, maxNames)) +
+                $" ... and {names.Count - maxNames} more";
         }
 
         private void EnsureCategoryPatches()

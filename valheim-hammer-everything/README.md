@@ -25,7 +25,7 @@ Hammer Everything automatically renders a transparent 128×128 thumbnail from ea
 
 ## Crafting costs
 
-Version 1.3 changes the default from free building to survival costs. If a hidden vanilla piece already has a non-empty developer-authored `m_resources` array, Hammer Everything leaves it alone. For recipe-less props, the mod carries a reviewed recipe table.
+Version 1.3 changes the default from free building to survival costs. Version 1.3.1 expands that reviewed table to cover the vanilla decorative statue family and the Mörkhalla/Deep North prop set. If a hidden vanilla piece already has a non-empty developer-authored `m_resources` array, Hammer Everything leaves it alone. For recipe-less props, the mod carries a reviewed recipe table.
 
 Current curated recipes include:
 
@@ -39,8 +39,17 @@ Current curated recipes include:
 - Dvergr hook and chain: 2 Copper + 1 Chain
 - Dvergr lantern props: the crafted Dvergr Lantern item, plus Copper for the standing mount
 - Dvergr pickaxe/wood structural props: Yggdrasil Wood with Iron/Copper where the model calls for metal reinforcement
+- Small decorative stone statues such as `StatueCorgi`: 5 Stone
+- Large Freya/Thor statues: 20 Stone; broken halves: 10 Stone
+- Mörkhalla chain: 4 Iron
+- Mörkhalla furniture: Timberwood (`Frostwood`) plus small Iron fittings
+- Mörkhalla banners/rugs/bedrolls: Elaking Hair Bundles with Stone or pelts where appropriate
+- Mörkhalla stone floors, railings, stairs, statue fragments, and gates: scaled Stone costs with Iron/Bloodgold reinforcement
+- Mörkhalla bridge: 24 Timberwood + 2 Flametal + 2 Bloodgold, matching the normal Deep North drawbridge material tier
 
 Player-built copies have `DropOnDestroyed` removed after Valheim assigns their creator ID. Natural world copies are untouched, so this prevents building a crate or lantern and then smashing it for location loot.
+
+If an automatically discovered prefab still has no developer or curated recipe, 1.3.1 prints its prefab name in the BepInEx warning log instead of only reporting a count. That makes remaining oddballs immediately actionable without guessing.
 
 Set `UseCraftingCosts=false` for the old free-build behavior. Pre-1.3 `AlwaysAvailable` config entries are intentionally ignored so an existing config cannot silently erase the new recipes.
 
