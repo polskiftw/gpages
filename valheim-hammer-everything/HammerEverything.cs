@@ -15,7 +15,7 @@ namespace HammerEverythingMod
     {
         public const string PluginGuid = "claire.valheim.hammereverything";
         public const string PluginName = "Hammer Everything";
-        public const string PluginVersion = "1.0.0";
+        public const string PluginVersion = "1.1.0";
 
         private static readonly BindingFlags AnyInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -126,6 +126,31 @@ namespace HammerEverythingMod
         private readonly Dictionary<string, object> _managedPrefabObjects =
             new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
+        private const int IconLayer = 31;
+        private const int IconSize = 128;
+        private const float IconFieldOfView = 0.5f;
+
+        private sealed class IconRenderRequest
+        {
+            public readonly string PrefabName;
+            public readonly object Prefab;
+            public readonly object Piece;
+
+            public IconRenderRequest(string prefabName, object prefab, object piece)
+            {
+                PrefabName = prefabName;
+                Prefab = prefab;
+                Piece = piece;
+            }
+        }
+
+        private readonly Queue<IconRenderRequest> _iconRenderQueue =
+            new Queue<IconRenderRequest>();
+        private readonly HashSet<string> _iconQueued =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, object> _generatedIcons =
+            new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
         private ConfigEntry<bool> _enabled;
         private ConfigEntry<bool> _automaticPropScan;
         private ConfigEntry<bool> _includeStructures;
@@ -143,6 +168,32 @@ namespace HammerEverythingMod
         private Type _zNetViewType;
         private Type _playerType;
         private Type _resourcesType;
+
+        private Type _unityObjectType;
+        private Type _gameObjectType;
+        private Type _componentType;
+        private Type _transformType;
+        private Type _rendererType;
+        private Type _meshRendererType;
+        private Type _skinnedMeshRendererType;
+        private Type _meshFilterType;
+        private Type _cameraType;
+        private Type _lightComponentType;
+        private Type _renderTextureType;
+        private Type _texture2DType;
+        private Type _spriteType;
+        private Type _rectType;
+        private Type _vector2Type;
+        private Type _vector3Type;
+        private Type _quaternionType;
+        private Type _colorType;
+        private Type _textureFormatType;
+        private Type _cameraClearFlagsType;
+        private Type _lightKindType;
+        private Type _applicationType;
+        private Type _systemInfoType;
+
+        private bool? _graphicsAvailable;
 
         private object _lastScene;
         private object _lastHammerPieceTable;
@@ -219,6 +270,8 @@ namespace HammerEverythingMod
 
         private void Update()
         {
+            ProcessIconRenderQueue();
+
             if (_pollTimer.ElapsedMilliseconds >= 1000)
             {
                 _pollTimer.Restart();
@@ -388,7 +441,7 @@ namespace HammerEverythingMod
                 _pieceAddedByUs.Add(name);
             }
 
-            ConfigurePiece(piece, templatePiece, name, addedComponent);
+            ConfigurePiece(prefab, piece, templatePiece, name, addedComponent);
 
             hammerPieces.Add(prefab);
             existingNames.Add(name);
@@ -467,7 +520,7 @@ namespace HammerEverythingMod
             return true;
         }
 
-        private void ConfigurePiece(object piece, object templatePiece, string prefabName, bool newlyAddedPiece)
+        private void ConfigurePiece(object prefab, object piece, object templatePiece, string prefabName, bool newlyAddedPiece)
         {
             SetPropertyIfExists(piece, "enabled", true);
             SetFieldIfExists(piece, "m_enabled", true);
@@ -509,10 +562,13 @@ namespace HammerEverythingMod
 
             if (templatePiece != null)
             {
+                // Keep a reliable vanilla icon until the prefab thumbnail is ready.
                 CopyFieldIfTargetEmpty(templatePiece, piece, "m_icon");
                 CopyFieldIfTargetZero(templatePiece, piece, "m_category");
                 CopyFieldIfTargetZero(templatePiece, piece, "m_usage");
             }
+
+            QueueUniqueIcon(prefabName, prefab, piece);
 
             if (_alwaysAvailable.Value)
             {
@@ -521,6 +577,589 @@ namespace HammerEverythingMod
                 SetFieldIfExists(piece, "m_requiredGlobalKey", "");
                 ClearStringCollectionField(piece, "m_requiredGlobalKeys");
             }
+        }
+
+
+        private void QueueUniqueIcon(string prefabName, object prefab, object piece)
+        {
+            if (string.IsNullOrWhiteSpace(prefabName) || prefab == null || piece == null)
+                return;
+
+            if (_generatedIcons.TryGetValue(prefabName, out object cached))
+            {
+                SetFieldIfExists(piece, "m_icon", cached);
+                return;
+            }
+
+            if (_iconQueued.Contains(prefabName))
+                return;
+
+            ResolveTypes();
+            if (!CanRenderIcons())
+                return;
+
+            _iconQueued.Add(prefabName);
+            _iconRenderQueue.Enqueue(new IconRenderRequest(prefabName, prefab, piece));
+        }
+
+        private void ProcessIconRenderQueue()
+        {
+            if (_iconRenderQueue.Count == 0)
+                return;
+
+            if (!CanRenderIcons())
+            {
+                _iconRenderQueue.Clear();
+                _iconQueued.Clear();
+                return;
+            }
+
+            IconRenderRequest request = _iconRenderQueue.Dequeue();
+            _iconQueued.Remove(request.PrefabName);
+
+            try
+            {
+                object sprite = RenderPrefabIcon(request.Prefab);
+                if (sprite == null)
+                {
+                    if (_verboseLogging != null && _verboseLogging.Value)
+                        Logger.LogWarning($"Could not render unique icon for {request.PrefabName}; keeping the fallback icon.");
+                    return;
+                }
+
+                _generatedIcons[request.PrefabName] = sprite;
+                SetFieldIfExists(request.Piece, "m_icon", sprite);
+                _playerRefreshed = false;
+
+                if (_verboseLogging != null && _verboseLogging.Value)
+                    Logger.LogInfo($"Rendered unique Hammer icon: {request.PrefabName}");
+            }
+            catch (Exception ex)
+            {
+                if (_verboseLogging != null && _verboseLogging.Value)
+                    Logger.LogWarning($"Icon render failed for {request.PrefabName}: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        private bool CanRenderIcons()
+        {
+            if (_graphicsAvailable.HasValue)
+                return _graphicsAvailable.Value;
+
+            ResolveTypes();
+
+            if (_unityObjectType == null ||
+                _gameObjectType == null ||
+                _componentType == null ||
+                _transformType == null ||
+                _rendererType == null ||
+                _meshFilterType == null ||
+                _cameraType == null ||
+                _lightComponentType == null ||
+                _renderTextureType == null ||
+                _texture2DType == null ||
+                _spriteType == null ||
+                _rectType == null ||
+                _vector2Type == null ||
+                _vector3Type == null ||
+                _quaternionType == null ||
+                _colorType == null ||
+                _textureFormatType == null ||
+                _cameraClearFlagsType == null ||
+                _lightKindType == null)
+            {
+                return false;
+            }
+
+            object isBatchMode = GetStaticMemberValue(_applicationType, "isBatchMode");
+            if (isBatchMode is bool batchMode && batchMode)
+            {
+                _graphicsAvailable = false;
+                return false;
+            }
+
+            object graphicsDeviceType = GetStaticMemberValue(_systemInfoType, "graphicsDeviceType");
+            if (graphicsDeviceType != null &&
+                string.Equals(graphicsDeviceType.ToString(), "Null", StringComparison.OrdinalIgnoreCase))
+            {
+                _graphicsAvailable = false;
+                return false;
+            }
+
+            _graphicsAvailable = true;
+            return true;
+        }
+
+        private object RenderPrefabIcon(object prefab)
+        {
+            object parent = null;
+            object spawn = null;
+            object cameraObject = null;
+            object lightObject = null;
+            object camera = null;
+            object renderTexture = null;
+            object previousRenderTexture = null;
+
+            try
+            {
+                parent = Activator.CreateInstance(_gameObjectType, new object[] { "HammerEverything Icon Parent" });
+                SetGameObjectActive(parent, false);
+
+                object parentTransform = GetPropertyValue(parent, "transform");
+                spawn = InvokeStaticWithOptionalTail(_unityObjectType, "Instantiate", prefab, parentTransform);
+                if (spawn == null)
+                    return null;
+
+                SetGameObjectActive(spawn, false);
+
+                if (!StripCloneToVisuals(spawn))
+                    return null;
+
+                SetLayerRecursive(spawn, IconLayer);
+
+                object spawnTransform = GetPropertyValue(spawn, "transform");
+                if (spawnTransform == null)
+                    return null;
+
+                SetPropertyIfExists(spawnTransform, "parent", null);
+                DestroyUnityObjectImmediate(parent);
+                parent = null;
+
+                SetPropertyIfExists(spawnTransform, "position", CreateVector3(0f, 0f, 0f));
+                SetPropertyIfExists(
+                    spawnTransform,
+                    "rotation",
+                    InvokeStaticWithOptionalTail(_quaternionType, "Euler", 23f, 51f, 25.8f));
+
+                if (!TryGetVisualBounds(
+                        spawn,
+                        out float minX,
+                        out float minY,
+                        out float minZ,
+                        out float maxX,
+                        out float maxY,
+                        out float maxZ))
+                {
+                    return null;
+                }
+
+                float centerX = (minX + maxX) * 0.5f;
+                float centerY = (minY + maxY) * 0.5f;
+                float centerZ = (minZ + maxZ) * 0.5f;
+
+                SetPropertyIfExists(
+                    spawnTransform,
+                    "position",
+                    CreateVector3(-centerX, -centerY, -centerZ));
+
+                float sizeX = Math.Max(0.01f, maxX - minX);
+                float sizeY = Math.Max(0.01f, maxY - minY);
+                float maxMeshSize = Math.Max(sizeX, sizeY) + 0.1f;
+                float radians = IconFieldOfView * (float)Math.PI / 180f;
+                float distance = maxMeshSize / Math.Max(0.0001f, (float)Math.Tan(radians));
+
+                cameraObject = Activator.CreateInstance(_gameObjectType, new object[] { "HammerEverything Icon Camera" });
+                camera = AddComponent(cameraObject, _cameraType);
+                if (camera == null)
+                    return null;
+
+                object cameraTransform = GetPropertyValue(cameraObject, "transform");
+                SetPropertyIfExists(camera, "backgroundColor", Activator.CreateInstance(_colorType, new object[] { 0f, 0f, 0f, 0f }));
+                SetPropertyIfExists(camera, "clearFlags", Enum.Parse(_cameraClearFlagsType, "SolidColor"));
+                SetPropertyIfExists(camera, "fieldOfView", IconFieldOfView);
+                SetPropertyIfExists(camera, "nearClipPlane", 0.01f);
+                SetPropertyIfExists(camera, "farClipPlane", 100000f);
+                SetPropertyIfExists(camera, "cullingMask", unchecked(1 << IconLayer));
+                SetPropertyIfExists(cameraTransform, "position", CreateVector3(0f, 0f, distance));
+                SetPropertyIfExists(
+                    cameraTransform,
+                    "rotation",
+                    InvokeStaticWithOptionalTail(_quaternionType, "Euler", 0f, 180f, 0f));
+
+                lightObject = Activator.CreateInstance(_gameObjectType, new object[] { "HammerEverything Icon Light" });
+                object light = AddComponent(lightObject, _lightComponentType);
+                if (light == null)
+                    return null;
+
+                object lightTransform = GetPropertyValue(lightObject, "transform");
+                SetPropertyIfExists(light, "type", Enum.Parse(_lightKindType, "Directional"));
+                SetPropertyIfExists(light, "cullingMask", unchecked(1 << IconLayer));
+                SetPropertyIfExists(light, "intensity", 1.15f);
+                SetPropertyIfExists(lightTransform, "position", CreateVector3(0f, 0f, 0f));
+                SetPropertyIfExists(
+                    lightTransform,
+                    "rotation",
+                    InvokeStaticWithOptionalTail(_quaternionType, "Euler", 5f, 180f, 5f));
+
+                renderTexture = InvokeStaticWithOptionalTail(_renderTextureType, "GetTemporary", IconSize, IconSize);
+                if (renderTexture == null)
+                    return null;
+
+                previousRenderTexture = GetStaticMemberValue(_renderTextureType, "active");
+                SetPropertyIfExists(camera, "targetTexture", renderTexture);
+                SetStaticPropertyIfExists(_renderTextureType, "active", renderTexture);
+
+                SetGameObjectActive(spawn, true);
+                InvokeInstanceWithOptionalTail(camera, "Render");
+                SetGameObjectActive(spawn, false);
+
+                object rgba32 = Enum.Parse(_textureFormatType, "RGBA32");
+                object texture = Activator.CreateInstance(
+                    _texture2DType,
+                    new object[] { IconSize, IconSize, rgba32, false });
+
+                object rect = Activator.CreateInstance(
+                    _rectType,
+                    new object[] { 0f, 0f, (float)IconSize, (float)IconSize });
+
+                InvokeInstanceWithOptionalTail(texture, "ReadPixels", rect, 0, 0);
+                InvokeInstanceWithOptionalTail(texture, "Apply");
+
+                object pivot = Activator.CreateInstance(_vector2Type, new object[] { 0.5f, 0.5f });
+                return InvokeStaticWithOptionalTail(_spriteType, "Create", texture, rect, pivot);
+            }
+            finally
+            {
+                try
+                {
+                    if (_renderTextureType != null)
+                        SetStaticPropertyIfExists(_renderTextureType, "active", previousRenderTexture);
+                }
+                catch
+                {
+                    // Best-effort cleanup only.
+                }
+
+                try
+                {
+                    if (camera != null)
+                        SetPropertyIfExists(camera, "targetTexture", null);
+                }
+                catch
+                {
+                    // Best-effort cleanup only.
+                }
+
+                try
+                {
+                    if (renderTexture != null)
+                        InvokeStaticWithOptionalTail(_renderTextureType, "ReleaseTemporary", renderTexture);
+                }
+                catch
+                {
+                    // Best-effort cleanup only.
+                }
+
+                DestroyUnityObjectImmediate(spawn);
+                DestroyUnityObjectImmediate(parent);
+                DestroyUnityObjectImmediate(cameraObject);
+                DestroyUnityObjectImmediate(lightObject);
+            }
+        }
+
+        private bool StripCloneToVisuals(object root)
+        {
+            object rawComponents = InvokeInstanceWithOptionalTail(
+                root,
+                "GetComponentsInChildren",
+                _componentType,
+                true);
+
+            if (!(rawComponents is IEnumerable components))
+                return false;
+
+            List<object> removable = new List<object>();
+
+            foreach (object component in components)
+            {
+                if (component == null)
+                    continue;
+
+                Type type = component.GetType();
+                bool keep =
+                    (_transformType != null && _transformType.IsAssignableFrom(type)) ||
+                    (_rendererType != null && _rendererType.IsAssignableFrom(type)) ||
+                    (_meshFilterType != null && _meshFilterType.IsAssignableFrom(type));
+
+                if (!keep)
+                    removable.Add(component);
+            }
+
+            while (removable.Count > 0)
+            {
+                bool madeProgress = false;
+
+                for (int i = removable.Count - 1; i >= 0; i--)
+                {
+                    try
+                    {
+                        DestroyUnityObjectImmediate(removable[i]);
+                        removable.RemoveAt(i);
+                        madeProgress = true;
+                    }
+                    catch
+                    {
+                        // A RequireComponent dependency may need another component removed first.
+                    }
+                }
+
+                if (!madeProgress)
+                    return false;
+            }
+
+            return true;
+        }
+
+        private void SetLayerRecursive(object root, int layer)
+        {
+            object rawTransforms = InvokeInstanceWithOptionalTail(
+                root,
+                "GetComponentsInChildren",
+                _transformType,
+                true);
+
+            if (!(rawTransforms is IEnumerable transforms))
+                return;
+
+            foreach (object transform in transforms)
+            {
+                object gameObject = GetPropertyValue(transform, "gameObject");
+                SetPropertyIfExists(gameObject, "layer", layer);
+            }
+        }
+
+        private bool TryGetVisualBounds(
+            object root,
+            out float minX,
+            out float minY,
+            out float minZ,
+            out float maxX,
+            out float maxY,
+            out float maxZ)
+        {
+            minX = minY = minZ = float.PositiveInfinity;
+            maxX = maxY = maxZ = float.NegativeInfinity;
+
+            object rawRenderers = InvokeInstanceWithOptionalTail(
+                root,
+                "GetComponentsInChildren",
+                _rendererType,
+                true);
+
+            if (!(rawRenderers is IEnumerable renderers))
+                return false;
+
+            bool found = false;
+
+            foreach (object renderer in renderers)
+            {
+                if (renderer == null)
+                    continue;
+
+                Type rendererType = renderer.GetType();
+                if (_meshRendererType != null && _skinnedMeshRendererType != null &&
+                    !_meshRendererType.IsAssignableFrom(rendererType) &&
+                    !_skinnedMeshRendererType.IsAssignableFrom(rendererType))
+                {
+                    continue;
+                }
+
+                object bounds = GetPropertyValue(renderer, "bounds");
+                object min = GetMemberValue(bounds, "min");
+                object max = GetMemberValue(bounds, "max");
+                if (min == null || max == null)
+                    continue;
+
+                float x0 = GetSingleMember(min, "x");
+                float y0 = GetSingleMember(min, "y");
+                float z0 = GetSingleMember(min, "z");
+                float x1 = GetSingleMember(max, "x");
+                float y1 = GetSingleMember(max, "y");
+                float z1 = GetSingleMember(max, "z");
+
+                if (!AreFinite(x0, y0, z0, x1, y1, z1))
+                    continue;
+
+                minX = Math.Min(minX, x0);
+                minY = Math.Min(minY, y0);
+                minZ = Math.Min(minZ, z0);
+                maxX = Math.Max(maxX, x1);
+                maxY = Math.Max(maxY, y1);
+                maxZ = Math.Max(maxZ, z1);
+                found = true;
+            }
+
+            return found && maxX > minX && maxY > minY;
+        }
+
+        private object CreateVector3(float x, float y, float z)
+        {
+            return Activator.CreateInstance(_vector3Type, new object[] { x, y, z });
+        }
+
+        private void SetGameObjectActive(object gameObject, bool active)
+        {
+            InvokeInstanceWithOptionalTail(gameObject, "SetActive", active);
+        }
+
+        private void DestroyUnityObjectImmediate(object unityObject)
+        {
+            if (unityObject == null || _unityObjectType == null)
+                return;
+
+            InvokeStaticWithOptionalTail(_unityObjectType, "DestroyImmediate", unityObject);
+        }
+
+        private static bool AreFinite(params float[] values)
+        {
+            foreach (float value in values)
+            {
+                if (float.IsNaN(value) || float.IsInfinity(value))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static float GetSingleMember(object instance, string memberName)
+        {
+            object value = GetMemberValue(instance, memberName);
+            return value == null
+                ? 0f
+                : Convert.ToSingle(value, CultureInfo.InvariantCulture);
+        }
+
+        private static object GetMemberValue(object instance, string memberName)
+        {
+            if (instance == null)
+                return null;
+
+            FieldInfo field = instance.GetType().GetField(memberName, AnyInstance);
+            if (field != null)
+                return field.GetValue(instance);
+
+            PropertyInfo property = instance.GetType().GetProperty(memberName, AnyInstance);
+            return property?.GetValue(instance, null);
+        }
+
+        private static object GetStaticMemberValue(Type type, string memberName)
+        {
+            if (type == null)
+                return null;
+
+            FieldInfo field = type.GetField(memberName, AnyStatic);
+            if (field != null)
+                return field.GetValue(null);
+
+            PropertyInfo property = type.GetProperty(memberName, AnyStatic);
+            return property?.GetValue(null, null);
+        }
+
+        private static void SetStaticPropertyIfExists(Type type, string propertyName, object value)
+        {
+            if (type == null)
+                return;
+
+            PropertyInfo property = type.GetProperty(propertyName, AnyStatic);
+            if (property != null && property.CanWrite)
+                property.SetValue(null, value, null);
+        }
+
+        private static object InvokeInstanceWithOptionalTail(object instance, string methodName, params object[] supplied)
+        {
+            if (instance == null)
+                return null;
+
+            MethodInfo method = FindCallableMethod(instance.GetType(), methodName, AnyInstance, supplied);
+            return method?.Invoke(instance, BuildInvocationArguments(method, supplied));
+        }
+
+        private static object InvokeStaticWithOptionalTail(Type type, string methodName, params object[] supplied)
+        {
+            if (type == null)
+                return null;
+
+            MethodInfo method = FindCallableMethod(type, methodName, AnyStatic, supplied);
+            return method?.Invoke(null, BuildInvocationArguments(method, supplied));
+        }
+
+        private static MethodInfo FindCallableMethod(
+            Type type,
+            string methodName,
+            BindingFlags flags,
+            object[] supplied)
+        {
+            foreach (MethodInfo method in type.GetMethods(flags))
+            {
+                if (!string.Equals(method.Name, methodName, StringComparison.Ordinal) ||
+                    method.IsGenericMethodDefinition)
+                {
+                    continue;
+                }
+
+                ParameterInfo[] parameters = method.GetParameters();
+                if (parameters.Length < supplied.Length)
+                    continue;
+
+                bool compatible = true;
+
+                for (int i = 0; i < supplied.Length; i++)
+                {
+                    object value = supplied[i];
+                    Type parameterType = parameters[i].ParameterType;
+
+                    if (value == null)
+                    {
+                        if (parameterType.IsValueType && Nullable.GetUnderlyingType(parameterType) == null)
+                        {
+                            compatible = false;
+                            break;
+                        }
+
+                        continue;
+                    }
+
+                    if (!parameterType.IsInstanceOfType(value))
+                    {
+                        compatible = false;
+                        break;
+                    }
+                }
+
+                if (!compatible)
+                    continue;
+
+                for (int i = supplied.Length; i < parameters.Length; i++)
+                {
+                    if (!parameters[i].IsOptional)
+                    {
+                        compatible = false;
+                        break;
+                    }
+                }
+
+                if (compatible)
+                    return method;
+            }
+
+            return null;
+        }
+
+        private static object[] BuildInvocationArguments(MethodInfo method, object[] supplied)
+        {
+            if (method == null)
+                return null;
+
+            ParameterInfo[] parameters = method.GetParameters();
+            object[] args = new object[parameters.Length];
+
+            for (int i = 0; i < supplied.Length; i++)
+                args[i] = supplied[i];
+
+            for (int i = supplied.Length; i < parameters.Length; i++)
+                args[i] = parameters[i].DefaultValue;
+
+            return args;
         }
 
         private object TryGetHammerPieceTable()
@@ -666,6 +1305,53 @@ namespace HammerEverythingMod
                 _playerType = FindLoadedType("Player");
             if (_resourcesType == null)
                 _resourcesType = FindLoadedType("UnityEngine.Resources");
+
+            if (_unityObjectType == null)
+                _unityObjectType = FindLoadedType("UnityEngine.Object");
+            if (_gameObjectType == null)
+                _gameObjectType = FindLoadedType("UnityEngine.GameObject");
+            if (_componentType == null)
+                _componentType = FindLoadedType("UnityEngine.Component");
+            if (_transformType == null)
+                _transformType = FindLoadedType("UnityEngine.Transform");
+            if (_rendererType == null)
+                _rendererType = FindLoadedType("UnityEngine.Renderer");
+            if (_meshRendererType == null)
+                _meshRendererType = FindLoadedType("UnityEngine.MeshRenderer");
+            if (_skinnedMeshRendererType == null)
+                _skinnedMeshRendererType = FindLoadedType("UnityEngine.SkinnedMeshRenderer");
+            if (_meshFilterType == null)
+                _meshFilterType = FindLoadedType("UnityEngine.MeshFilter");
+            if (_cameraType == null)
+                _cameraType = FindLoadedType("UnityEngine.Camera");
+            if (_lightComponentType == null)
+                _lightComponentType = FindLoadedType("UnityEngine.Light");
+            if (_renderTextureType == null)
+                _renderTextureType = FindLoadedType("UnityEngine.RenderTexture");
+            if (_texture2DType == null)
+                _texture2DType = FindLoadedType("UnityEngine.Texture2D");
+            if (_spriteType == null)
+                _spriteType = FindLoadedType("UnityEngine.Sprite");
+            if (_rectType == null)
+                _rectType = FindLoadedType("UnityEngine.Rect");
+            if (_vector2Type == null)
+                _vector2Type = FindLoadedType("UnityEngine.Vector2");
+            if (_vector3Type == null)
+                _vector3Type = FindLoadedType("UnityEngine.Vector3");
+            if (_quaternionType == null)
+                _quaternionType = FindLoadedType("UnityEngine.Quaternion");
+            if (_colorType == null)
+                _colorType = FindLoadedType("UnityEngine.Color");
+            if (_textureFormatType == null)
+                _textureFormatType = FindLoadedType("UnityEngine.TextureFormat");
+            if (_cameraClearFlagsType == null)
+                _cameraClearFlagsType = FindLoadedType("UnityEngine.CameraClearFlags");
+            if (_lightKindType == null)
+                _lightKindType = FindLoadedType("UnityEngine.LightType");
+            if (_applicationType == null)
+                _applicationType = FindLoadedType("UnityEngine.Application");
+            if (_systemInfoType == null)
+                _systemInfoType = FindLoadedType("UnityEngine.SystemInfo");
         }
 
         private static object GetStaticSingleton(Type type, string memberName)
