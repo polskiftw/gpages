@@ -25,7 +25,7 @@ Hammer Everything automatically renders a transparent 128×128 thumbnail from ea
 
 ## Crafting costs
 
-Version 1.3 changes the default from free building to survival costs. Version 1.4 completes an exhaustive recipe audit of the current safe hidden-prefab set instead of patching families piecemeal. If a hidden vanilla piece already has a non-empty developer-authored `m_resources` array, Hammer Everything leaves it alone. For recipe-less props, the mod carries a reviewed recipe table.
+Version 1.3 changes the default from free building to survival costs. Version 1.4 completes an exhaustive recipe audit of the current safe hidden-prefab set instead of patching families piecemeal. Version 1.4.1 also audits hidden Piece names: the sole current blank existing Piece, `goblin_bed`, is exposed as **Fuling Bed**, and the runtime now refuses to add any prefab that still cannot obtain a usable display name. If a hidden vanilla piece already has a non-empty developer-authored `m_resources` array, Hammer Everything leaves it alone. For recipe-less props, the mod carries a reviewed recipe table.
 
 Current curated recipes include:
 

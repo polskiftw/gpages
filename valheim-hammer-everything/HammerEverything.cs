@@ -16,7 +16,7 @@ namespace HammerEverythingMod
     {
         public const string PluginGuid = "claire.valheim.hammereverything";
         public const string PluginName = "Hammer Everything";
-        public const string PluginVersion = "1.4.0";
+        public const string PluginVersion = "1.4.1";
 
         private static readonly BindingFlags AnyInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -117,7 +117,8 @@ namespace HammerEverythingMod
                 { "dvergrprops_chair", "Dvergr Chair" },
                 { "dvergrprops_curtain", "Dvergr Curtain" },
                 { "dvergrprops_hooknchain", "Dvergr Hook & Chain" },
-                { "dvergrprops_lantern", "Dvergr Lantern" }
+                { "dvergrprops_lantern", "Dvergr Lantern" },
+                { "goblin_bed", "Fuling Bed" }
             };
 
         private sealed class RecipeIngredient
@@ -895,6 +896,16 @@ namespace HammerEverythingMod
             }
 
             ConfigurePiece(prefab, piece, templatePiece, name, addedComponent);
+
+            // Some hidden vanilla prefabs already carry Piece but have an empty
+            // m_name (goblin_bed is the current example). Never allow a blank
+            // build-menu entry: preserve real names, synthesize a friendly name
+            // only when vanilla left it empty, and skip the prefab if naming fails.
+            if (!EnsurePieceDisplayName(piece, name))
+            {
+                Logger.LogWarning($"Skipped Hammer prefab with no usable display name: {name}");
+                return false;
+            }
 
             hammerPieces.Add(prefab);
             existingNames.Add(name);
@@ -2773,6 +2784,31 @@ namespace HammerEverythingMod
             return result;
         }
 
+        private bool EnsurePieceDisplayName(object piece, string prefabName)
+        {
+            if (piece == null)
+                return false;
+
+            FieldInfo field = piece.GetType().GetField("m_name", AnyInstance);
+            if (field == null || field.FieldType != typeof(string))
+                return false;
+
+            string current = field.GetValue(piece) as string;
+            if (!string.IsNullOrWhiteSpace(current))
+                return true;
+
+            string fallback = GetFriendlyName(prefabName);
+            if (string.IsNullOrWhiteSpace(fallback))
+                return false;
+
+            field.SetValue(piece, fallback);
+
+            if (_verboseLogging != null && _verboseLogging.Value)
+                Logger.LogInfo($"Filled blank Piece name: {prefabName} -> {fallback}");
+
+            return true;
+        }
+
         private static string GetFriendlyName(string prefabName)
         {
             if (FriendlyNames.TryGetValue(prefabName, out string friendly))
@@ -2780,7 +2816,9 @@ namespace HammerEverythingMod
 
             string value = prefabName ?? "Vanilla Prop";
             value = Regex.Replace(value, "^dvergrprops_", "Dvergr ", RegexOptions.IgnoreCase);
+            value = Regex.Replace(value, "^dvergrtown_", "Dvergr ", RegexOptions.IgnoreCase);
             value = Regex.Replace(value, "^goblinprops_", "Fuling ", RegexOptions.IgnoreCase);
+            value = Regex.Replace(value, "^goblin_", "Fuling ", RegexOptions.IgnoreCase);
             value = Regex.Replace(value, "^castlekit_", "Castle ", RegexOptions.IgnoreCase);
             value = value.Replace('_', ' ').Replace('-', ' ');
             value = Regex.Replace(value, "([a-z0-9])([A-Z])", "$1 $2");
