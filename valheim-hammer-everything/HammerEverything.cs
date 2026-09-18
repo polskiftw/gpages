@@ -16,7 +16,7 @@ namespace HammerEverythingMod
     {
         public const string PluginGuid = "claire.valheim.hammereverything";
         public const string PluginName = "Hammer Everything";
-        public const string PluginVersion = "1.4.6";
+        public const string PluginVersion = "1.4.7";
 
         private static readonly BindingFlags AnyInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -88,7 +88,7 @@ namespace HammerEverythingMod
         };
 
         // World/location props whose prefab root sits below the visible base.
-        // Only Player.PlacePiece is adjusted; naturally spawned copies are untouched.
+        // Only the Hammer placement ghost is adjusted; naturally spawned copies are untouched.
         private static readonly HashSet<string> GroundAlignedPrefabNames =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -549,6 +549,8 @@ namespace HammerEverythingMod
             new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, float> _placementLiftByPrefab =
             new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<object, float[]> _placementGhostCorrections =
+            new Dictionary<object, float[]>();
         private readonly Dictionary<Type, object> _emptyDropTables =
             new Dictionary<Type, object>();
         private readonly HashSet<string> _unpricedPrefabNames =
@@ -1238,8 +1240,7 @@ namespace HammerEverythingMod
                 _byUsagePieceListType == null ||
                 _pieceType == null ||
                 _playerType == null ||
-                _vector3Type == null ||
-                _quaternionType == null)
+                _vector3Type == null)
             {
                 return;
             }
@@ -1254,15 +1255,15 @@ namespace HammerEverythingMod
                 MethodInfo getAvailablePiecesWithTag = FindInstanceMethod(_byUsagePieceListType, "GetAvailablePiecesWithTag");
                 MethodInfo pieceAwake = FindInstanceMethod(_pieceType, "Awake");
                 MethodInfo pieceSetCreator = FindPieceSetCreatorMethod();
-                MethodInfo playerPlacePiece = FindPlayerPlacePieceMethod();
+                MethodInfo updatePlacementGhost = FindInstanceMethod(_playerType, "UpdatePlacementGhost");
 
+                // Build-menu hooks are the core contract. Placement/removal hooks
+                // are deliberately optional so a Valheim method-signature change
+                // cannot disable the entire Hammer Everything category.
                 if (updateAvailable == null ||
                     updateAvailableTags == null ||
                     getTagDisplayName == null ||
-                    getAvailablePiecesWithTag == null ||
-                    pieceAwake == null ||
-                    pieceSetCreator == null ||
-                    playerPlacePiece == null)
+                    getAvailablePiecesWithTag == null)
                 {
                     return;
                 }
@@ -1294,23 +1295,32 @@ namespace HammerEverythingMod
                         nameof(UsageListGetAvailablePiecesWithTagPrefix),
                         AnyStatic)));
 
-                _harmony.Patch(
-                    pieceAwake,
-                    postfix: new HarmonyMethod(typeof(HammerEverything).GetMethod(
-                        nameof(PieceAwakePostfix),
-                        AnyStatic)));
+                if (pieceAwake != null)
+                {
+                    _harmony.Patch(
+                        pieceAwake,
+                        postfix: new HarmonyMethod(typeof(HammerEverything).GetMethod(
+                            nameof(PieceAwakePostfix),
+                            AnyStatic)));
+                }
 
-                _harmony.Patch(
-                    pieceSetCreator,
-                    postfix: new HarmonyMethod(typeof(HammerEverything).GetMethod(
-                        nameof(PieceSetCreatorPostfix),
-                        AnyStatic)));
+                if (pieceSetCreator != null)
+                {
+                    _harmony.Patch(
+                        pieceSetCreator,
+                        postfix: new HarmonyMethod(typeof(HammerEverything).GetMethod(
+                            nameof(PieceSetCreatorPostfix),
+                            AnyStatic)));
+                }
 
-                _harmony.Patch(
-                    playerPlacePiece,
-                    prefix: new HarmonyMethod(typeof(HammerEverything).GetMethod(
-                        nameof(PlayerPlacePiecePrefix),
-                        AnyStatic)));
+                if (updatePlacementGhost != null)
+                {
+                    _harmony.Patch(
+                        updatePlacementGhost,
+                        postfix: new HarmonyMethod(typeof(HammerEverything).GetMethod(
+                            nameof(PlayerUpdatePlacementGhostPostfix),
+                            AnyStatic)));
+                }
 
                 _categoryPatchesInstalled = true;
                 Logger.LogInfo("Installed Valheim 1.0 build-menu and placement hooks.");
@@ -1341,9 +1351,9 @@ namespace HammerEverythingMod
             _instance?.FinalizeManagedPlacedPiece(__instance);
         }
 
-        private static void PlayerPlacePiecePrefix(object[] __args)
+        private static void PlayerUpdatePlacementGhostPostfix(object __instance)
         {
-            _instance?.AdjustGroundAlignedPlacement(__args);
+            _instance?.AdjustGroundAlignedPlacementGhost(__instance);
         }
 
         private static void PieceTableUpdateAvailablePrefix(object __instance)
@@ -1820,33 +1830,6 @@ namespace HammerEverythingMod
 
                 if (value == null || parameters[0].ParameterType.IsInstanceOfType(value))
                     return method;
-            }
-
-            return null;
-        }
-
-        private MethodInfo FindPlayerPlacePieceMethod()
-        {
-            if (_playerType == null || _pieceType == null || _vector3Type == null || _quaternionType == null)
-                return null;
-
-            foreach (MethodInfo method in _playerType.GetMethods(AnyInstance))
-            {
-                if (!string.Equals(method.Name, "PlacePiece", StringComparison.Ordinal))
-                    continue;
-
-                ParameterInfo[] parameters = method.GetParameters();
-                if (parameters.Length != 5)
-                    continue;
-
-                if (parameters[0].ParameterType == _pieceType &&
-                    parameters[1].ParameterType == _vector3Type &&
-                    parameters[2].ParameterType == _quaternionType &&
-                    parameters[3].ParameterType == typeof(bool) &&
-                    parameters[4].ParameterType == typeof(bool))
-                {
-                    return method;
-                }
             }
 
             return null;
@@ -2539,23 +2522,34 @@ namespace HammerEverythingMod
             _playerRefreshed = true;
         }
 
-        private void AdjustGroundAlignedPlacement(object[] args)
+        private void AdjustGroundAlignedPlacementGhost(object player)
         {
-            if (args == null || args.Length < 2 || args[0] == null || args[1] == null)
+            if (player == null)
                 return;
 
-            object piece = args[0];
-            object prefab = GetPropertyValue(piece, "gameObject");
-            string name = NormalizeInstanceName(GetUnityName(prefab));
+            object ghost = GetFieldValue(player, "m_placementGhost");
+            if (ghost == null)
+                return;
 
+            string name = NormalizeInstanceName(GetUnityName(ghost));
             if (string.IsNullOrEmpty(name) || !GroundAlignedPrefabNames.Contains(name))
+            {
+                _placementGhostCorrections.Remove(ghost);
                 return;
+            }
+
+            if (!_managedPrefabObjects.TryGetValue(name, out object prefab) || prefab == null)
+                prefab = ghost;
 
             float lift = GetGroundAlignmentLift(prefab, name);
             if (lift <= 0.001f)
                 return;
 
-            object pos = args[1];
+            object transform = GetPropertyValue(ghost, "transform");
+            object pos = GetPropertyValue(transform, "position");
+            if (transform == null || pos == null)
+                return;
+
             float x = GetSingleMember(pos, "x");
             float y = GetSingleMember(pos, "y");
             float z = GetSingleMember(pos, "z");
@@ -2563,13 +2557,25 @@ namespace HammerEverythingMod
             if (!AreFinite(x, y, z))
                 return;
 
-            // __args is writable in Harmony. Changing the boxed Vector3 here
-            // changes the position passed to Player.PlacePiece before the
-            // network prefab is instantiated, so the corrected height persists.
-            args[1] = CreateVector3(x, y + lift, z);
+            // UpdatePlacementGhost normally rewrites the raw placement position
+            // every frame. If it early-outs and leaves our already-corrected
+            // transform untouched, do not stack the lift again.
+            if (_placementGhostCorrections.TryGetValue(ghost, out float[] previous) &&
+                previous != null &&
+                previous.Length == 3 &&
+                Math.Abs(x - previous[0]) < 0.0005f &&
+                Math.Abs(y - previous[1]) < 0.0005f &&
+                Math.Abs(z - previous[2]) < 0.0005f)
+            {
+                return;
+            }
+
+            float correctedY = y + lift;
+            SetPropertyIfExists(transform, "position", CreateVector3(x, correctedY, z));
+            _placementGhostCorrections[ghost] = new[] { x, correctedY, z };
 
             if (_verboseLogging != null && _verboseLogging.Value)
-                Logger.LogInfo($"Ground-aligned placement: {name} +{lift:0.###}m.");
+                Logger.LogInfo($"Ground-aligned placement ghost: {name} +{lift:0.###}m.");
         }
 
         private float GetGroundAlignmentLift(object prefab, string prefabName)
@@ -2596,9 +2602,10 @@ namespace HammerEverythingMod
                 {
                     float candidate = rootY - minY;
 
-                    // These are small ground props. A huge value means a renderer
-                    // child is not suitable for placement alignment, so fail safe.
-                    if (AreFinite(candidate) && candidate > 0.001f && candidate <= 3f)
+                    // This is only used for the small, explicit allowlist above.
+                    // Castle/location prefabs can have roots several metres below
+                    // their visible model, so keep a generous but finite sanity cap.
+                    if (AreFinite(candidate) && candidate > 0.001f && candidate <= 12f)
                         lift = candidate;
                 }
             }
