@@ -77,6 +77,50 @@ jobs:
 
           Copy-Item $harmony.FullName (Join-Path $env:GITHUB_WORKSPACE 'valheim-hammer-everything\lib\0Harmony.dll')
 
+      - name: Audit Hammer Everything recipe coverage
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sourcePath = '.\valheim-hammer-everything\HammerEverything.cs'
+          $auditPath = '.\valheim-hammer-everything\recipe-audit.txt'
+
+          $source = Get-Content $sourcePath -Raw
+          $audit = @(
+            Get-Content $auditPath |
+              ForEach-Object { $_.Trim() } |
+              Where-Object { $_ -and -not $_.StartsWith('#') }
+          )
+
+          $match = [regex]::Match(
+            $source,
+            '(?s)private static readonly Dictionary<string, RecipeIngredient\[\]> CuratedRecipes\s*=\s*new Dictionary<string, RecipeIngredient\[\]>\(StringComparer\.OrdinalIgnoreCase\)\s*\{(?<body>.*?)\n\s*\};'
+          )
+          if (-not $match.Success) {
+            throw 'Could not locate CuratedRecipes dictionary for audit.'
+          }
+
+          $recipeNames = @(
+            [regex]::Matches($match.Groups['body'].Value, '\{\s*"([^"]+)"\s*,\s*Recipe\(') |
+              ForEach-Object { $_.Groups[1].Value }
+          )
+
+          $duplicates = @(
+            $recipeNames |
+              Group-Object |
+              Where-Object Count -gt 1 |
+              ForEach-Object Name
+          )
+          if ($duplicates.Count -gt 0) {
+            throw "Duplicate curated recipe key(s): $($duplicates -join ', ')"
+          }
+
+          $missing = @($audit | Where-Object { $recipeNames -notcontains $_ })
+          if ($missing.Count -gt 0) {
+            throw "Audited prefab(s) missing curated recipes: $($missing -join ', ')"
+          }
+
+          Write-Host "Recipe audit passed: $($audit.Count) audited hidden prefabs, $($recipeNames.Count) curated recipe keys."
+
       - name: Build Ward Hit Sound Toggle
         shell: pwsh
         run: dotnet build .\valheim-ward-hit-sound\WardHitSoundToggle.csproj -c Release
