@@ -41,6 +41,9 @@ jobs:
           $bep = Get-ChildItem -Path "$env:RUNNER_TEMP\bepinex" -Recurse -File -Filter 'BepInEx.dll' | Select-Object -First 1
           if (-not $bep) { throw 'Could not find BepInEx.dll in BepInEx pack' }
 
+          $harmony = Get-ChildItem -Path "$env:RUNNER_TEMP\bepinex" -Recurse -File -Filter '0Harmony.dll' | Select-Object -First 1
+          if (-not $harmony) { throw 'Could not find 0Harmony.dll in BepInEx pack' }
+
           @'
           <Project Sdk="Microsoft.NET.Sdk">
             <PropertyGroup>
@@ -71,6 +74,8 @@ jobs:
             Copy-Item $bep.FullName (Join-Path $lib 'BepInEx.dll')
             Copy-Item $unity (Join-Path $lib 'UnityEngine.dll')
           }
+
+          Copy-Item $harmony.FullName (Join-Path $env:GITHUB_WORKSPACE 'valheim-hammer-everything\lib\0Harmony.dll')
 
       - name: Build Ward Hit Sound Toggle
         shell: pwsh

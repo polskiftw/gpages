@@ -1,5 +1,6 @@
 using BepInEx;
 using BepInEx.Configuration;
+using HarmonyLib;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -15,12 +16,15 @@ namespace HammerEverythingMod
     {
         public const string PluginGuid = "claire.valheim.hammereverything";
         public const string PluginName = "Hammer Everything";
-        public const string PluginVersion = "1.1.0";
+        public const string PluginVersion = "1.2.0";
 
         private static readonly BindingFlags AnyInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         private static readonly BindingFlags AnyStatic =
             BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+
+        private const string CustomBuildCategoryName = "Hammer Everything";
+        private static HammerEverything _instance;
 
         private static readonly string[] PropHints =
         {
@@ -151,6 +155,14 @@ namespace HammerEverythingMod
         private readonly Dictionary<string, object> _generatedIcons =
             new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
+        private readonly Dictionary<object, int> _customTagIds =
+            new Dictionary<object, int>();
+
+        private Harmony _harmony;
+        private bool _categoryPatchesInstalled;
+        private int _customCategoryId = -1;
+        private Type _pieceCategoryType;
+
         private ConfigEntry<bool> _enabled;
         private ConfigEntry<bool> _automaticPropScan;
         private ConfigEntry<bool> _includeStructures;
@@ -168,6 +180,8 @@ namespace HammerEverythingMod
         private Type _zNetViewType;
         private Type _playerType;
         private Type _resourcesType;
+        private Type _pieceTableType;
+        private Type _byUsagePieceListType;
 
         private Type _unityObjectType;
         private Type _gameObjectType;
@@ -201,6 +215,8 @@ namespace HammerEverythingMod
 
         private void Awake()
         {
+            _instance = this;
+
             _enabled = Config.Bind(
                 "General",
                 "Enabled",
@@ -265,11 +281,28 @@ namespace HammerEverythingMod
             _blockedPrefabNames.SettingChanged += OnConfigChanged;
 
             ResolveTypes();
+            EnsureCategoryPatches();
             Logger.LogInfo($"{PluginName} {PluginVersion} loaded. Waiting for Valheim's prefab database.");
+        }
+
+        private void OnDestroy()
+        {
+            try
+            {
+                _harmony?.UnpatchSelf();
+            }
+            catch
+            {
+                // BepInEx is unloading; nothing useful to recover here.
+            }
+
+            if (ReferenceEquals(_instance, this))
+                _instance = null;
         }
 
         private void Update()
         {
+            EnsureCategoryPatches();
             ProcessIconRenderQueue();
 
             if (_pollTimer.ElapsedMilliseconds >= 1000)
@@ -299,6 +332,7 @@ namespace HammerEverythingMod
                 return;
 
             ResolveTypes();
+            EnsureCategoryPatches();
 
             if (_zNetSceneType == null || _objectDbType == null ||
                 _itemDropType == null || _pieceType == null)
@@ -568,6 +602,13 @@ namespace HammerEverythingMod
                 CopyFieldIfTargetZero(templatePiece, piece, "m_usage");
             }
 
+            // Valheim 1.0's Hammer menu is usage-tag driven. Give every piece
+            // added by this plugin one private category and no vanilla usage tags,
+            // so it appears under Hammer Everything (plus Show All) instead of
+            // being scattered through Building/Furniture/Decor/etc.
+            if (_categoryPatchesInstalled)
+                AssignCustomBuildCategory(piece);
+
             QueueUniqueIcon(prefabName, prefab, piece);
 
             if (_alwaysAvailable.Value)
@@ -579,6 +620,534 @@ namespace HammerEverythingMod
             }
         }
 
+
+
+        private void EnsureCategoryPatches()
+        {
+            if (_categoryPatchesInstalled)
+                return;
+
+            ResolveTypes();
+            if (_pieceTableType == null || _byUsagePieceListType == null)
+                return;
+
+            try
+            {
+                _harmony = _harmony ?? new Harmony(PluginGuid + ".buildcategory");
+
+                MethodInfo updateAvailable = FindInstanceMethod(_pieceTableType, "UpdateAvailable");
+                MethodInfo updateAvailableTags = FindInstanceMethod(_byUsagePieceListType, "UpdateAvailableTags");
+                MethodInfo getTagDisplayName = FindInstanceMethod(_byUsagePieceListType, "GetTagDisplayName");
+                MethodInfo getAvailablePiecesWithTag = FindInstanceMethod(_byUsagePieceListType, "GetAvailablePiecesWithTag");
+
+                if (updateAvailable == null ||
+                    updateAvailableTags == null ||
+                    getTagDisplayName == null ||
+                    getAvailablePiecesWithTag == null)
+                {
+                    return;
+                }
+
+                _harmony.Patch(
+                    updateAvailable,
+                    prefix: new HarmonyMethod(typeof(HammerEverything).GetMethod(
+                        nameof(PieceTableUpdateAvailablePrefix),
+                        AnyStatic)),
+                    postfix: new HarmonyMethod(typeof(HammerEverything).GetMethod(
+                        nameof(PieceTableUpdateAvailablePostfix),
+                        AnyStatic)));
+
+                _harmony.Patch(
+                    updateAvailableTags,
+                    postfix: new HarmonyMethod(typeof(HammerEverything).GetMethod(
+                        nameof(UsageListUpdateAvailableTagsPostfix),
+                        AnyStatic)));
+
+                _harmony.Patch(
+                    getTagDisplayName,
+                    prefix: new HarmonyMethod(typeof(HammerEverything).GetMethod(
+                        nameof(UsageListGetTagDisplayNamePrefix),
+                        AnyStatic)));
+
+                _harmony.Patch(
+                    getAvailablePiecesWithTag,
+                    prefix: new HarmonyMethod(typeof(HammerEverything).GetMethod(
+                        nameof(UsageListGetAvailablePiecesWithTagPrefix),
+                        AnyStatic)));
+
+                _categoryPatchesInstalled = true;
+                Logger.LogInfo("Installed Valheim 1.0 build-menu category hooks.");
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    _harmony?.UnpatchSelf();
+                }
+                catch
+                {
+                    // Ignore cleanup errors and retry on a later frame.
+                }
+
+                if (_verboseLogging != null && _verboseLogging.Value)
+                    Logger.LogWarning($"Build-menu category hooks not ready: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        private static void PieceTableUpdateAvailablePrefix(object __instance)
+        {
+            _instance?.PrepareCustomCategorySlot(__instance, clearCustomList: true);
+        }
+
+        private static void PieceTableUpdateAvailablePostfix(object __instance)
+        {
+            _instance?.PrepareCustomCategorySlot(__instance, clearCustomList: false);
+            _instance?.PopulateCustomCategoryList(__instance);
+            _instance?.EnsurePieceTableCategoryMetadata(__instance);
+        }
+
+        private static void UsageListUpdateAvailableTagsPostfix(object __instance, object[] __args)
+        {
+            object pieceTable = __args != null && __args.Length > 0 ? __args[0] : null;
+            _instance?.RegisterCustomUsageTag(__instance, pieceTable);
+        }
+
+        private static bool UsageListGetTagDisplayNamePrefix(
+            object __instance,
+            int index,
+            ref string __result)
+        {
+            HammerEverything plugin = _instance;
+            if (plugin == null || !plugin.IsCustomTagAtIndex(__instance, index))
+                return true;
+
+            __result = CustomBuildCategoryName;
+            return false;
+        }
+
+        private static bool UsageListGetAvailablePiecesWithTagPrefix(
+            object __instance,
+            object[] __args)
+        {
+            HammerEverything plugin = _instance;
+            if (plugin == null)
+                return true;
+
+            return !plugin.TryFillCustomTagResults(__instance, __args);
+        }
+
+        private bool AssignCustomBuildCategory(object piece)
+        {
+            if (piece == null)
+                return false;
+
+            FieldInfo categoryField = piece.GetType().GetField("m_category", AnyInstance);
+            if (categoryField == null || !categoryField.FieldType.IsEnum)
+                return false;
+
+            _pieceCategoryType = categoryField.FieldType;
+
+            if (_customCategoryId < 0)
+            {
+                int allValue = GetEnumValueOrDefault(_pieceCategoryType, "All", 100);
+                int maxBelowAll = -1;
+
+                foreach (object raw in Enum.GetValues(_pieceCategoryType))
+                {
+                    int value = Convert.ToInt32(raw, CultureInfo.InvariantCulture);
+                    if (value >= 0 && value < allValue && value > maxBelowAll)
+                        maxBelowAll = value;
+                }
+
+                _customCategoryId = maxBelowAll + 1;
+                if (_customCategoryId == allValue)
+                    _customCategoryId = allValue + 1;
+
+                Logger.LogInfo(
+                    $"Registered private build category '{CustomBuildCategoryName}' as ID {_customCategoryId}.");
+            }
+
+            categoryField.SetValue(piece, Enum.ToObject(_pieceCategoryType, _customCategoryId));
+
+            // Zero means no vanilla usage tags. Our ByUsagePieceList hook supplies
+            // the dedicated Hammer Everything tag instead.
+            SetEnumFieldToZero(piece, "m_usage");
+            return true;
+        }
+
+        private void PrepareCustomCategorySlot(object pieceTable, bool clearCustomList)
+        {
+            if (pieceTable == null || _customCategoryId < 0)
+                return;
+
+            try
+            {
+                IList byCategory = GetFieldValue(pieceTable, "m_availablePiecesByCategory") as IList;
+                if (byCategory != null)
+                {
+                    EnsureListOfListsSize(byCategory, _customCategoryId + 1);
+
+                    if (clearCustomList &&
+                        _customCategoryId >= 0 &&
+                        _customCategoryId < byCategory.Count)
+                    {
+                        object list = byCategory[_customCategoryId];
+                        ClearCollection(list);
+                    }
+                }
+
+                ResizeArrayField(pieceTable, "m_selectedPiece", _customCategoryId + 1);
+                ResizeArrayField(pieceTable, "m_lastSelectedPiece", _customCategoryId + 1);
+            }
+            catch (Exception ex)
+            {
+                if (_verboseLogging != null && _verboseLogging.Value)
+                    Logger.LogDebug($"Custom category capacity refresh skipped: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        private void PopulateCustomCategoryList(object pieceTable)
+        {
+            if (pieceTable == null || _customCategoryId < 0)
+                return;
+
+            IList byCategory = GetFieldValue(pieceTable, "m_availablePiecesByCategory") as IList;
+            if (byCategory == null)
+                return;
+
+            EnsureListOfListsSize(byCategory, _customCategoryId + 1);
+            if (_customCategoryId >= byCategory.Count)
+                return;
+
+            object customList = byCategory[_customCategoryId];
+            if (customList == null)
+                return;
+
+            ClearCollection(customList);
+
+            object rawAvailable = GetFieldValue(pieceTable, "m_availablePieces");
+            if (!(rawAvailable is IEnumerable availablePieces))
+                return;
+
+            foreach (object piece in availablePieces)
+            {
+                if (GetEnumFieldInt(piece, "m_category") != _customCategoryId)
+                    continue;
+
+                AddCollectionItemIfMissing(customList, piece);
+            }
+        }
+
+        private void EnsurePieceTableCategoryMetadata(object pieceTable)
+        {
+            if (pieceTable == null || _customCategoryId < 0 || _pieceCategoryType == null)
+                return;
+
+            IList categories = GetFieldValue(pieceTable, "m_categories") as IList;
+            if (categories == null)
+                return;
+
+            object categoryValue = Enum.ToObject(_pieceCategoryType, _customCategoryId);
+            int categoryIndex = IndexOfNumericValue(categories, _customCategoryId);
+
+            if (categoryIndex < 0)
+            {
+                categories.Add(categoryValue);
+                categoryIndex = categories.Count - 1;
+            }
+
+            IList labels = GetFieldValue(pieceTable, "m_categoryLabels") as IList;
+            if (labels == null)
+                return;
+
+            while (labels.Count <= categoryIndex)
+                labels.Add(string.Empty);
+
+            labels[categoryIndex] = CustomBuildCategoryName;
+        }
+
+        private void RegisterCustomUsageTag(object usageList, object pieceTable)
+        {
+            if (usageList == null || pieceTable == null || _customCategoryId < 0)
+                return;
+
+            if (!PieceTableHasAvailableCustomPiece(pieceTable))
+            {
+                _customTagIds.Remove(usageList);
+                return;
+            }
+
+            IList availableTags = GetFieldValue(usageList, "m_availableTags") as IList;
+            Array usageTags = GetFieldValue(usageList, "m_usageTags") as Array;
+            if (availableTags == null || usageTags == null)
+                return;
+
+            if (_customTagIds.TryGetValue(usageList, out int existingTagId) &&
+                CollectionContainsNumericValue(availableTags, existingTagId))
+            {
+                return;
+            }
+
+            int tagId = usageTags.Length + availableTags.Count;
+            while (CollectionContainsNumericValue(availableTags, tagId))
+                tagId++;
+
+            availableTags.Add(tagId);
+            _customTagIds[usageList] = tagId;
+        }
+
+        private bool IsCustomTagAtIndex(object usageList, int index)
+        {
+            if (usageList == null ||
+                !_customTagIds.TryGetValue(usageList, out int customTagId))
+            {
+                return false;
+            }
+
+            IList availableTags = GetFieldValue(usageList, "m_availableTags") as IList;
+            if (availableTags == null || index < 0 || index >= availableTags.Count)
+                return false;
+
+            return Convert.ToInt32(availableTags[index], CultureInfo.InvariantCulture) == customTagId;
+        }
+
+        private bool TryFillCustomTagResults(object usageList, object[] args)
+        {
+            if (usageList == null ||
+                args == null ||
+                args.Length < 3 ||
+                !_customTagIds.TryGetValue(usageList, out int customTagId))
+            {
+                return false;
+            }
+
+            int requestedTagId;
+            try
+            {
+                requestedTagId = Convert.ToInt32(args[0], CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return false;
+            }
+
+            if (requestedTagId != customTagId)
+                return false;
+
+            object pieceTable = args[1];
+            object resultOut = args[2];
+            object rawAvailable = GetFieldValue(pieceTable, "m_availablePieces");
+
+            if (!(rawAvailable is IEnumerable availablePieces) || resultOut == null)
+                return true;
+
+            foreach (object piece in availablePieces)
+            {
+                if (GetEnumFieldInt(piece, "m_category") == _customCategoryId)
+                    AddCollectionItemIfMissing(resultOut, piece);
+            }
+
+            return true;
+        }
+
+        private bool PieceTableHasAvailableCustomPiece(object pieceTable)
+        {
+            object rawAvailable = GetFieldValue(pieceTable, "m_availablePieces");
+            if (!(rawAvailable is IEnumerable availablePieces))
+                return false;
+
+            foreach (object piece in availablePieces)
+            {
+                if (GetEnumFieldInt(piece, "m_category") == _customCategoryId)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static int GetEnumValueOrDefault(Type enumType, string name, int fallback)
+        {
+            if (enumType == null || !enumType.IsEnum)
+                return fallback;
+
+            try
+            {
+                object value = Enum.Parse(enumType, name, ignoreCase: false);
+                return Convert.ToInt32(value, CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return fallback;
+            }
+        }
+
+        private static int GetEnumFieldInt(object instance, string fieldName)
+        {
+            object value = GetFieldValue(instance, fieldName);
+            if (value == null)
+                return int.MinValue;
+
+            try
+            {
+                return Convert.ToInt32(value, CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return int.MinValue;
+            }
+        }
+
+        private static void EnsureListOfListsSize(IList outer, int requiredCount)
+        {
+            if (outer == null || requiredCount <= outer.Count)
+                return;
+
+            Type elementType = null;
+            Type outerType = outer.GetType();
+            if (outerType.IsGenericType)
+            {
+                Type[] genericArgs = outerType.GetGenericArguments();
+                if (genericArgs.Length == 1)
+                    elementType = genericArgs[0];
+            }
+
+            if (elementType == null)
+                return;
+
+            while (outer.Count < requiredCount)
+                outer.Add(Activator.CreateInstance(elementType));
+        }
+
+        private static void ResizeArrayField(object instance, string fieldName, int requiredLength)
+        {
+            if (instance == null)
+                return;
+
+            FieldInfo field = instance.GetType().GetField(fieldName, AnyInstance);
+            if (field == null || !field.FieldType.IsArray)
+                return;
+
+            Array current = field.GetValue(instance) as Array;
+            int currentLength = current?.Length ?? 0;
+            if (currentLength >= requiredLength)
+                return;
+
+            Type elementType = field.FieldType.GetElementType();
+            if (elementType == null)
+                return;
+
+            Array resized = Array.CreateInstance(elementType, requiredLength);
+            if (current != null)
+                Array.Copy(current, resized, currentLength);
+
+            field.SetValue(instance, resized);
+        }
+
+        private static int IndexOfNumericValue(IList list, int value)
+        {
+            if (list == null)
+                return -1;
+
+            for (int i = 0; i < list.Count; i++)
+            {
+                try
+                {
+                    if (Convert.ToInt32(list[i], CultureInfo.InvariantCulture) == value)
+                        return i;
+                }
+                catch
+                {
+                    // Ignore entries that are not enum/integer-like.
+                }
+            }
+
+            return -1;
+        }
+
+        private static bool CollectionContainsNumericValue(IList list, int value)
+        {
+            return IndexOfNumericValue(list, value) >= 0;
+        }
+
+        private static void ClearCollection(object collection)
+        {
+            if (collection == null)
+                return;
+
+            if (collection is IList list)
+            {
+                list.Clear();
+                return;
+            }
+
+            MethodInfo clear = collection.GetType().GetMethod(
+                "Clear",
+                AnyInstance,
+                binder: null,
+                types: Type.EmptyTypes,
+                modifiers: null);
+
+            clear?.Invoke(collection, null);
+        }
+
+        private static void AddCollectionItemIfMissing(object collection, object item)
+        {
+            if (collection == null || item == null)
+                return;
+
+            if (collection is IList list)
+            {
+                if (!list.Contains(item))
+                    list.Add(item);
+                return;
+            }
+
+            MethodInfo contains = FindCompatibleSingleArgumentMethod(collection.GetType(), "Contains", item);
+            if (contains != null)
+            {
+                object present = contains.Invoke(collection, new[] { item });
+                if (present is bool exists && exists)
+                    return;
+            }
+
+            MethodInfo add = FindCompatibleSingleArgumentMethod(collection.GetType(), "Add", item);
+            add?.Invoke(collection, new[] { item });
+        }
+
+        private static MethodInfo FindCompatibleSingleArgumentMethod(Type type, string name, object value)
+        {
+            if (type == null)
+                return null;
+
+            foreach (MethodInfo method in type.GetMethods(AnyInstance))
+            {
+                if (!string.Equals(method.Name, name, StringComparison.Ordinal))
+                    continue;
+
+                ParameterInfo[] parameters = method.GetParameters();
+                if (parameters.Length != 1)
+                    continue;
+
+                if (value == null || parameters[0].ParameterType.IsInstanceOfType(value))
+                    return method;
+            }
+
+            return null;
+        }
+
+        private static MethodInfo FindInstanceMethod(Type type, string name)
+        {
+            if (type == null)
+                return null;
+
+            foreach (MethodInfo method in type.GetMethods(AnyInstance))
+            {
+                if (string.Equals(method.Name, name, StringComparison.Ordinal))
+                    return method;
+            }
+
+            return null;
+        }
 
         private void QueueUniqueIcon(string prefabName, object prefab, object piece)
         {
@@ -1305,6 +1874,10 @@ namespace HammerEverythingMod
                 _playerType = FindLoadedType("Player");
             if (_resourcesType == null)
                 _resourcesType = FindLoadedType("UnityEngine.Resources");
+            if (_pieceTableType == null)
+                _pieceTableType = FindLoadedType("PieceTable");
+            if (_byUsagePieceListType == null)
+                _byUsagePieceListType = FindLoadedType("ByUsagePieceList");
 
             if (_unityObjectType == null)
                 _unityObjectType = FindLoadedType("UnityEngine.Object");

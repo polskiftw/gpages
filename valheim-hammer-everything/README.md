@@ -11,9 +11,15 @@ A dependency-light Valheim BepInEx plugin that exposes normally hidden **vanilla
 - Hidden pieces are free and station-less by default so they are available immediately.
 - Naturally spawned copies of newly-piece-enabled props remain non-removable; player-built copies become removable after Valheim assigns a creator ID.
 
+## Build-menu category
+
+Hammer Everything 1.2 puts every piece it adds under a dedicated **Hammer Everything** tag in Valheim 1.0's build menu. Added pieces have their normal usage tags cleared, so they no longer spill into Building, Furniture, Decor, Storage, and the other vanilla tags. They still appear under Valheim's normal Show All view.
+
+This uses HarmonyX that is already shipped inside BepInEx 5. There is still no Jotunn requirement and no extra dependency to install.
+
 ## Icons
 
-Hammer Everything 1.1 automatically renders a transparent 128×128 thumbnail from each added vanilla prefab, so barrels look like barrels, crates look like crates, and so on instead of every generated entry borrowing the wooden-chest icon. Rendering is client-side, processed one icon per frame, and falls back to the normal vanilla icon if a prefab cannot be rendered safely. No icon asset bundle or Jotunn dependency is required.
+Hammer Everything automatically renders a transparent 128×128 thumbnail from each added vanilla prefab, so barrels look like barrels, crates look like crates, and so on instead of every generated entry borrowing the wooden-chest icon. Rendering is client-side, processed one icon per frame, and falls back to the normal vanilla icon if a prefab cannot be rendered safely. No icon asset bundle or Jotunn dependency is required.
 
 ## Install
 
