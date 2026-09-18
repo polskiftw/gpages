@@ -11,7 +11,7 @@ A dependency-light Valheim BepInEx plugin that exposes normally hidden **vanilla
 - Preserve developer-authored vanilla recipes where Iron Gate already serialized one.
 - Apply hand-authored survival recipes to the principal recipe-less props instead of making them free by default.
 - Naturally spawned copies of newly-piece-enabled props remain non-removable; player-built copies become removable after Valheim assigns a creator ID.
-- Strip location-only `DropOnDestroyed` loot from player-built copies so crates, barrels, lanterns, and similar props cannot duplicate world loot.
+- Neutralize location-only `DropOnDestroyed` loot on player-built copies by swapping in an empty drop table while keeping the callback component alive, so props cannot duplicate world loot and remain safely removable.
 
 ## Build-menu category
 
@@ -25,7 +25,7 @@ Hammer Everything automatically renders a transparent 128×128 thumbnail from ea
 
 ## Crafting costs
 
-Version 1.3 changes the default from free building to survival costs. Version 1.4 completes an exhaustive recipe audit of the current safe hidden-prefab set instead of patching families piecemeal. Version 1.4.1 also audits hidden Piece names: the sole current blank existing Piece, `goblin_bed`, is exposed as **Fuling Bed**, and the runtime now refuses to add any prefab that still cannot obtain a usable display name. If a hidden vanilla piece already has a non-empty developer-authored `m_resources` array, Hammer Everything leaves it alone. For recipe-less props, the mod carries a reviewed recipe table.
+Version 1.3 changes the default from free building to survival costs. Version 1.4 completes an exhaustive recipe audit of the current safe hidden-prefab set instead of patching families piecemeal. Version 1.4.1 also audits hidden Piece names: the sole current blank existing Piece, `goblin_bed`, is exposed as **Fuling Bed**, and the runtime now refuses to add any prefab that still cannot obtain a usable display name. Version 1.4.2 fixes Hammer removal for hidden location props that carry `DropOnDestroyed`: the component is kept alive and its drop table is neutralized instead of destroying the callback target. If a hidden vanilla piece already has a non-empty developer-authored `m_resources` array, Hammer Everything leaves it alone. For recipe-less props, the mod carries a reviewed recipe table.
 
 Current curated recipes include:
 

@@ -16,7 +16,7 @@ namespace HammerEverythingMod
     {
         public const string PluginGuid = "claire.valheim.hammereverything";
         public const string PluginName = "Hammer Everything";
-        public const string PluginVersion = "1.4.1";
+        public const string PluginVersion = "1.4.2";
 
         private static readonly BindingFlags AnyInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -538,6 +538,8 @@ namespace HammerEverythingMod
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, object> _managedPrefabObjects =
             new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<Type, object> _emptyDropTables =
+            new Dictionary<Type, object>();
         private readonly HashSet<string> _unpricedPrefabNames =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -2426,11 +2428,14 @@ namespace HammerEverythingMod
                         SetFieldIfExists(piece, "m_canBeRemoved", playerBuilt);
 
                     // Location props frequently carry DropOnDestroyed loot (Soft
-                    // Tissue, Extractors, Surtling Cores, etc.). Removing that
-                    // component only from player-built clones prevents material/
-                    // loot duplication while leaving natural world props intact.
+                    // Tissue, Extractors, Surtling Cores, etc.). Keep the component
+                    // alive: WearNTear can retain its OnDestroyed callback, so
+                    // destroying the component leaves a delegate targeting a dead
+                    // Unity component and can make Hammer removal throw before the
+                    // object is deleted. Neutralize only the player-built clone's
+                    // drop table instead.
                     if (playerBuilt)
-                        RemoveDropOnDestroyedComponents(gameObject);
+                        NeutralizeDropOnDestroyedLoot(gameObject);
                 }
             }
             catch (Exception ex)
@@ -2441,7 +2446,7 @@ namespace HammerEverythingMod
         }
 
 
-        private void RemoveDropOnDestroyedComponents(object gameObject)
+        private void NeutralizeDropOnDestroyedLoot(object gameObject)
         {
             if (gameObject == null || _dropOnDestroyedType == null)
                 return;
@@ -2459,23 +2464,45 @@ namespace HammerEverythingMod
 
                 foreach (object component in components)
                 {
-                    if (component != null)
-                        DestroyUnityObject(component);
+                    if (component == null)
+                        continue;
+
+                    FieldInfo dropTableField =
+                        component.GetType().GetField("m_dropWhenDestroyed", AnyInstance);
+
+                    if (dropTableField == null)
+                        continue;
+
+                    Type dropTableType = dropTableField.FieldType;
+                    if (dropTableType == null)
+                        continue;
+
+                    if (!_emptyDropTables.TryGetValue(dropTableType, out object emptyDropTable))
+                    {
+                        try
+                        {
+                            emptyDropTable = Activator.CreateInstance(dropTableType);
+                        }
+                        catch
+                        {
+                            emptyDropTable = null;
+                        }
+
+                        if (emptyDropTable == null)
+                            continue;
+
+                        _emptyDropTables[dropTableType] = emptyDropTable;
+                    }
+
+                    if (!ReferenceEquals(dropTableField.GetValue(component), emptyDropTable))
+                        dropTableField.SetValue(component, emptyDropTable);
                 }
             }
             catch (Exception ex)
             {
                 if (_verboseLogging != null && _verboseLogging.Value)
-                    Logger.LogDebug($"Player-built loot cleanup skipped: {ex.GetType().Name}: {ex.Message}");
+                    Logger.LogDebug($"Player-built loot neutralization skipped: {ex.GetType().Name}: {ex.Message}");
             }
-        }
-
-        private void DestroyUnityObject(object unityObject)
-        {
-            if (unityObject == null || _unityObjectType == null)
-                return;
-
-            InvokeStaticWithOptionalTail(_unityObjectType, "Destroy", unityObject);
         }
 
         private void ResolveTypes()
