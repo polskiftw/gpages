@@ -16,7 +16,7 @@ namespace HammerEverythingMod
     {
         public const string PluginGuid = "claire.valheim.hammereverything";
         public const string PluginName = "Hammer Everything";
-        public const string PluginVersion = "1.4.3";
+        public const string PluginVersion = "1.4.4";
 
         private static readonly BindingFlags AnyInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -808,7 +808,17 @@ namespace HammerEverythingMod
             HashSet<string> blocked = ParseNameSet(_blockedPrefabNames.Value);
             HashSet<string> explicitNames = ParseNameSet(_extraPrefabNames.Value);
 
-            // Always prioritize the prop families Claire asked for.
+            // The audited recipe table is also our deterministic allowlist of
+            // known-safe hidden build prefabs. Add every curated candidate by
+            // exact prefab name before the heuristic scan. This prevents a valid
+            // audited piece from disappearing just because a naming heuristic
+            // changes or fails to recognize it (for example,
+            // dvergrtown_stair_corner_wood_left).
+            foreach (string curatedName in CuratedRecipes.Keys)
+                explicitNames.Add(curatedName);
+
+            // Keep these original high-priority names explicit even if their
+            // recipe handling changes in a future release.
             explicitNames.Add("barrell");
             explicitNames.Add("dvergrprops_barrel");
             explicitNames.Add("dvergrprops_crate");
