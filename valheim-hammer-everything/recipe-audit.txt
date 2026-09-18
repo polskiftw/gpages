@@ -332,7 +332,6 @@ stonechest
 stonewall_2
 stonewall_3
 sunken_crypt_gate
-SunkenKit_int_towerwall_LOD
 trader_wagon_destructable
 turf_roof
 turf_roof_top

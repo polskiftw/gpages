@@ -16,7 +16,7 @@ namespace HammerEverythingMod
     {
         public const string PluginGuid = "claire.valheim.hammereverything";
         public const string PluginName = "Hammer Everything";
-        public const string PluginVersion = "1.4.2";
+        public const string PluginVersion = "1.4.3";
 
         private static readonly BindingFlags AnyInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -513,7 +513,6 @@ namespace HammerEverythingMod
                 { "stonewall_2", Recipe(Ingredient("Stone", 8)) },
                 { "stonewall_3", Recipe(Ingredient("Stone", 8)) },
                 { "sunken_crypt_gate", Recipe(Ingredient("Iron", 4)) },
-                { "SunkenKit_int_towerwall_LOD", Recipe(Ingredient("Stone", 16)) },
                 { "trader_wagon_destructable", Recipe(Ingredient("FineWood", 32)) },
                 { "turf_roof", Recipe(Ingredient("Wood", 2)) },
                 { "turf_roof_top", Recipe(Ingredient("Wood", 2)) },
@@ -958,6 +957,7 @@ namespace HammerEverythingMod
                 lower.StartsWith("fx_") ||
                 lower.EndsWith("_old") ||
                 lower.EndsWith("_test") ||
+                lower.EndsWith("_lod") ||
                 lower.Contains("random") ||
                 lower.Contains("projectile") ||
                 lower.Contains("aoe") ||

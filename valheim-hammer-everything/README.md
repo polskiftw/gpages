@@ -25,7 +25,7 @@ Hammer Everything automatically renders a transparent 128×128 thumbnail from ea
 
 ## Crafting costs
 
-Version 1.3 changes the default from free building to survival costs. Version 1.4 completes an exhaustive recipe audit of the current safe hidden-prefab set instead of patching families piecemeal. Version 1.4.1 also audits hidden Piece names: the sole current blank existing Piece, `goblin_bed`, is exposed as **Fuling Bed**, and the runtime now refuses to add any prefab that still cannot obtain a usable display name. Version 1.4.2 fixes Hammer removal for hidden location props that carry `DropOnDestroyed`: the component is kept alive and its drop table is neutralized instead of destroying the callback target. If a hidden vanilla piece already has a non-empty developer-authored `m_resources` array, Hammer Everything leaves it alone. For recipe-less props, the mod carries a reviewed recipe table.
+Version 1.3 changes the default from free building to survival costs. Version 1.4 completes an exhaustive recipe audit of the current safe hidden-prefab set instead of patching families piecemeal. Version 1.4.1 also audits hidden Piece names: the sole current blank existing Piece, `goblin_bed`, is exposed as **Fuling Bed**, and the runtime now refuses to add any prefab that still cannot obtain a usable display name. Version 1.4.2 fixes Hammer removal for hidden location props that carry `DropOnDestroyed`: the component is kept alive and its drop table is neutralized instead of destroying the callback target. Version 1.4.3 excludes render-only `_LOD` prefabs from the build scan; the current `SunkenKit_int_towerwall_LOD` entry was a low-detail scene asset rather than a usable build piece. If a hidden vanilla piece already has a non-empty developer-authored `m_resources` array, Hammer Everything leaves it alone. For recipe-less props, the mod carries a reviewed recipe table.
 
 Current curated recipes include:
 
@@ -54,7 +54,7 @@ Current curated recipes include:
 
 Player-built copies have `DropOnDestroyed` removed after Valheim assigns their creator ID. Natural world copies are untouched, so this prevents building a crate or lantern and then smashing it for location loot.
 
-Version 1.4 checks in `recipe-audit.txt` with all 342 current safe hidden prefab candidates. GitHub Actions parses the source and refuses to publish if any audited prefab lacks an explicit fallback recipe or if the recipe table contains duplicate keys. Real non-empty developer `m_resources` still win at runtime, so the fallback table never overwrites an authentic Iron Gate recipe.
+Version 1.4 checks in `recipe-audit.txt` with all 341 current safe hidden prefab candidates. GitHub Actions parses the source and refuses to publish if any audited prefab lacks an explicit fallback recipe or if the recipe table contains duplicate keys. Real non-empty developer `m_resources` still win at runtime, so the fallback table never overwrites an authentic Iron Gate recipe.
 
 The completed pass adds 249 fallback recipes beyond 1.3.1: 106 are cross-checked against existing vanilla/hidden-piece recipe data, and 143 recipe-less world props are hand-balanced by material, closest vanilla analogue, size, and harvest/drop safety. The runtime warning remains for future Valheim prefabs or manually added `ExtraPrefabNames` that are outside the checked-in audit.
 
