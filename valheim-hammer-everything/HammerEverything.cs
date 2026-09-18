@@ -16,7 +16,7 @@ namespace HammerEverythingMod
     {
         public const string PluginGuid = "claire.valheim.hammereverything";
         public const string PluginName = "Hammer Everything";
-        public const string PluginVersion = "1.2.0";
+        public const string PluginVersion = "1.3.0";
 
         private static readonly BindingFlags AnyInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -120,6 +120,68 @@ namespace HammerEverythingMod
                 { "dvergrprops_lantern", "Dvergr Lantern" }
             };
 
+        private sealed class RecipeIngredient
+        {
+            public readonly string ItemPrefab;
+            public readonly int Amount;
+
+            public RecipeIngredient(string itemPrefab, int amount)
+            {
+                ItemPrefab = itemPrefab;
+                Amount = amount;
+            }
+        }
+
+        private static RecipeIngredient[] Recipe(params RecipeIngredient[] ingredients)
+        {
+            return ingredients;
+        }
+
+        private static RecipeIngredient Ingredient(string itemPrefab, int amount)
+        {
+            return new RecipeIngredient(itemPrefab, amount);
+        }
+
+        // Hand-authored survival recipes for vanilla props which have no usable
+        // developer Piece recipe. Existing non-empty vanilla m_resources arrays
+        // always win over this table.
+        private static readonly Dictionary<string, RecipeIngredient[]> CuratedRecipes =
+            new Dictionary<string, RecipeIngredient[]>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "barrell", Recipe(Ingredient("Wood", 10), Ingredient("BarrelRings", 1)) },
+
+                { "dvergrprops_barrel", Recipe(Ingredient("FineWood", 8), Ingredient("Copper", 2)) },
+                { "dvergrprops_crate", Recipe(Ingredient("FineWood", 6), Ingredient("Copper", 1)) },
+                { "dvergrprops_crate_long", Recipe(Ingredient("FineWood", 10), Ingredient("Copper", 2)) },
+                { "dvergrprops_crate_ashlands", Recipe(Ingredient("Blackwood", 6), Ingredient("FlametalNew", 1)) },
+
+                { "dvergrprops_bed", Recipe(Ingredient("Wood", 8), Ingredient("Copper", 2)) },
+                { "dvergrprops_chair", Recipe(Ingredient("Wood", 4), Ingredient("Copper", 1)) },
+                { "dvergrprops_stool", Recipe(Ingredient("Wood", 4), Ingredient("Copper", 1)) },
+                { "dvergrprops_table", Recipe(Ingredient("Wood", 6), Ingredient("Copper", 2)) },
+                { "dvergrprops_shelf", Recipe(Ingredient("Wood", 4), Ingredient("Copper", 1)) },
+
+                { "dvergrprops_banner", Recipe(Ingredient("JuteBlue", 4), Ingredient("FineWood", 1)) },
+                { "dvergrprops_curtain", Recipe(Ingredient("JuteBlue", 4), Ingredient("FineWood", 1)) },
+                { "dvergrprops_hooknchain", Recipe(Ingredient("Copper", 2), Ingredient("Chain", 1)) },
+
+                { "dvergrprops_lantern", Recipe(Ingredient("Lantern", 1)) },
+                { "dvergrprops_lantern_standing", Recipe(Ingredient("Lantern", 1), Ingredient("Copper", 2)) },
+
+                { "dvergrprops_pickaxe", Recipe(Ingredient("YggdrasilWood", 1), Ingredient("Iron", 2)) },
+                { "dvergrprops_wood_beam", Recipe(Ingredient("YggdrasilWood", 4)) },
+                { "dvergrprops_wood_pole", Recipe(Ingredient("YggdrasilWood", 4), Ingredient("Copper", 2)) },
+                { "dvergrprops_wood_stake", Recipe(Ingredient("YggdrasilWood", 2), Ingredient("Iron", 1)) },
+                { "dvergrprops_wood_stakewall", Recipe(Ingredient("YggdrasilWood", 8), Ingredient("Iron", 4)) },
+                { "dvergrprops_wood_wall", Recipe(Ingredient("YggdrasilWood", 20), Ingredient("Copper", 10)) },
+
+                // These already carry Piece components in current Valheim. The
+                // entries below are only fallbacks if a future game build leaves
+                // the component present but strips its serialized recipe.
+                { "dvergrprops_wood_floor", Recipe(Ingredient("Wood", 2)) },
+                { "dvergrprops_wood_stair", Recipe(Ingredient("Wood", 2)) }
+            };
+
         private readonly Stopwatch _pollTimer = Stopwatch.StartNew();
         private readonly Stopwatch _removalTimer = Stopwatch.StartNew();
 
@@ -129,6 +191,8 @@ namespace HammerEverythingMod
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, object> _managedPrefabObjects =
             new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _unpricedPrefabNames =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         private const int IconLayer = 31;
         private const int IconSize = 128;
@@ -166,7 +230,7 @@ namespace HammerEverythingMod
         private ConfigEntry<bool> _enabled;
         private ConfigEntry<bool> _automaticPropScan;
         private ConfigEntry<bool> _includeStructures;
-        private ConfigEntry<bool> _alwaysAvailable;
+        private ConfigEntry<bool> _useCraftingCosts;
         private ConfigEntry<bool> _allowDungeonPlacement;
         private ConfigEntry<bool> _allowOverlap;
         private ConfigEntry<string> _extraPrefabNames;
@@ -182,6 +246,7 @@ namespace HammerEverythingMod
         private Type _resourcesType;
         private Type _pieceTableType;
         private Type _byUsagePieceListType;
+        private Type _dropOnDestroyedType;
 
         private Type _unityObjectType;
         private Type _gameObjectType;
@@ -235,11 +300,11 @@ namespace HammerEverythingMod
                 true,
                 "Also include safe hidden wall, floor, roof, door, gate, beam, stair, and similar vanilla prefabs.");
 
-            _alwaysAvailable = Config.Bind(
+            _useCraftingCosts = Config.Bind(
                 "General",
-                "AlwaysAvailable",
+                "UseCraftingCosts",
                 true,
-                "Hidden pieces added by this mod have no material or crafting-station requirement.");
+                "Use curated survival crafting costs for recipe-less hidden props while preserving developer-authored vanilla recipes. Disable for free building. The old AlwaysAvailable setting from pre-1.3 configs is intentionally ignored.");
 
             _allowDungeonPlacement = Config.Bind(
                 "Placement",
@@ -274,7 +339,7 @@ namespace HammerEverythingMod
             _enabled.SettingChanged += OnConfigChanged;
             _automaticPropScan.SettingChanged += OnConfigChanged;
             _includeStructures.SettingChanged += OnConfigChanged;
-            _alwaysAvailable.SettingChanged += OnConfigChanged;
+            _useCraftingCosts.SettingChanged += OnConfigChanged;
             _allowDungeonPlacement.SettingChanged += OnConfigChanged;
             _allowOverlap.SettingChanged += OnConfigChanged;
             _extraPrefabNames.SettingChanged += OnConfigChanged;
@@ -391,6 +456,7 @@ namespace HammerEverythingMod
             }
 
             int added = 0;
+            _unpricedPrefabNames.Clear();
             HashSet<string> blocked = ParseNameSet(_blockedPrefabNames.Value);
             HashSet<string> explicitNames = ParseNameSet(_extraPrefabNames.Value);
 
@@ -430,6 +496,13 @@ namespace HammerEverythingMod
             Logger.LogInfo(
                 $"Hammer Everything registered {added} hidden vanilla prefab(s). " +
                 $"Hammer now has {hammerPieces.Count} piece entries.");
+
+            if (_useCraftingCosts.Value && _unpricedPrefabNames.Count > 0)
+            {
+                Logger.LogWarning(
+                    $"{_unpricedPrefabNames.Count} added prefab(s) had neither a developer recipe nor a curated 1.3 recipe. " +
+                    "Their original resource state was left untouched rather than inventing a generic cost.");
+            }
         }
 
         private bool TryAddPrefab(
@@ -611,7 +684,11 @@ namespace HammerEverythingMod
 
             QueueUniqueIcon(prefabName, prefab, piece);
 
-            if (_alwaysAvailable.Value)
+            if (_useCraftingCosts.Value)
+            {
+                ConfigureCraftingRecipe(prefabName, piece);
+            }
+            else
             {
                 ClearArrayField(piece, "m_resources");
                 SetFieldIfExists(piece, "m_craftingStation", null);
@@ -621,6 +698,124 @@ namespace HammerEverythingMod
         }
 
 
+
+
+        private void ConfigureCraftingRecipe(string prefabName, object piece)
+        {
+            if (piece == null)
+                return;
+
+            if (HasNonEmptyArrayField(piece, "m_resources"))
+            {
+                if (_verboseLogging != null && _verboseLogging.Value)
+                    Logger.LogInfo($"Preserved developer recipe: {prefabName}");
+                return;
+            }
+
+            if (!CuratedRecipes.TryGetValue(prefabName, out RecipeIngredient[] recipe))
+            {
+                _unpricedPrefabNames.Add(prefabName);
+                return;
+            }
+
+            if (!TrySetPieceRecipe(piece, recipe))
+            {
+                _unpricedPrefabNames.Add(prefabName);
+                return;
+            }
+
+            if (_verboseLogging != null && _verboseLogging.Value)
+                Logger.LogInfo($"Applied curated recipe: {prefabName} = {FormatRecipe(recipe)}");
+        }
+
+        private bool TrySetPieceRecipe(object piece, RecipeIngredient[] ingredients)
+        {
+            if (piece == null || ingredients == null || ingredients.Length == 0)
+                return false;
+
+            FieldInfo resourcesField = piece.GetType().GetField("m_resources", AnyInstance);
+            if (resourcesField == null || !resourcesField.FieldType.IsArray)
+                return false;
+
+            Type requirementType = resourcesField.FieldType.GetElementType();
+            if (requirementType == null)
+                return false;
+
+            object[] itemDrops = new object[ingredients.Length];
+
+            for (int i = 0; i < ingredients.Length; i++)
+            {
+                itemDrops[i] = TryGetItemDrop(ingredients[i].ItemPrefab);
+                if (itemDrops[i] == null)
+                {
+                    Logger.LogWarning(
+                        $"Could not apply recipe because item prefab '{ingredients[i].ItemPrefab}' was not found.");
+                    return false;
+                }
+            }
+
+            Array requirements = Array.CreateInstance(requirementType, ingredients.Length);
+
+            for (int i = 0; i < ingredients.Length; i++)
+            {
+                object requirement = Activator.CreateInstance(requirementType);
+                if (requirement == null)
+                    return false;
+
+                SetFieldIfExists(requirement, "m_resItem", itemDrops[i]);
+                SetFieldIfExists(requirement, "m_amount", ingredients[i].Amount);
+                SetFieldIfExists(requirement, "m_recover", true);
+                requirements.SetValue(requirement, i);
+            }
+
+            resourcesField.SetValue(piece, requirements);
+            return true;
+        }
+
+        private object TryGetItemDrop(string itemPrefabName)
+        {
+            if (string.IsNullOrWhiteSpace(itemPrefabName) ||
+                _objectDbType == null ||
+                _itemDropType == null)
+            {
+                return null;
+            }
+
+            object objectDb = GetStaticSingleton(_objectDbType, "instance");
+            if (objectDb == null)
+                return null;
+
+            MethodInfo getItemPrefab = _objectDbType.GetMethod(
+                "GetItemPrefab",
+                AnyInstance,
+                binder: null,
+                types: new[] { typeof(string) },
+                modifiers: null);
+
+            object itemPrefab = getItemPrefab?.Invoke(objectDb, new object[] { itemPrefabName });
+            return itemPrefab == null ? null : GetComponent(itemPrefab, _itemDropType);
+        }
+
+        private static bool HasNonEmptyArrayField(object instance, string fieldName)
+        {
+            if (instance == null)
+                return false;
+
+            FieldInfo field = instance.GetType().GetField(fieldName, AnyInstance);
+            return field?.GetValue(instance) is Array values && values.Length > 0;
+        }
+
+        private static string FormatRecipe(RecipeIngredient[] recipe)
+        {
+            if (recipe == null || recipe.Length == 0)
+                return "(none)";
+
+            string[] parts = new string[recipe.Length];
+            for (int i = 0; i < recipe.Length; i++)
+                parts[i] = $"{recipe[i].Amount}x {recipe[i].ItemPrefab}";
+
+            return string.Join(", ", parts);
+        }
 
         private void EnsureCategoryPatches()
         {
@@ -1796,7 +1991,7 @@ namespace HammerEverythingMod
 
         private void UpdateRemovalStateForPlacedProps()
         {
-            if (_pieceAddedByUs.Count == 0 || _pieceType == null)
+            if (_managedPrefabNames.Count == 0 || _pieceType == null)
                 return;
 
             ResolveTypes();
@@ -1826,13 +2021,17 @@ namespace HammerEverythingMod
                     object gameObject = GetPropertyValue(piece, "gameObject");
                     string name = NormalizeInstanceName(GetUnityName(gameObject));
 
-                    if (!_pieceAddedByUs.Contains(name))
+                    if (!_managedPrefabNames.Contains(name))
                         continue;
 
-                    if (_managedPrefabObjects.TryGetValue(name, out object prefab) &&
-                        ReferenceEquals(prefab, gameObject))
+                    bool isPrefab =
+                        _managedPrefabObjects.TryGetValue(name, out object prefab) &&
+                        ReferenceEquals(prefab, gameObject);
+
+                    if (isPrefab)
                     {
-                        SetFieldIfExists(piece, "m_canBeRemoved", false);
+                        if (_pieceAddedByUs.Contains(name))
+                            SetFieldIfExists(piece, "m_canBeRemoved", false);
                         continue;
                     }
 
@@ -1848,7 +2047,17 @@ namespace HammerEverythingMod
 
                     object creatorValue = getCreator.Invoke(piece, null);
                     long creator = creatorValue == null ? 0L : Convert.ToInt64(creatorValue, CultureInfo.InvariantCulture);
-                    SetFieldIfExists(piece, "m_canBeRemoved", creator != 0L);
+                    bool playerBuilt = creator != 0L;
+
+                    if (_pieceAddedByUs.Contains(name))
+                        SetFieldIfExists(piece, "m_canBeRemoved", playerBuilt);
+
+                    // Location props frequently carry DropOnDestroyed loot (Soft
+                    // Tissue, Extractors, Surtling Cores, etc.). Removing that
+                    // component only from player-built clones prevents material/
+                    // loot duplication while leaving natural world props intact.
+                    if (playerBuilt)
+                        RemoveDropOnDestroyedComponents(gameObject);
                 }
             }
             catch (Exception ex)
@@ -1856,6 +2065,44 @@ namespace HammerEverythingMod
                 if (_verboseLogging != null && _verboseLogging.Value)
                     Logger.LogDebug($"Placed-prop removal scan skipped: {ex.GetType().Name}: {ex.Message}");
             }
+        }
+
+
+        private void RemoveDropOnDestroyedComponents(object gameObject)
+        {
+            if (gameObject == null || _dropOnDestroyedType == null)
+                return;
+
+            try
+            {
+                object rawComponents = InvokeInstanceWithOptionalTail(
+                    gameObject,
+                    "GetComponentsInChildren",
+                    _dropOnDestroyedType,
+                    true);
+
+                if (!(rawComponents is IEnumerable components))
+                    return;
+
+                foreach (object component in components)
+                {
+                    if (component != null)
+                        DestroyUnityObject(component);
+                }
+            }
+            catch (Exception ex)
+            {
+                if (_verboseLogging != null && _verboseLogging.Value)
+                    Logger.LogDebug($"Player-built loot cleanup skipped: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        private void DestroyUnityObject(object unityObject)
+        {
+            if (unityObject == null || _unityObjectType == null)
+                return;
+
+            InvokeStaticWithOptionalTail(_unityObjectType, "Destroy", unityObject);
         }
 
         private void ResolveTypes()
@@ -1878,6 +2125,8 @@ namespace HammerEverythingMod
                 _pieceTableType = FindLoadedType("PieceTable");
             if (_byUsagePieceListType == null)
                 _byUsagePieceListType = FindLoadedType("ByUsagePieceList");
+            if (_dropOnDestroyedType == null)
+                _dropOnDestroyedType = FindLoadedType("DropOnDestroyed");
 
             if (_unityObjectType == null)
                 _unityObjectType = FindLoadedType("UnityEngine.Object");
