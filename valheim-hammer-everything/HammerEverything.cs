@@ -16,7 +16,7 @@ namespace HammerEverythingMod
     {
         public const string PluginGuid = "claire.valheim.hammereverything";
         public const string PluginName = "Hammer Everything";
-        public const string PluginVersion = "1.4.7";
+        public const string PluginVersion = "1.4.8";
 
         private static readonly BindingFlags AnyInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -2538,10 +2538,10 @@ namespace HammerEverythingMod
                 return;
             }
 
-            if (!_managedPrefabObjects.TryGetValue(name, out object prefab) || prefab == null)
-                prefab = ghost;
-
-            float lift = GetGroundAlignmentLift(prefab, name);
+            // Measure the active ghost, not the inactive prefab stored inside
+            // ZNetScene. Renderer.bounds is reliable here because Valheim has
+            // already instantiated and positioned the preview object.
+            float lift = GetGroundAlignmentLift(ghost, name);
             if (lift <= 0.001f)
                 return;
 
@@ -2615,7 +2615,12 @@ namespace HammerEverythingMod
                     Logger.LogDebug($"Placement lift measurement skipped for {prefabName}: {ex.GetType().Name}: {ex.Message}");
             }
 
-            _placementLiftByPrefab[prefabName] = lift;
+            // Do not cache a failed/zero measurement. Placement ghosts can finish
+            // activating their renderer hierarchy a frame later, so retry until
+            // a real geometric offset is available.
+            if (lift > 0.001f)
+                _placementLiftByPrefab[prefabName] = lift;
+
             return lift;
         }
 
