@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'valheim-ward-hit-sound/**'
+      - 'valheim-hammer-everything/**'
       - '.github/workflows/build-valheim.yml'
   workflow_dispatch:
 
@@ -13,7 +14,7 @@ permissions:
   contents: write
 
 jobs:
-  ward-hit-sound:
+  build-and-publish:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,10 +23,15 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $project = Join-Path $env:GITHUB_WORKSPACE 'valheim-ward-hit-sound'
-          $lib = Join-Path $project 'lib'
+          $projects = @(
+            (Join-Path $env:GITHUB_WORKSPACE 'valheim-ward-hit-sound'),
+            (Join-Path $env:GITHUB_WORKSPACE 'valheim-hammer-everything')
+          )
           $stubDir = Join-Path $env:RUNNER_TEMP 'unity-stub'
-          New-Item -ItemType Directory -Force -Path $lib | Out-Null
+
+          foreach ($project in $projects) {
+            New-Item -ItemType Directory -Force -Path (Join-Path $project 'lib') | Out-Null
+          }
           New-Item -ItemType Directory -Force -Path $stubDir | Out-Null
 
           $url = 'https://thunderstore.io/package/download/denikson/BepInExPack_Valheim/5.4.2350/'
@@ -34,7 +40,6 @@ jobs:
 
           $bep = Get-ChildItem -Path "$env:RUNNER_TEMP\bepinex" -Recurse -File -Filter 'BepInEx.dll' | Select-Object -First 1
           if (-not $bep) { throw 'Could not find BepInEx.dll in BepInEx pack' }
-          Copy-Item $bep.FullName (Join-Path $lib 'BepInEx.dll')
 
           @'
           <Project Sdk="Microsoft.NET.Sdk">
@@ -59,42 +64,50 @@ jobs:
           '@ | Set-Content -Path (Join-Path $stubDir 'UnityEngineStub.cs') -Encoding UTF8
 
           dotnet build (Join-Path $stubDir 'UnityEngineStub.csproj') -c Release
-          Copy-Item (Join-Path $stubDir 'bin\Release\net472\UnityEngine.dll') (Join-Path $lib 'UnityEngine.dll')
+          $unity = Join-Path $stubDir 'bin\Release\net472\UnityEngine.dll'
+
+          foreach ($project in $projects) {
+            $lib = Join-Path $project 'lib'
+            Copy-Item $bep.FullName (Join-Path $lib 'BepInEx.dll')
+            Copy-Item $unity (Join-Path $lib 'UnityEngine.dll')
+          }
 
       - name: Build Ward Hit Sound Toggle
         shell: pwsh
         run: dotnet build .\valheim-ward-hit-sound\WardHitSoundToggle.csproj -c Release
 
-      - name: Verify DLL
+      - name: Build Hammer Everything
+        shell: pwsh
+        run: dotnet build .\valheim-hammer-everything\HammerEverything.csproj -c Release
+
+      - name: Verify DLLs
         shell: pwsh
         run: |
-          $dll = '.\valheim-ward-hit-sound\bin\Release\net472\WardHitSoundToggle.dll'
-          if (-not (Test-Path $dll)) { throw "Build output missing: $dll" }
-          Get-FileHash $dll -Algorithm SHA256
+          $dlls = @(
+            '.\valheim-ward-hit-sound\bin\Release\net472\WardHitSoundToggle.dll',
+            '.\valheim-hammer-everything\bin\Release\net472\HammerEverything.dll'
+          )
+          foreach ($dll in $dlls) {
+            if (-not (Test-Path $dll)) { throw "Build output missing: $dll" }
+            Get-FileHash $dll -Algorithm SHA256
+          }
 
-      - name: Publish DLL to gpages
+      - name: Publish DLLs to gpages
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $source = '.\valheim-ward-hit-sound\bin\Release\net472\WardHitSoundToggle.dll'
-          $dest = '.\valheim\ward-hit-sound\WardHitSoundToggle.dll'
-          $page = '.\valheim\ward-hit-sound\index.html'
-          Copy-Item -Force $source $dest
-
-          $html = Get-Content -Raw $page
-          $html = $html.Replace('https://nightly.link/polskiftw/gpages/workflows/validate-static-js/main/WardHitSoundToggle.zip', 'WardHitSoundToggle.dll')
-          $html = $html.Replace('No GitHub account required. The ZIP contains <code>WardHitSoundToggle.dll</code>.', 'Direct download from this GPages site. No account required.')
-          $html = $html.Replace('<li>Extract <code>WardHitSoundToggle.dll</code>.</li>', '<li>Download <code>WardHitSoundToggle.dll</code>.</li>')
-          Set-Content -Path $page -Value $html -NoNewline
+          Copy-Item -Force '.\valheim-ward-hit-sound\bin\Release\net472\WardHitSoundToggle.dll' '.\valheim\ward-hit-sound\WardHitSoundToggle.dll'
+          Copy-Item -Force '.\valheim-hammer-everything\bin\Release\net472\HammerEverything.dll' '.\valheim\hammer-everything\HammerEverything.dll'
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- "valheim/ward-hit-sound/WardHitSoundToggle.dll" "valheim/ward-hit-sound/index.html"
+          git add -- "valheim/ward-hit-sound/WardHitSoundToggle.dll" "valheim/hammer-everything/HammerEverything.dll"
+
           git diff --cached --quiet
           if ($LASTEXITCODE -eq 0) {
-            Write-Host 'Published DLL and page are already current.'
+            Write-Host 'Published DLLs are already current.'
             exit 0
           }
 
-          git commit -m "Publish WardHitSoundToggle.dll"
+          git commit -m "Publish Valheim mod DLLs"
           git push
