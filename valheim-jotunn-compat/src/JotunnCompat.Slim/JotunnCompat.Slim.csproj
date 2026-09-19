@@ -10,9 +10,38 @@
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <Deterministic>true</Deterministic>
     <DebugType>portable</DebugType>
+    <SlimLibDir>$(MSBuildThisFileDirectory)..\..\lib</SlimLibDir>
   </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
-    <PackageReference Include="CoffeeNova.Valheim.ManagedReferences" Version="1.2214.6" PrivateAssets="all" />
+    <PackageReference
+      Include="CoffeeNova.Valheim.ManagedReferences"
+      Version="1.2214.6"
+      PrivateAssets="all"
+      Condition="'$(ValheimManaged)' == ''" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ValheimManaged)' != ''">
+    <Reference Include="BepInEx">
+      <HintPath>$(SlimLibDir)\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(SlimLibDir)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <_ValheimManagedReference Include="$(ValheimManaged)\Assembly-CSharp.dll" />
+    <_ValheimManagedReference Include="$(ValheimManaged)\assembly_valheim.dll"
+                              Condition="Exists('$(ValheimManaged)\assembly_valheim.dll')" />
+    <_ValheimManagedReference Include="$(ValheimManaged)\assembly_utils.dll"
+                              Condition="Exists('$(ValheimManaged)\assembly_utils.dll')" />
+    <_ValheimManagedReference Include="$(ValheimManaged)\SoftReferenceableAssets.dll" />
+    <_ValheimManagedReference Include="$(ValheimManaged)\UnityEngine*.dll" />
+
+    <Reference Include="@(_ValheimManagedReference)">
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 </Project>
