@@ -15,15 +15,15 @@ namespace JotunnCompat.FastPath
     /// recursion at depth five because cyclic graphs can otherwise recurse forever.
     /// A single graph can still reach the same object repeatedly through different paths.
     ///
-    /// This layer remembers object identities for one top-level FixReferences traversal.
-    /// Re-visiting an already-completely-processed object cannot discover any new fields,
-    /// so skipping the duplicate walk preserves the resulting references while avoiding
-    /// repeated reflection and cycle churn.
+    /// This layer remembers the shallowest depth at which each object was processed during
+    /// one top-level FixReferences traversal. Re-visiting an object at an equal or deeper
+    /// depth cannot expose anything the earlier walk could not already reach, so that duplicate
+    /// work can be skipped without changing Jotunn's depth-limited behavior.
     /// </summary>
     internal static class ReferenceFastPath
     {
         [ThreadStatic]
-        private static HashSet<object> visitedObjects;
+        private static Dictionary<object, int> bestVisitedDepth;
 
         [ThreadStatic]
         private static Dictionary<MockLookupKey, Object> resolvedMocks;
@@ -79,9 +79,9 @@ namespace JotunnCompat.FastPath
         {
             __state = depth == 0;
 
-            if (__state || visitedObjects == null)
+            if (__state || bestVisitedDepth == null)
             {
-                visitedObjects = new HashSet<object>(ReferenceComparer.Instance);
+                bestVisitedDepth = new Dictionary<object, int>(ReferenceComparer.Instance);
                 resolvedMocks = new Dictionary<MockLookupKey, Object>(MockLookupComparer.Instance);
             }
 
@@ -90,9 +90,25 @@ namespace JotunnCompat.FastPath
                 return false;
             }
 
-            // The first visit performs Jotunn's original implementation.
-            // Later visits to the identical object in this traversal are redundant.
-            return visitedObjects.Add(objectToFix);
+            // Upstream does no work at depth 5. Do not mark an object as processed at
+            // that depth, because the same object may later be reached by a shorter path.
+            if (depth >= 5)
+            {
+                return true;
+            }
+
+            // Jotunn's depth limit makes a simple "seen" set subtly incorrect: an object
+            // first reached at depth 4 has less traversal budget than the same object later
+            // reached at depth 2. Skip only if we already processed it at an equal or lower
+            // depth (which means equal or greater remaining traversal reach).
+            if (bestVisitedDepth.TryGetValue(objectToFix, out var previousDepth) &&
+                previousDepth <= depth)
+            {
+                return false;
+            }
+
+            bestVisitedDepth[objectToFix] = depth;
+            return true;
         }
 
         private static void FixReferencesPostfix(bool __state)
@@ -103,7 +119,7 @@ namespace JotunnCompat.FastPath
             }
 
             // Do not retain arbitrary mod object graphs after one top-level traversal.
-            visitedObjects = null;
+            bestVisitedDepth = null;
             resolvedMocks = null;
         }
 
