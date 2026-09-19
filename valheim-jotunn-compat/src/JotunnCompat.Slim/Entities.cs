@@ -353,6 +353,98 @@ namespace Jotunn.Entities
             AddWordMethod.Invoke(Localization.instance, new object[] { key, value });
         }
 
+        internal void AddToken(string token, string value, bool force)
+        {
+            if (string.IsNullOrEmpty(token))
+            {
+                return;
+            }
+
+            var key = token.TrimStart('(string language, string fileContent)
+        {
+            if (string.IsNullOrEmpty(language) || string.IsNullOrEmpty(fileContent)) return;
+            Dictionary<string, string> parsed;
+            try
+            {
+                parsed = new YamlDotNet.Serialization.DeserializerBuilder().Build()
+                    .Deserialize<Dictionary<string, string>>(fileContent);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("Could not parse localization YAML: " + ex.Message);
+                return;
+            }
+            if (parsed == null) return;
+            if (!map.TryGetValue(language, out var lang))
+                map[language] = lang = new Dictionary<string, string>();
+            foreach (var kv in parsed)
+            {
+                var key = kv.Key.TrimStart('$');
+                lang[key] = kv.Value;
+                AddWord(key, kv.Value);
+            }
+        }
+
+        internal void ApplyCurrent()
+        {
+            if (Localization.instance == null) return;
+            var language = Localization.instance.GetSelectedLanguage();
+            if (!map.TryGetValue(language, out var words) && !map.TryGetValue("English", out words)) return;
+            foreach (var kv in words) AddWord(kv.Key, kv.Value);
+        }
+    }
+
+    public class CustomRPC
+    {
+        private const byte JotunnPackage = 1;
+        internal readonly string ID;
+        internal readonly NetworkManager.CoroutineHandler ServerReceive;
+        internal readonly NetworkManager.CoroutineHandler ClientReceive;
+
+        internal CustomRPC(string id, NetworkManager.CoroutineHandler server, NetworkManager.CoroutineHandler client)
+        {
+            ID = id;
+            ServerReceive = server;
+            ClientReceive = client;
+        }
+
+        public void SendPackage(long target, ZPackage package)
+        {
+            if (ZRoutedRpc.instance == null || package == null) return;
+            var wrapped = new ZPackage();
+            wrapped.Write(JotunnPackage);
+            wrapped.Write(package.GetArray());
+            wrapped.SetPos(0);
+            ZRoutedRpc.instance.InvokeRoutedRPC(target, ID, wrapped);
+        }
+
+        internal void Receive(long sender, ZPackage package)
+        {
+            if (package == null || package.Size() <= 0 || ZNet.instance == null) return;
+
+            var flags = package.ReadByte();
+            if ((flags & JotunnPackage) != JotunnPackage) return;
+
+            var payload = new ZPackage(package.ReadByteArray());
+            var handler = ZNet.instance.IsServer() ? ServerReceive : ClientReceive;
+            if (handler != null) ZNet.instance.StartCoroutine(handler(sender, payload));
+        }
+    }
+}
+);
+            if (!map.TryGetValue("English", out var lang))
+            {
+                map["English"] = lang = new Dictionary<string, string>();
+            }
+
+            if (force || !lang.ContainsKey(key))
+            {
+                lang[key] = value ?? string.Empty;
+            }
+
+            AddWord(key, lang[key]);
+        }
+
         public void AddYamlFile(string language, string fileContent)
         {
             if (string.IsNullOrEmpty(language) || string.IsNullOrEmpty(fileContent)) return;
