@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using HarmonyLib;
 using Jotunn.Entities;
 using Jotunn.Utils;
@@ -621,6 +622,150 @@ namespace Jotunn.Managers
         [HarmonyPatch(typeof(Localization), nameof(Localization.SetupLanguage))]
         [HarmonyPostfix]
         private static void LocalizationSetup() => LocalizationManager.Instance.Apply();
+
+        [HarmonyPatch(typeof(PieceTable), nameof(PieceTable.UpdateAvailable))]
+        [HarmonyPrefix]
+        private static void PieceTableUpdateAvailablePrefix(
+            PieceTable __instance)
+        {
+            PieceManager.Instance.ExpandAvailablePieces(__instance);
+        }
+
+        [HarmonyPatch(typeof(PieceTable), nameof(PieceTable.UpdateAvailable))]
+        [HarmonyPostfix]
+        private static void PieceTableUpdateAvailablePostfix(
+            PieceTable __instance)
+        {
+            PieceManager.Instance.AdjustPieceTable(__instance);
+        }
+
+        [HarmonyPatch(typeof(PieceTable), nameof(PieceTable.UpdateAvailable))]
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction>
+            PieceTableUpdateAvailableTranspiler(
+                IEnumerable<CodeInstruction> instructions)
+        {
+            var vanillaMax = (int)Piece.PieceCategory.Max;
+            var replacement = AccessTools.Method(
+                typeof(PieceManager),
+                nameof(PieceManager.MaxCategory));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.opcode == OpCodes.Call &&
+                    instruction.operand is MethodInfo method &&
+                    method.Name.Contains("MaxCategory"))
+                {
+                    yield return new CodeInstruction(
+                        OpCodes.Call,
+                        replacement);
+                }
+                else if (instruction.LoadsConstant(vanillaMax))
+                {
+                    yield return new CodeInstruction(
+                        OpCodes.Call,
+                        replacement);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+
+        [HarmonyPatch(typeof(Enum), nameof(Enum.GetValues))]
+        [HarmonyPostfix]
+        private static void EnumGetValuesPostfix(
+            Type enumType,
+            ref Array __result)
+        {
+            PieceManager.Instance.EnumGetValuesPatch(
+                enumType,
+                ref __result);
+        }
+
+        [HarmonyPatch(typeof(Enum), nameof(Enum.GetNames))]
+        [HarmonyPostfix]
+        private static void EnumGetNamesPostfix(
+            Type enumType,
+            ref string[] __result)
+        {
+            PieceManager.Instance.EnumGetNamesPatch(
+                enumType,
+                ref __result);
+        }
+
+        [HarmonyPatch(
+            typeof(ByUsagePieceList),
+            nameof(ByUsagePieceList.UpdateAvailableTags))]
+        [HarmonyPostfix]
+        private static void UpdateAvailableTagsPostfix(
+            ByUsagePieceList __instance,
+            PieceTable pieceTable)
+        {
+            PieceManager.Instance.UpdateCustomAvailableTags(
+                __instance,
+                pieceTable);
+        }
+
+        [HarmonyPatch(
+            typeof(ByUsagePieceList),
+            nameof(ByUsagePieceList.GetTagDisplayName))]
+        [HarmonyPrefix]
+        private static bool GetTagDisplayNamePrefix(
+            ByUsagePieceList __instance,
+            int index,
+            ref string __result)
+        {
+            if (!PieceManager.Instance.TryGetCustomCategoryDisplayName(
+                    __instance,
+                    index,
+                    out var custom))
+            {
+                return true;
+            }
+
+            __result = custom;
+            return false;
+        }
+
+        [HarmonyPatch(
+            typeof(ByUsagePieceList),
+            nameof(ByUsagePieceList.GetAvailablePiecesWithTag))]
+        [HarmonyPostfix]
+        private static void GetAvailablePiecesWithTagPostfix(
+            ByUsagePieceList __instance,
+            int tagId,
+            PieceTable pieceTable,
+            IList<Piece> resultOut)
+        {
+            PieceManager.Instance.AddPiecesForCustomCategory(
+                __instance,
+                tagId,
+                pieceTable,
+                resultOut);
+        }
+
+        [HarmonyPatch(
+            typeof(ByUsagePieceList),
+            nameof(ByUsagePieceList.GetTagById))]
+        [HarmonyPrefix]
+        private static bool GetTagByIdPrefix(
+            ByUsagePieceList __instance,
+            int id,
+            ref Piece.UsageTagFlags __result)
+        {
+            if (!PieceManager.Instance.TryGetUsageTag(
+                    __instance,
+                    id,
+                    out var custom))
+            {
+                return true;
+            }
+
+            __result = custom;
+            return false;
+        }
 
         internal static void MinimapDataLoaded() =>
             MinimapManager.InvokeVanillaMapDataLoaded();
