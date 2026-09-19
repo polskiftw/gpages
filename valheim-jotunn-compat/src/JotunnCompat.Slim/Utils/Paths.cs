@@ -1,0 +1,37 @@
+﻿using System.IO;
+
+namespace Jotunn.Utils
+{
+    /// <summary>
+    ///     Various Path constants used in Jötunn
+    /// </summary>
+    public static class Paths
+    {
+        /// <summary>
+        ///     Path to the game's save path
+        /// </summary>
+        public static string JotunnFolder
+        {
+            get
+            {
+                var saveDataPath = global::Utils.GetSaveDataPath(FileHelpers.FileSource.Local);
+                return Path.Combine(saveDataPath, Main.ModName);
+            }
+        }
+
+        /// <summary>
+        ///     Path to the custom item folder
+        /// </summary>
+        public static string CustomItemDataFolder => Path.Combine(JotunnFolder, "CustomItemData");
+
+        /// <summary>
+        ///     Path to the global translation folder
+        /// </summary>
+        public static string LanguageTranslationsFolder => BepInEx.Paths.PluginPath;
+
+        /// <summary>
+        ///     Path to cached icons. See <see cref="Managers.RenderManager"/>
+        /// </summary>
+        public static string IconCachePath => Path.Combine(JotunnFolder, "CachedIcons");
+    }
+}
