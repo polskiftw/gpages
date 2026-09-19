@@ -126,6 +126,18 @@ Console.WriteLine(
 Console.WriteLine(
     $"Referenced Jotunn members: {jotunnMembers.Length}");
 
+Console.WriteLine("Referenced Jotunn type surface:");
+foreach (var type in jotunnTypes)
+{
+    Console.WriteLine("  TYPE " + type.FullName);
+}
+
+Console.WriteLine("Referenced Jotunn member surface:");
+foreach (var member in jotunnMembers)
+{
+    Console.WriteLine("  MEMBER " + MemberKey(member));
+}
+
 if (failures.Count != 0)
 {
     Console.Error.WriteLine(
