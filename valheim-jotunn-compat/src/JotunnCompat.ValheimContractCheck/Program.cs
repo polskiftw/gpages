@@ -46,6 +46,9 @@ try
     RequireMethod(modules, "ZNetScene", "Awake");
 
     RequireField(modules, "ObjectDB", "m_itemByHash", isStatic: false);
+    RequireField(modules, "ObjectDB", "m_terrainOps", isStatic: false);
+    RequireField(modules, "ObjectDB", "m_terrainOpsByHash", isStatic: false);
+    RequireMethod(modules, "ObjectDB", "GetPrefabHash", "UnityEngine.GameObject");
     RequireMethod(modules, "ObjectDB", "Awake");
     RequireMethod(modules, "ObjectDB", "CopyOtherDB", "ObjectDB");
 
@@ -113,7 +116,7 @@ try
 
     Console.WriteLine("Valheim runtime contract check passed.");
     Console.WriteLine($"  Managed assemblies scanned: {modules.Count}");
-    Console.WriteLine("  Reflection/Harmony targets checked: 32");
+    Console.WriteLine("  Reflection/Harmony targets checked: 35");
     return 0;
 }
 finally
