@@ -39,6 +39,12 @@ namespace Jotunn.Managers
             AssetManager.Instance.AddAsset(customPrefab.Prefab);
         }
 
+        public void AddPrefab(GameObject prefab)
+        {
+            if (!prefab) return;
+            AddPrefab(new CustomPrefab(prefab, false));
+        }
+
         public GameObject GetPrefab(string name)
         {
             if (string.IsNullOrEmpty(name)) return null;
@@ -49,9 +55,34 @@ namespace Jotunn.Managers
             return Cache.GetPrefab<GameObject>(name);
         }
 
+        public GameObject CreateEmptyPrefab(string name, bool addZNetView = true)
+        {
+            if (string.IsNullOrEmpty(name) || GetPrefab(name))
+            {
+                return null;
+            }
+
+            var prefab = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            prefab.name = name;
+            prefab.transform.SetParent(PrefabContainer.transform, false);
+
+            if (addZNetView)
+            {
+                var view = prefab.GetComponent<ZNetView>() ?? prefab.AddComponent<ZNetView>();
+                view.m_persistent = true;
+            }
+
+            AssetManager.Instance.AddAsset(prefab);
+            return prefab;
+        }
+
         public GameObject CreateClonedPrefab(string name, string baseName)
         {
-            var source = GetPrefab(baseName);
+            return CreateClonedPrefab(name, GetPrefab(baseName));
+        }
+
+        public GameObject CreateClonedPrefab(string name, GameObject source)
+        {
             if (!source || string.IsNullOrEmpty(name) || GetPrefab(name)) return null;
             var clone = Object.Instantiate(source, PrefabContainer.transform);
             clone.name = name;
@@ -514,6 +545,10 @@ namespace Jotunn.Managers
         [HarmonyPatch(typeof(Game), "Start")]
         [HarmonyPostfix]
         private static void GameStart() => NetworkManager.Instance.RegisterAll();
+
+        [HarmonyPatch(typeof(global::Console), "Awake")]
+        [HarmonyPostfix]
+        private static void ConsoleAwake() => CommandManager.Instance.RegisterAll();
 
         [HarmonyPatch(typeof(Localization), nameof(Localization.SetupLanguage))]
         [HarmonyPostfix]
