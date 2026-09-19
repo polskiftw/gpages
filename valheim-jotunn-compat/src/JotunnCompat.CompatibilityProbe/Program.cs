@@ -52,8 +52,9 @@ var jotunnReference = mod.MainModule.AssemblyReferences
 
 if (jotunnReference == null)
 {
-    throw new InvalidDataException(
-        $"{mod.Name.Name} does not reference an assembly named Jotunn.");
+    Console.WriteLine($"Dependent assembly: {mod.Name.FullName}");
+    Console.WriteLine("No Jotunn assembly reference; compatibility probe skipped.");
+    return 0;
 }
 
 var jotunnTypes = mod.MainModule.GetTypeReferences()
