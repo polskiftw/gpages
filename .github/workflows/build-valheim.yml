@@ -34,6 +34,7 @@ jobs:
             (Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat')
           )
           $stubDir = Join-Path $env:RUNNER_TEMP 'unity-stub'
+          $valheimInstall = Join-Path $env:RUNNER_TEMP 'valheim-server'
 
           foreach ($project in $projects) {
             New-Item -ItemType Directory -Force -Path (Join-Path $project 'lib') | Out-Null
@@ -92,13 +93,34 @@ jobs:
           Copy-Item $preloader.FullName (Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\lib\BepInEx.Preloader.dll')
           Copy-Item $cecil.FullName (Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\lib\Mono.Cecil.dll')
 
+          choco install steamcmd -y --no-progress
+          & steamcmd +force_install_dir $valheimInstall +login anonymous +app_info_update 1 +app_update 896660 validate +quit
+          if ($LASTEXITCODE -ne 0) { throw "SteamCMD Valheim server install failed with exit code $LASTEXITCODE" }
+
+          $serverData = Join-Path $valheimInstall 'valheim_server_Data'
+          $clientData = Join-Path $valheimInstall 'Valheim_Data'
+          if ((Test-Path $serverData) -and -not (Test-Path $clientData)) {
+            Move-Item $serverData $clientData
+          }
+          if (-not (Test-Path (Join-Path $clientData 'Managed\Assembly-CSharp.dll'))) {
+            throw 'Valheim managed assemblies were not installed as expected'
+          }
+
+          $vhCore = Join-Path $valheimInstall 'BepInEx\core'
+          New-Item -ItemType Directory -Force -Path $vhCore | Out-Null
+          Copy-Item $bep.FullName (Join-Path $vhCore 'BepInEx.dll')
+          Copy-Item $harmony.FullName (Join-Path $vhCore '0Harmony.dll')
+          Copy-Item $cecil.FullName (Join-Path $vhCore 'Mono.Cecil.dll')
+          "VALHEIM_INSTALL=$valheimInstall" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Enforce generic Jotunn runtime
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $runtimeRoots = @(
             '.\valheim-jotunn-compat\src\JotunnCompat.Runtime',
-            '.\valheim-jotunn-compat\src\JotunnCompat.Preloader'
+            '.\valheim-jotunn-compat\src\JotunnCompat.Preloader',
+            '.\valheim-jotunn-compat\src\JotunnCompat.Slim'
           )
           $forbidden = @(
             'MoreWorldLocations',
@@ -182,28 +204,22 @@ jobs:
           dotnet build .\valheim-jotunn-compat\src\JotunnCompat.CompatibilityProbe\JotunnCompat.CompatibilityProbe.csproj -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Build slim Jotunn runtime
+        shell: pwsh
+        run: |
+          dotnet build .\valheim-jotunn-compat\src\JotunnCompat.Slim\JotunnCompat.Slim.csproj -c Release /p:ValheimInstall="$env:VALHEIM_INSTALL"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Build Jotunn compatibility package
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '2.30.1'
-          $expectedJotunnSha256 = '493754EB0CA7EAA416B82910FFBCA661FA760EEEB1C560D4C85A67CB4AFFB4A1'
-          $url = "https://github.com/Valheim-Modding/Jotunn/releases/download/v$version/Jotunn.dll"
-          $upstream = Join-Path $env:RUNNER_TEMP "Jotunn-$version.dll"
+          $slim = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.Slim\bin\Release\net472\Jotunn.dll'
+          $yaml = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.Slim\bin\Release\net472\YamlDotNet.dll'
           $packageDir = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\bin\Release\package'
           $packageZip = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\bin\Release\JotunnCompat.zip'
 
-          Invoke-WebRequest -Uri $url -OutFile $upstream
-
-          $actualJotunnSha256 = (Get-FileHash $upstream -Algorithm SHA256).Hash
-          if ($actualJotunnSha256 -ne $expectedJotunnSha256) {
-            throw "Upstream Jotunn.dll SHA256 mismatch. Expected $expectedJotunnSha256, got $actualJotunnSha256"
-          }
-
-          $contractCheck = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.ContractCheck\bin\Release\net8.0\JotunnCompat.ContractCheck.dll'
-          $compatPreloader = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.Preloader\bin\Release\net472\JotunnCompat.Preloader.dll'
-          dotnet $contractCheck $upstream $compatPreloader
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path $slim)) { throw "Slim Jotunn build output missing: $slim" }
 
           # First compatibility canary. Target-specific knowledge lives only in CI/tests;
           # production runtime code remains completely generic.
@@ -215,22 +231,17 @@ jobs:
           Expand-Archive -Path $mwlZip -DestinationPath $mwlExtract
 
           $mwlDll = Get-ChildItem -Path $mwlExtract -Recurse -File -Filter 'More_World_Locations_AIO.dll' | Select-Object -First 1
-          if (-not $mwlDll) {
-            throw "Could not find More_World_Locations_AIO.dll in canary package $mwlVersion"
-          }
+          if (-not $mwlDll) { throw "Could not find More_World_Locations_AIO.dll in canary package $mwlVersion" }
 
           $compatProbe = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.CompatibilityProbe\bin\Release\net8.0\JotunnCompat.CompatibilityProbe.dll'
-          dotnet $compatProbe $upstream $mwlDll.FullName
+          dotnet $compatProbe $slim $mwlDll.FullName
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
           $pluginDir = Join-Path $packageDir 'BepInEx\plugins\JotunnCompat'
-          $patcherDir = Join-Path $packageDir 'BepInEx\patchers'
-
           New-Item -ItemType Directory -Force -Path $pluginDir | Out-Null
-          New-Item -ItemType Directory -Force -Path $patcherDir | Out-Null
 
-          Copy-Item -Force $upstream (Join-Path $pluginDir 'Jotunn.dll')
-          Copy-Item -Force $compatPreloader (Join-Path $patcherDir 'JotunnCompat.Preloader.dll')
+          Copy-Item -Force $slim (Join-Path $pluginDir 'Jotunn.dll')
+          if (Test-Path $yaml) { Copy-Item -Force $yaml (Join-Path $pluginDir 'YamlDotNet.dll') }
           Copy-Item -Force '.\valheim-jotunn-compat\LICENSE' (Join-Path $packageDir 'LICENSE')
           Copy-Item -Force '.\valheim-jotunn-compat\README.md' (Join-Path $packageDir 'README.md')
 
@@ -244,7 +255,6 @@ jobs:
             '.\valheim-ward-hit-sound\bin\Release\net472\WardHitSoundToggle.dll',
             '.\valheim-hammer-everything\bin\Release\net472\HammerEverything.dll',
             '.\valheim-jotunn-compat\bin\Release\package\BepInEx\plugins\JotunnCompat\Jotunn.dll',
-            '.\valheim-jotunn-compat\bin\Release\package\BepInEx\patchers\JotunnCompat.Preloader.dll',
             '.\valheim-jotunn-compat\bin\Release\JotunnCompat.zip'
           )
           foreach ($file in $files) {
@@ -266,11 +276,11 @@ jobs:
           Copy-Item -Force '.\valheim-ward-hit-sound\bin\Release\net472\WardHitSoundToggle.dll' '.\valheim\ward-hit-sound\WardHitSoundToggle.dll'
           Copy-Item -Force '.\valheim-hammer-everything\bin\Release\net472\HammerEverything.dll' '.\valheim\hammer-everything\HammerEverything.dll'
           Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\package\BepInEx\plugins\JotunnCompat\Jotunn.dll' '.\valheim\jotunn-compat\Jotunn.dll'
-          Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\package\BepInEx\patchers\JotunnCompat.Preloader.dll' '.\valheim\jotunn-compat\JotunnCompat.Preloader.dll'
+          git rm -f --ignore-unmatch "valheim/jotunn-compat/JotunnCompat.Preloader.dll"
           Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\JotunnCompat.zip' '.\valheim\jotunn-compat\JotunnCompat.zip'
 
           git rm -f --ignore-unmatch "valheim/jotunn-compat/JotunnCompat.FastPath.dll"
-          git add -- "valheim/ward-hit-sound/WardHitSoundToggle.dll" "valheim/hammer-everything/HammerEverything.dll" "valheim/jotunn-compat/Jotunn.dll" "valheim/jotunn-compat/JotunnCompat.Preloader.dll" "valheim/jotunn-compat/JotunnCompat.zip"
+          git add -- "valheim/ward-hit-sound/WardHitSoundToggle.dll" "valheim/hammer-everything/HammerEverything.dll" "valheim/jotunn-compat/Jotunn.dll" "valheim/jotunn-compat/JotunnCompat.zip"
 
           git diff --cached --quiet
           if ($LASTEXITCODE -eq 0) {
