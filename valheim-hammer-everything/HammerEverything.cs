@@ -16,7 +16,7 @@ namespace HammerEverythingMod
     {
         public const string PluginGuid = "claire.valheim.hammereverything";
         public const string PluginName = "Hammer Everything";
-        public const string PluginVersion = "1.4.12";
+        public const string PluginVersion = "1.4.13";
 
         private static readonly BindingFlags AnyInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -95,6 +95,7 @@ namespace HammerEverythingMod
             {
                 "barrell",
                 "CastleKit_brazier",
+                "piece_dvergr_pole",
                 "MountainKit_brazier",
                 "MountainKit_brazier_blue",
                 "MountainKit_brazier_purple",
@@ -1084,7 +1085,13 @@ namespace HammerEverythingMod
             if (_categoryPatchesInstalled)
                 AssignCustomBuildCategory(piece);
 
-            QueueUniqueIcon(prefabName, prefab, piece);
+            // Runtime prefab thumbnail generation is intentionally disabled.
+            // Cloned Valheim prefabs share material assets with the originals, and
+            // stripping behavioural components from those clones can trigger
+            // cleanup paths that mutate shared renderer/material state. Preserve
+            // vanilla icons where present and keep the template fallback otherwise.
+            //
+            // Do not call QueueUniqueIcon() here.
 
             if (_useCraftingCosts.Value)
             {
