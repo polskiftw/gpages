@@ -66,8 +66,11 @@ namespace Jotunn.Entities
 
     public class CustomLocation
     {
+        private readonly LocationConfig locationConfig;
+
         public GameObject Prefab { get; private set; }
         public ZoneSystem.ZoneLocation ZoneLocation { get; }
+        public Location Location { get; private set; }
         public string Name { get; }
         public bool FixReference { get; set; }
         public bool SoftReference { get; }
@@ -76,29 +79,92 @@ namespace Jotunn.Entities
         {
             Prefab = exteriorPrefab;
             Name = exteriorPrefab ? exteriorPrefab.name : string.Empty;
+            locationConfig = config;
             FixReference = fixReference;
+
+            if (exteriorPrefab)
+            {
+                Location = exteriorPrefab.GetComponent<Location>();
+                if (!Location)
+                {
+                    Location = exteriorPrefab.AddComponent<Location>();
+                    Location.m_clearArea = config.ClearArea;
+                    Location.m_exteriorRadius = config.ExteriorRadius;
+                    Location.m_hasInterior = config.HasInterior;
+                    Location.m_interiorRadius = config.InteriorRadius;
+                    Location.m_interiorEnvironment = config.InteriorEnvironment;
+                }
+            }
+
             ZoneLocation = config.GetZoneLocation();
             ZoneLocation.m_prefabName = Name;
+
             if (exteriorPrefab)
             {
                 var id = AssetManager.Instance.AddAsset(exteriorPrefab);
                 ZoneLocation.m_prefab = new SoftReference<GameObject>(id);
+                SyncZoneLocationFromComponent(Location);
             }
         }
 
-        public CustomLocation(SoftReference<GameObject> softReferencePrefab, bool fixReference, LocationConfig config)
+        public CustomLocation(
+            SoftReference<GameObject> softReferencePrefab,
+            bool fixReference,
+            LocationConfig config)
         {
             Name = softReferencePrefab.Name;
+            locationConfig = config;
             FixReference = fixReference;
             SoftReference = true;
             ZoneLocation = config.GetZoneLocation();
             ZoneLocation.m_prefab = softReferencePrefab;
             ZoneLocation.m_prefabName = Name;
-            AssetManager.Instance.ResolveMocksOnLoad(softReferencePrefab, ZoneManager.Instance.LocationContainer.transform, go =>
+
+            AssetManager.Instance.ResolveMocksOnLoad(
+                softReferencePrefab,
+                ZoneManager.Instance.LocationContainer.transform,
+                OnLocationResolve);
+        }
+
+        private void OnLocationResolve(GameObject gameObject)
+        {
+            Prefab = gameObject;
+            if (!gameObject)
             {
-                Prefab = go;
-                if (go) go.SetActive(true);
-            });
+                return;
+            }
+
+            gameObject.SetActive(true);
+            Location = gameObject.GetComponent<Location>();
+            if (Location)
+            {
+                SyncZoneLocationFromComponent(Location);
+            }
+
+            ZoneManager.Instance.PrepareLocation(ZoneLocation);
+        }
+
+        private void SyncZoneLocationFromComponent(Location location)
+        {
+            if (!location || ZoneLocation == null || locationConfig == null)
+            {
+                return;
+            }
+
+            if (!locationConfig.HasExteriorRadius)
+            {
+                ZoneLocation.m_exteriorRadius = location.m_exteriorRadius;
+            }
+
+            if (!locationConfig.HasInteriorRadius)
+            {
+                ZoneLocation.m_interiorRadius = location.m_interiorRadius;
+            }
+
+            if (!locationConfig.HasClearArea)
+            {
+                ZoneLocation.m_clearArea = location.m_clearArea;
+            }
         }
     }
 
