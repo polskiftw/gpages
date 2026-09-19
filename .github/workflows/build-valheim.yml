@@ -14,6 +14,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: valheim-build-main
+  cancel-in-progress: true
+
 jobs:
   build-and-publish:
     runs-on: windows-latest
@@ -184,6 +188,11 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+
           New-Item -ItemType Directory -Force -Path '.\valheim\jotunn-compat' | Out-Null
 
           Copy-Item -Force '.\valheim-ward-hit-sound\bin\Release\net472\WardHitSoundToggle.dll' '.\valheim\ward-hit-sound\WardHitSoundToggle.dll'
@@ -192,8 +201,6 @@ jobs:
           Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\package\JotunnCompat.FastPath.dll' '.\valheim\jotunn-compat\JotunnCompat.FastPath.dll'
           Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\JotunnCompat.zip' '.\valheim\jotunn-compat\JotunnCompat.zip'
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- "valheim/ward-hit-sound/WardHitSoundToggle.dll" "valheim/hammer-everything/HammerEverything.dll" "valheim/jotunn-compat/Jotunn.dll" "valheim/jotunn-compat/JotunnCompat.FastPath.dll" "valheim/jotunn-compat/JotunnCompat.zip"
 
           git diff --cached --quiet
