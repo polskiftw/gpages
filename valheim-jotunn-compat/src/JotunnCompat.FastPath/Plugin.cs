@@ -15,7 +15,7 @@ namespace JotunnCompat.FastPath
     {
         public const string ModGuid = "claire.valheim.jotunncompat.fastpath";
         public const string ModName = "Jotunn Compatibility FastPath";
-        public const string Version = "0.1.0";
+        public const string Version = "0.2.0";
         public const string JotunnGuid = "com.jotunn.jotunn";
 
         private Harmony harmony;
@@ -33,6 +33,9 @@ namespace JotunnCompat.FastPath
                 "Jotunn.Utils.AutomaticLocalizationsLoading",
                 "Init",
                 nameof(LocalizationInitPrefix));
+
+            PrefabCacheFastPath.Install(harmony);
+            ReferenceFastPath.Install(harmony);
 
             Logger.LogInfo("Jotunn compatibility fast paths installed.");
         }
