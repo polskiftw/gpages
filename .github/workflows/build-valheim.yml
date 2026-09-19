@@ -163,7 +163,12 @@ jobs:
             'MoreWorldLocations',
             'More_World_Locations',
             'warpalicious.More_World_Locations',
-            'jneb802'
+            'jneb802',
+            'ValheimRAFT',
+            'ValheimVehicles',
+            'team0',
+            'JNDEV0',
+            'zolantris'
           )
 
           foreach ($needle in $forbidden) {
@@ -301,6 +306,43 @@ jobs:
           $compatProbe = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.CompatibilityProbe\bin\Release\net8.0\JotunnCompat.CompatibilityProbe.dll'
           foreach ($candidate in $mwlDlls) {
             Write-Host "Compatibility probe: $($candidate.FullName)"
+            dotnet $compatProbe $slim $candidate.FullName
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+          # Second compatibility canary: ValheimRAFT. Like MWL, this is test-only
+          # knowledge used to expand generic Jotunn API coverage.
+          $raftVersion = '4.3.5'
+          $raftUrl = "https://thunderstore.io/package/download/team0/ValheimRAFT/$raftVersion/"
+          $raftZip = Join-Path $env:RUNNER_TEMP "ValheimRAFT-$raftVersion.zip"
+          $raftExtract = Join-Path $env:RUNNER_TEMP "ValheimRAFT-$raftVersion"
+
+          $raftDownloaded = $false
+          for ($attempt = 1; $attempt -le 4; $attempt++) {
+            try {
+              Invoke-WebRequest -Uri $raftUrl -OutFile $raftZip
+              $raftDownloaded = $true
+              break
+            }
+            catch {
+              if ($attempt -eq 4) { throw }
+              Start-Sleep -Seconds (3 * $attempt)
+            }
+          }
+          if (-not $raftDownloaded) { throw "Could not download ValheimRAFT canary package $raftVersion" }
+
+          Expand-Archive -Path $raftZip -DestinationPath $raftExtract
+
+          $raftDlls = @(
+            Get-ChildItem -Path $raftExtract -Recurse -File -Filter '*.dll' |
+              Sort-Object FullName
+          )
+          if ($raftDlls.Count -eq 0) {
+            throw "No DLLs found in ValheimRAFT canary package $raftVersion"
+          }
+
+          foreach ($candidate in $raftDlls) {
+            Write-Host "ValheimRAFT compatibility probe: $($candidate.FullName)"
             dotnet $compatProbe $slim $candidate.FullName
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
