@@ -37,7 +37,8 @@ namespace Jotunn.Managers
             fadeDuration = 0.1f
         };
 
-        private bool inputBlocked;
+        private static bool inputBlocked;
+        private static int inputBlockRequests;
 
         private GUIManager() { }
 
@@ -79,9 +80,24 @@ namespace Jotunn.Managers
             return PrefabManager.Cache.GetPrefab<Sprite>(spriteName);
         }
 
-        public void BlockInput(bool block)
+        public static void BlockInput(bool block)
         {
-            inputBlocked = block;
+            if (block)
+            {
+                inputBlockRequests++;
+            }
+            else
+            {
+                inputBlockRequests = Math.Max(0, inputBlockRequests - 1);
+            }
+
+            inputBlocked = inputBlockRequests > 0;
+
+            if (GameCamera.instance)
+            {
+                GameCamera.instance.m_mouseCapture = !inputBlocked;
+                GameCamera.instance.UpdateMouseCapture();
+            }
         }
 
         public void ApplyTextStyle(Text text, int fontSize = 16)
