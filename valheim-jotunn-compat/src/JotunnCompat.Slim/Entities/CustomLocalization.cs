@@ -1,0 +1,495 @@
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using BepInEx;
+using Jotunn.Managers;
+using UnityEngine;
+
+namespace Jotunn.Entities
+{
+    /// <summary> Wrapper to hold each mod localization data. </summary>
+    public class CustomLocalization : CustomEntity
+    {
+        /// <summary> Map that work as [language][token] = translation. </summary>
+        internal Dictionary<string, Dictionary<string, string>> Map { get; }
+        
+        private static HashSet<string> loggedInvalidTokens = new HashSet<string>();
+
+        private static bool? _yamlDotNetAvailable;
+
+        /// <summary>
+        ///     Returns true if YamlDotNet is loaded in the current AppDomain.
+        ///     Placed here (not on LocalizationManager) so it can be called without triggering
+        ///     LocalizationManager's static constructor, which requires the game runtime.
+        /// </summary>
+        internal static bool IsYamlDotNetAvailable() =>
+            _yamlDotNetAvailable ??= AppDomain.CurrentDomain.GetAssemblies()
+                .Any(a => a.GetName().Name == "YamlDotNet");
+
+        /// <summary>
+        ///     Default constructor.
+        /// </summary>
+        [Obsolete("Use LocalizationManager.Instance.GetLocalization() instead")]
+        public CustomLocalization() : base(Assembly.GetCallingAssembly())
+        {
+            Map = new Dictionary<string, Dictionary<string, string>>();
+        }
+
+        /// <summary>
+        ///     SourceMod hint constructor.
+        /// </summary>
+        /// <param name="sourceMod"> Mod data in the shape of BepInPlugin class. </param>
+        public CustomLocalization(BepInPlugin sourceMod) : base(sourceMod)
+        {
+            Map = new Dictionary<string, Dictionary<string, string>>();
+        }
+
+        /// <summary> Retrieve list of languages that have been added. </summary>
+        public IEnumerable<string> GetLanguages() => Map.Keys;
+
+        /// <summary> Retrieve translations for given language. </summary>
+        /// <param name="language"> Language of the translation you want to retrieve. </param>
+        public IReadOnlyDictionary<string, string> GetTranslations(in string language)
+        {
+            return Map.TryGetValue(language, out var languageMap) ? languageMap : new Dictionary<string, string>();
+        }
+
+        /// <summary>
+        ///     Retrieve a translation from this custom localization or <see cref="Localization.Translate"/>.
+        ///     Searches with the user language with a fallback to English.
+        /// </summary>
+        /// <param name="word">Word to translate.</param>
+        /// <returns>Translated word in player language or english as a fallback.</returns>
+        public string TryTranslate(string word)
+        {
+            if (string.IsNullOrEmpty(word))
+            {
+                return string.Empty;
+            }
+
+            if (!word.StartsWith(LocalizationManager.TokenFirstChar.ToString()))
+            {
+                // the word is not a token, return it as is
+                return word;
+            }
+
+            if (word.IndexOfAny(LocalizationManager.ForbiddenCharsArr) != -1)
+            {
+                if (loggedInvalidTokens.Add(word))
+                {
+                    Logger.LogWarning(SourceMod, $"Token '{word}' must not contain following chars: '{LocalizationManager.ForbiddenChars}'");
+                }
+
+                return $"[{word}]";
+            }
+
+            var cleanedWord = word.TrimStart(LocalizationManager.TokenFirstChar);
+            var playerLang = LocalizationManager.GetPlayerLanguage();
+            var defaultLang = LocalizationManager.DefaultLanguage;
+
+            if (Map.TryGetValue(playerLang, out var translations) && translations.TryGetValue(cleanedWord, out var translation))
+            {
+                return translation;
+            }
+
+            if (playerLang != defaultLang && Map.TryGetValue(defaultLang, out translations) && translations.TryGetValue(cleanedWord, out translation))
+            {
+                return translation;
+            }
+
+            // fallback to vanilla localization if nothing found
+            if (Localization.m_instance != null)
+            {
+                return Localization.m_instance.Translate(cleanedWord);
+            }
+
+            return $"[{word}]";
+        }
+
+        /// <summary> Checks if a translation exists for given language and token. </summary>
+        /// <param name="language"> Language being checked. </param>
+        /// <param name="token"> Token being checked. </param>
+        /// <returns> True if the token was found. </returns>
+        public bool Contains(in string language, in string token)
+        {
+            var cleanedToken = token.TrimStart(LocalizationManager.TokenFirstChar);
+            if (Map.TryGetValue(language, out var translations))
+            {
+                return translations.ContainsKey(cleanedToken);
+            }
+            return false;
+        }
+
+        #region Add Directly
+
+        /// <summary> Add a translation. </summary>
+        /// <param name="token"> Token of the translation you want to add. </param>
+        /// <param name="translation"> The translation. </param>
+        public void AddTranslation(in string token, string translation)
+            => AddTranslation(LocalizationManager.DefaultLanguage, token, translation);
+
+        /// <summary> Add a translation. </summary>
+        /// <param name="language"> Language of the translation you want to add. </param>
+        /// <param name="token"> Token of the translation you want to add. </param>
+        /// <param name="translation"> The translation. </param>
+        public void AddTranslation(in string language, in string token, string translation)
+        {
+            if (!Map.ContainsKey(language))
+            {
+                Map.Add(language, new Dictionary<string, string>());
+            }
+
+            if (!ValidateLanguage(language))
+            {
+                return;
+            }
+            if (!ValidateToken(token))
+            {
+                return;
+            }
+            if (!ValidateTranslation(translation))
+            {
+                return;
+            }
+            var cleanedToken = token.TrimStart(LocalizationManager.TokenFirstChar);
+
+            AddTranslationToMap(language, cleanedToken, translation);
+        }
+
+        /// <summary> Add a group of translations. </summary>
+        /// <param name="language"> Language of the translation you want to add. </param>
+        /// <param name="tokenValue"> Token-Value dictionary. </param>
+        public void AddTranslation(in string language, Dictionary<string, string> tokenValue)
+        {
+            if (!Map.ContainsKey(language))
+            {
+                Map.Add(language, new Dictionary<string, string>());
+            }
+
+            if (!ValidateLanguage(language))
+            {
+                return;
+            }
+
+            foreach (var tv in tokenValue)
+            {
+                var cleanedToken = tv.Key.TrimStart(LocalizationManager.TokenFirstChar);
+                var translation = tv.Value;
+
+                if (!ValidateToken(cleanedToken))
+                {
+                    continue;
+                }
+                if (!ValidateTranslation(translation))
+                {
+                    continue;
+                }
+
+                AddTranslationToMap(language, cleanedToken, translation);
+            }
+        }
+
+        #endregion
+
+        #region Add by File
+
+        /// <summary> Add a translation file via absolute path. </summary>
+        /// <param name="path"> Absolute path to file. </param>
+        /// <param name="isJson"> Is the language file a json file. </param>
+        public void AddFileByPath(string path, bool isJson = false)
+        {
+            if (path is null)
+            {
+                throw new ArgumentNullException(nameof(path));
+            }
+
+            var fileContent = File.ReadAllText(path);
+
+            if (fileContent is null)
+            {
+                throw new ArgumentNullException(nameof(fileContent));
+            }
+
+            var ext = Path.GetExtension(path).ToLowerInvariant();
+            string format;
+
+            if (ext == ".yaml" || ext == ".yml")
+            {
+                AddYamlFile(Path.GetFileName(Path.GetDirectoryName(path)), fileContent);
+                format = "YAML";
+            }
+            else if (isJson)
+            {
+                AddJsonFile(Path.GetFileName(Path.GetDirectoryName(path)), fileContent);
+                format = "JSON";
+            }
+            else
+            {
+                AddLanguageFile(fileContent);
+                format = "";
+            }
+
+            Logger.LogDebug($"Added {format} language file: {Path.GetFileName(path)}");
+        }
+
+        /// <summary> Add a json language file (match crowdin format). </summary>
+        /// <param name="language"> Language for the json file, for example, "English" </param>
+        /// <param name="fileContent"> Entire file as string </param>
+        public void AddJsonFile(string language, string fileContent)
+        {
+            if (!ValidateLanguage(language))
+            {
+                return;
+            }
+
+            IDictionary<string, object> json;
+
+            try
+            {
+                json = SimpleJson.SimpleJson.DeserializeObject<IDictionary<string, object>>(fileContent);
+            }
+            catch (Exception e)
+            {
+                Logger.LogWarning(SourceMod, $"Could not read {language} JSON localization: {e.Message}");
+                return;
+            }
+
+            if (!Map.ContainsKey(language))
+            {
+                Map.Add(language, new Dictionary<string, string>());
+            }
+
+            foreach (var tv in json)
+            {
+                var translation = tv.Value as string;
+                var cleanedToken = tv.Key.TrimStart(LocalizationManager.TokenFirstChar);
+
+                if (!ValidateToken(cleanedToken))
+                {
+                    continue;
+                }
+
+                if (!ValidateTranslation(translation))
+                {
+                    continue;
+                }
+
+                AddTranslationToMap(language, cleanedToken, translation);
+            }
+        }
+
+        /// <summary> Add a YAML language file. Keys are flat string-to-string mappings. </summary>
+        /// <param name="language"> Language for the yaml file, for example, "English" </param>
+        /// <param name="fileContent"> Entire file as string </param>
+        public void AddYamlFile(string language, string fileContent)
+        {
+            if (!IsYamlDotNetAvailable())
+            {
+                Logger.LogWarning(SourceMod,
+                    $"Cannot load YAML localization for '{language}': YamlDotNet is not loaded. " +
+                    "Mods using .yaml/.yml localization must include YamlDotNet.dll as a dependency.");
+                return;
+            }
+
+            if (!ValidateLanguage(language))
+            {
+                return;
+            }
+
+            ParseAndAddYaml(language, fileContent);
+        }
+
+        // Isolated in its own method so the JIT only resolves YamlDotNet types when actually called.
+        private void ParseAndAddYaml(string language, string fileContent)
+        {
+            Dictionary<string, string> yaml;
+
+            try
+            {
+                yaml = new YamlDotNet.Serialization.DeserializerBuilder()
+                    .IgnoreFields()
+                    .Build()
+                    .Deserialize<Dictionary<string, string>>(fileContent);
+            }
+            catch (Exception e)
+            {
+                Logger.LogWarning(SourceMod, $"Could not read {language} YAML localization: {e.Message}");
+                return;
+            }
+
+            if (yaml == null)
+            {
+                return;
+            }
+
+            if (!Map.ContainsKey(language))
+            {
+                Map.Add(language, new Dictionary<string, string>());
+            }
+
+            foreach (var tv in yaml)
+            {
+                var cleanedToken = tv.Key.TrimStart(LocalizationManager.TokenFirstChar);
+
+                if (!ValidateToken(cleanedToken))
+                {
+                    continue;
+                }
+
+                if (!ValidateTranslation(tv.Value))
+                {
+                    continue;
+                }
+
+                AddTranslationToMap(language, cleanedToken, tv.Value);
+            }
+        }
+
+        /// <summary> Add a Unity style translation file. </summary>
+        /// <param name="fileContent"> Contents of the language file in string format. </param>
+        public void AddLanguageFile(string fileContent)
+        {
+            var strReader = new StringReader(fileContent);
+            var languages = strReader.ReadLine().Split(',');
+
+            foreach (var slicedLine in LocalizationManager.DoQuoteLineSplit(strReader))
+            {
+                if (slicedLine.Count == 0)
+                {
+                    continue;
+                }
+
+                var token = slicedLine[0];
+
+                if (token.StartsWith("//") || token.Length == 0)
+                {
+                    continue;
+                }
+                if (!ValidateToken(token))
+                {
+                    continue;
+                }
+
+                var cleanedToken = token.TrimStart(LocalizationManager.TokenFirstChar);
+
+                for (var i = 1; i < slicedLine.Count; i++)
+                {
+                    var language = languages[i];
+                    var translation = slicedLine[i];
+
+                    if (string.IsNullOrEmpty(translation) || translation[0] == '\r')
+                    {
+                        translation = slicedLine[1];
+                    }
+                    if (!ValidateLanguage(language))
+                    {
+                        continue;
+                    }
+                    if (!ValidateTranslation(translation))
+                    {
+                        continue;
+                    }
+                    if (!Map.ContainsKey(language))
+                    {
+                        Map.Add(language, new Dictionary<string, string>());
+                    }
+
+                    AddTranslationToMap(language, cleanedToken, translation);
+                }
+            }
+        }
+
+        #endregion
+
+        #region Deletion
+
+        /// <summary> Attempts to remove a given token from certain language. </summary>
+        /// <param name="language"> Language from which to search the token. </param>
+        /// <param name="token"> Token to clear. </param>
+        public void ClearToken(in string language, in string token)
+        {
+            if (Map.ContainsKey(language))
+            {
+                Map.Remove(token.TrimStart(LocalizationManager.TokenFirstChar));
+            }
+        }
+
+        /// <summary> Attempts to remove a given token from default language. </summary>
+        /// <param name="token"> Token to clear. </param>
+        public void ClearToken(in string token)
+            => ClearToken(LocalizationManager.DefaultLanguage, token);
+
+        /// <summary> Attempts to remove given language. </summary>
+        /// <param name="language"> Language to clear. </param>
+        public void ClearLanguage(in string language)
+            => Map.Remove(language);
+
+        /// <summary> Clear all localization data. </summary>
+        public void ClearAll()
+            => Map.Clear();
+
+        #endregion
+
+        private void AddTranslationToMap(in string language, string cleanedToken, string translation)
+        {
+            Map[language][cleanedToken] = translation;
+
+            if (Localization.m_instance != null && !Localization.m_instance.m_translations.ContainsKey(cleanedToken))
+            {
+                Localization.m_instance.AddWord(cleanedToken, translation);
+            }
+        }
+
+        #region Validation Methods
+
+        private bool ValidateLanguage(in string language)
+        {
+            if (string.IsNullOrEmpty(language))
+            {
+                throw new ArgumentNullException(nameof(language));
+            }
+            if (!char.IsUpper(language[0]))
+            {
+                Logger.LogWarning(SourceMod, $"Language '{language}' must start with a capital letter");
+                return false;
+            }
+            return true;
+        }
+
+        private bool ValidateToken(in string token)
+        {
+            if (string.IsNullOrEmpty(token))
+            {
+                throw new ArgumentNullException(nameof(token));
+            }
+            if (token.IndexOfAny(LocalizationManager.ForbiddenCharsArr) != -1)
+            {
+                if (loggedInvalidTokens.Add(token))
+                {
+                    Logger.LogWarning(SourceMod, $"Token '{token}' must not contain following chars: '{LocalizationManager.ForbiddenChars}'");
+                }
+                return false;
+            }
+            return true;
+        }
+
+        private bool ValidateTranslation(in string translation)
+        {
+            if (translation == null)
+            {
+                throw new ArgumentNullException(nameof(translation));
+            }
+            return true;
+        }
+
+        #endregion
+
+        /// <inheritdoc/>
+        public override string ToString()
+        {
+            return $"Localization ({SourceMod.GUID})";
+        }
+    }
+}
