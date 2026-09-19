@@ -36,6 +36,7 @@ namespace Jotunn.Managers
             if (prefabs.ContainsKey(name)) return;
             customPrefab.Prefab.transform.SetParent(PrefabContainer.transform, false);
             prefabs.Add(name, customPrefab);
+            AssetManager.Instance.AddAsset(customPrefab.Prefab);
         }
 
         public GameObject GetPrefab(string name)
@@ -54,6 +55,7 @@ namespace Jotunn.Managers
             if (!source || string.IsNullOrEmpty(name) || GetPrefab(name)) return null;
             var clone = Object.Instantiate(source, PrefabContainer.transform);
             clone.name = name;
+            AssetManager.Instance.AddAsset(clone);
             return clone;
         }
 
