@@ -14,22 +14,22 @@
 <body><main>
 <a class="back" href="../">‹ Valheim</a>
 <h1>Jotunn Compatibility Layer</h1>
-<p class="sub">Drop-in Jotunn compatibility for existing Valheim mods, with startup work replaced incrementally by smaller fast paths instead of forcing mods to be ported to a new framework.</p>
+<p class="sub">Drop-in Jotunn compatibility for existing Valheim mods, with expensive internals replaced incrementally instead of forcing mods onto a new framework.</p>
 
 <div class="card">
   <a class="download" href="JotunnCompat.zip">Download JotunnCompat.zip</a>
-  <p class="note">Recommended package. Contains the compatible <code>Jotunn.dll</code> plus <code>JotunnCompat.FastPath.dll</code>.</p>
+  <p class="note">Recommended package. Contains the exact upstream <code>Jotunn.dll</code> plus <code>JotunnCompat.FastPath.dll</code>.</p>
 </div>
 
 <div class="card">
-  <p class="warning"><strong>Do not install this beside official Jotunn.</strong> This package intentionally uses the same <code>Jotunn</code> assembly identity and <code>com.jotunn.jotunn</code> BepInEx GUID so existing mods accept it as Jotunn.</p>
+  <p class="warning"><strong>Remove a separately installed Jotunn package first.</strong> This ZIP already contains Jotunn, so loading another copy would duplicate the same assembly/plugin.</p>
 </div>
 
 <div class="card">
   <div class="title">Install</div>
   <ol class="steps">
     <li>Install BepInEx 5 for Valheim.</li>
-    <li>Remove the official Jotunn package if it is installed.</li>
+    <li>Remove the separately installed official Jotunn package if present.</li>
     <li>Extract <code>JotunnCompat.zip</code> into a folder under <code>Valheim\BepInEx\plugins\</code>.</li>
     <li>Keep <code>Jotunn.dll</code> and <code>JotunnCompat.FastPath.dll</code> together.</li>
     <li>Launch Valheim normally.</li>
@@ -38,7 +38,7 @@
 
 <div class="card">
   <div class="title">Compatibility strategy</div>
-  <p class="meta">The current build uses official Jotunn <strong>2.30.1</strong> as the binary/API baseline. The build rewrites selected implementation bodies while preserving the complete public Jotunn type/member surface, assembly identity, version, and plugin GUID. CI rejects the output if that public API changes.</p>
+  <p class="meta">The current build bundles the <strong>unmodified official Jotunn 2.30.1 DLL</strong>. The fast-path plugin loads after Jotunn's <code>Awake</code> and installs Harmony overrides before Jotunn's <code>Start</code>. Existing mods therefore get the exact Jotunn assembly, GUID, version, namespaces, types, methods, and network behavior they were compiled against.</p>
 </div>
 
 <div class="card">
@@ -54,7 +54,7 @@
 </div>
 
 <div class="card">
-  <p class="meta"><strong>License:</strong> MIT derivative; upstream Jotunn copyright and license preserved<br><strong>Target:</strong> existing Jotunn-dependent mods without recompilation<br><strong>Baseline:</strong> Jotunn 2.30.1<br><strong>Approach:</strong> compatibility first, then replace internals subsystem by subsystem</p>
+  <p class="meta"><strong>License:</strong> MIT; upstream Jotunn copyright/license preserved<br><strong>Target:</strong> existing Jotunn-dependent mods without recompilation<br><strong>Baseline:</strong> Jotunn 2.30.1<br><strong>Approach:</strong> exact compatibility first, then replace internals subsystem by subsystem</p>
 </div>
 </main></body>
 </html>
