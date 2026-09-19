@@ -42,7 +42,10 @@ namespace Jotunn.Managers
         internal static List<DungeonDB.RoomData> AvailableRooms =>
             (List<DungeonDB.RoomData>)DungeonAvailableRooms.GetValue(null);
 
+        internal static object AssetLoaderObject =>
+            RuntimeAssetLoader?.GetValue(null);
+
         internal static bool AssetLoaderReady =>
-            RuntimeAssetLoader != null && RuntimeAssetLoader.GetValue(null) != null;
+            AssetLoaderObject != null;
     }
 }
