@@ -16,7 +16,7 @@ namespace HammerEverythingMod
     {
         public const string PluginGuid = "claire.valheim.hammereverything";
         public const string PluginName = "Hammer Everything";
-        public const string PluginVersion = "1.4.13";
+        public const string PluginVersion = "1.4.14";
 
         private static readonly BindingFlags AnyInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -1085,13 +1085,13 @@ namespace HammerEverythingMod
             if (_categoryPatchesInstalled)
                 AssignCustomBuildCategory(piece);
 
-            // Runtime prefab thumbnail generation is intentionally disabled.
-            // Cloned Valheim prefabs share material assets with the originals, and
-            // stripping behavioural components from those clones can trigger
-            // cleanup paths that mutate shared renderer/material state. Preserve
-            // vanilla icons where present and keep the template fallback otherwise.
-            //
-            // Do not call QueueUniqueIcon() here.
+            if (string.Equals(prefabName, "dvergrtown_arch", StringComparison.OrdinalIgnoreCase))
+                EnsureDvergrTownArchSnapPoint(prefab);
+
+            // Unique thumbnails are rendered from a fresh visual-only hierarchy.
+            // No gameplay component from the Valheim prefab is instantiated, and
+            // every material assigned to the icon clone is an isolated copy.
+            QueueUniqueIcon(prefabName, prefab, piece);
 
             if (_useCraftingCosts.Value)
             {
@@ -2001,7 +2001,6 @@ namespace HammerEverythingMod
 
         private object RenderPrefabIcon(object prefab)
         {
-            object parent = null;
             object spawn = null;
             object cameraObject = null;
             object lightObject = null;
@@ -2011,17 +2010,9 @@ namespace HammerEverythingMod
 
             try
             {
-                parent = Activator.CreateInstance(_gameObjectType, new object[] { "HammerEverything Icon Parent" });
-                SetGameObjectActive(parent, false);
-
-                object parentTransform = GetPropertyValue(parent, "transform");
-                spawn = InvokeStaticWithOptionalTail(_unityObjectType, "Instantiate", prefab, parentTransform);
+                List<object> isolatedMaterials = new List<object>();
+                spawn = CreateVisualOnlyIconClone(prefab, isolatedMaterials);
                 if (spawn == null)
-                    return null;
-
-                SetGameObjectActive(spawn, false);
-
-                if (!StripCloneToVisuals(spawn))
                     return null;
 
                 SetLayerRecursive(spawn, IconLayer);
@@ -2029,10 +2020,6 @@ namespace HammerEverythingMod
                 object spawnTransform = GetPropertyValue(spawn, "transform");
                 if (spawnTransform == null)
                     return null;
-
-                SetPropertyIfExists(spawnTransform, "parent", null);
-                DestroyUnityObjectImmediate(parent);
-                parent = null;
 
                 SetPropertyIfExists(spawnTransform, "position", CreateVector3(0f, 0f, 0f));
                 SetPropertyIfExists(
@@ -2160,9 +2147,260 @@ namespace HammerEverythingMod
                 }
 
                 DestroyUnityObjectImmediate(spawn);
-                DestroyUnityObjectImmediate(parent);
                 DestroyUnityObjectImmediate(cameraObject);
                 DestroyUnityObjectImmediate(lightObject);
+
+                if (isolatedMaterials != null)
+                {
+                    foreach (object material in isolatedMaterials)
+                        DestroyUnityObjectImmediate(material);
+                }
+            }
+        }
+
+        private object CreateVisualOnlyIconClone(object prefab, List<object> isolatedMaterials)
+        {
+            if (prefab == null ||
+                _gameObjectType == null ||
+                _transformType == null ||
+                _meshFilterType == null ||
+                _meshRendererType == null)
+            {
+                return null;
+            }
+
+            object visualRoot = Activator.CreateInstance(
+                _gameObjectType,
+                new object[] { "HammerEverything Icon Visual" });
+
+            if (visualRoot == null)
+                return null;
+
+            SetGameObjectActive(visualRoot, false);
+
+            object sourceTransform = GetPropertyValue(prefab, "transform");
+            object targetTransform = GetPropertyValue(visualRoot, "transform");
+            if (sourceTransform == null || targetTransform == null)
+            {
+                DestroyUnityObjectImmediate(visualRoot);
+                return null;
+            }
+
+            int rendererCount = 0;
+
+            try
+            {
+                CopyIconVisualNode(
+                    sourceTransform,
+                    targetTransform,
+                    true,
+                    isolatedMaterials,
+                    ref rendererCount);
+            }
+            catch
+            {
+                DestroyUnityObjectImmediate(visualRoot);
+                throw;
+            }
+
+            if (rendererCount == 0)
+            {
+                DestroyUnityObjectImmediate(visualRoot);
+                return null;
+            }
+
+            return visualRoot;
+        }
+
+        private void CopyIconVisualNode(
+            object sourceTransform,
+            object targetTransform,
+            bool isRoot,
+            List<object> isolatedMaterials,
+            ref int rendererCount)
+        {
+            object sourceGameObject = GetPropertyValue(sourceTransform, "gameObject");
+            object targetGameObject = GetPropertyValue(targetTransform, "gameObject");
+            if (sourceGameObject == null || targetGameObject == null)
+                return;
+
+            if (isRoot)
+            {
+                object sourceScale = GetPropertyValue(sourceTransform, "localScale");
+                if (sourceScale != null)
+                    SetPropertyIfExists(targetTransform, "localScale", sourceScale);
+            }
+            else
+            {
+                object localPosition = GetPropertyValue(sourceTransform, "localPosition");
+                object localRotation = GetPropertyValue(sourceTransform, "localRotation");
+                object localScale = GetPropertyValue(sourceTransform, "localScale");
+
+                if (localPosition != null)
+                    SetPropertyIfExists(targetTransform, "localPosition", localPosition);
+                if (localRotation != null)
+                    SetPropertyIfExists(targetTransform, "localRotation", localRotation);
+                if (localScale != null)
+                    SetPropertyIfExists(targetTransform, "localScale", localScale);
+            }
+
+            object sourceMeshFilter = GetComponent(sourceGameObject, _meshFilterType);
+            object sourceMeshRenderer = GetComponent(sourceGameObject, _meshRendererType);
+
+            if (sourceMeshFilter != null && sourceMeshRenderer != null)
+            {
+                object targetMeshFilter = AddComponent(targetGameObject, _meshFilterType);
+                object targetMeshRenderer = AddComponent(targetGameObject, _meshRendererType);
+                object sharedMesh = GetPropertyValue(sourceMeshFilter, "sharedMesh");
+
+                if (targetMeshFilter != null &&
+                    targetMeshRenderer != null &&
+                    sharedMesh != null)
+                {
+                    SetPropertyIfExists(targetMeshFilter, "sharedMesh", sharedMesh);
+                    CopyIsolatedRendererMaterials(
+                        sourceMeshRenderer,
+                        targetMeshRenderer,
+                        isolatedMaterials);
+                    rendererCount++;
+                }
+            }
+
+            object rawChildCount = GetPropertyValue(sourceTransform, "childCount");
+            int childCount = rawChildCount == null
+                ? 0
+                : Convert.ToInt32(rawChildCount, CultureInfo.InvariantCulture);
+
+            for (int i = 0; i < childCount; i++)
+            {
+                object sourceChild = InvokeInstanceWithOptionalTail(
+                    sourceTransform,
+                    "GetChild",
+                    i);
+
+                if (sourceChild == null)
+                    continue;
+
+                object childVisual = Activator.CreateInstance(
+                    _gameObjectType,
+                    new object[] { "HammerEverything Icon Visual Child" });
+
+                if (childVisual == null)
+                    continue;
+
+                object childTargetTransform = GetPropertyValue(childVisual, "transform");
+                if (childTargetTransform == null)
+                {
+                    DestroyUnityObjectImmediate(childVisual);
+                    continue;
+                }
+
+                SetPropertyIfExists(childTargetTransform, "parent", targetTransform);
+
+                CopyIconVisualNode(
+                    sourceChild,
+                    childTargetTransform,
+                    false,
+                    isolatedMaterials,
+                    ref rendererCount);
+            }
+        }
+
+        private void CopyIsolatedRendererMaterials(
+            object sourceRenderer,
+            object targetRenderer,
+            List<object> isolatedMaterials)
+        {
+            object rawMaterials = GetPropertyValue(sourceRenderer, "sharedMaterials");
+            if (!(rawMaterials is Array materials))
+                return;
+
+            Type elementType = materials.GetType().GetElementType();
+            if (elementType == null)
+                return;
+
+            Array copies = Array.CreateInstance(elementType, materials.Length);
+
+            for (int i = 0; i < materials.Length; i++)
+            {
+                object sourceMaterial = materials.GetValue(i);
+                object materialCopy = sourceMaterial == null
+                    ? null
+                    : InvokeStaticWithOptionalTail(
+                        _unityObjectType,
+                        "Instantiate",
+                        sourceMaterial);
+
+                copies.SetValue(materialCopy, i);
+
+                if (materialCopy != null)
+                    isolatedMaterials?.Add(materialCopy);
+            }
+
+            SetPropertyIfExists(targetRenderer, "sharedMaterials", copies);
+        }
+
+        private void EnsureDvergrTownArchSnapPoint(object prefab)
+        {
+            if (prefab == null || _gameObjectType == null || _transformType == null)
+                return;
+
+            try
+            {
+                object rawTransforms = InvokeInstanceWithOptionalTail(
+                    prefab,
+                    "GetComponentsInChildren",
+                    _transformType,
+                    true);
+
+                if (rawTransforms is IEnumerable transforms)
+                {
+                    foreach (object transform in transforms)
+                    {
+                        object gameObject = GetPropertyValue(transform, "gameObject");
+                        string childName = GetUnityName(gameObject);
+
+                        if (string.Equals(
+                                childName,
+                                "HammerEverything Arch Snappoint",
+                                StringComparison.Ordinal))
+                        {
+                            return;
+                        }
+                    }
+                }
+
+                object snapPoint = Activator.CreateInstance(
+                    _gameObjectType,
+                    new object[] { "HammerEverything Arch Snappoint" });
+
+                if (snapPoint == null)
+                    return;
+
+                object snapTransform = GetPropertyValue(snapPoint, "transform");
+                object prefabTransform = GetPropertyValue(prefab, "transform");
+
+                if (snapTransform == null || prefabTransform == null)
+                {
+                    DestroyUnityObjectImmediate(snapPoint);
+                    return;
+                }
+
+                SetPropertyIfExists(snapTransform, "parent", prefabTransform);
+                SetPropertyIfExists(
+                    snapTransform,
+                    "localPosition",
+                    CreateVector3(1f, 0.5f, 0f));
+                SetPropertyIfExists(snapPoint, "tag", "snappoint");
+                SetGameObjectActive(snapPoint, false);
+
+                if (_verboseLogging != null && _verboseLogging.Value)
+                    Logger.LogInfo("Added corrected dvergrtown_arch snap point at (1, 0.5, 0).");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(
+                    $"Could not add dvergrtown_arch snap point: {ex.GetType().Name}: {ex.Message}");
             }
         }
 
