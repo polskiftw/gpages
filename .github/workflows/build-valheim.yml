@@ -34,7 +34,6 @@ jobs:
             (Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat')
           )
           $stubDir = Join-Path $env:RUNNER_TEMP 'unity-stub'
-          $valheimInstall = Join-Path $env:RUNNER_TEMP 'valheim-server'
 
           foreach ($project in $projects) {
             New-Item -ItemType Directory -Force -Path (Join-Path $project 'lib') | Out-Null
@@ -93,28 +92,6 @@ jobs:
           Copy-Item $preloader.FullName (Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\lib\BepInEx.Preloader.dll')
           Copy-Item $cecil.FullName (Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\lib\Mono.Cecil.dll')
 
-          choco install steamcmd -y --no-progress
-          # The Chocolatey package installs SteamCMD's bootstrap binary. Give it one
-          # invocation to self-update before asking it to process app commands.
-          & steamcmd +quit
-          & steamcmd +@sSteamCmdForcePlatformType linux +force_install_dir $valheimInstall +login anonymous +app_info_update 1 +app_update 896660 validate +quit
-          if ($LASTEXITCODE -ne 0) { throw "SteamCMD Valheim server install failed with exit code $LASTEXITCODE" }
-
-          $serverData = Join-Path $valheimInstall 'valheim_server_Data'
-          $clientData = Join-Path $valheimInstall 'Valheim_Data'
-          if ((Test-Path $serverData) -and -not (Test-Path $clientData)) {
-            Move-Item $serverData $clientData
-          }
-          if (-not (Test-Path (Join-Path $clientData 'Managed\Assembly-CSharp.dll'))) {
-            throw 'Valheim managed assemblies were not installed as expected'
-          }
-
-          $vhCore = Join-Path $valheimInstall 'BepInEx\core'
-          New-Item -ItemType Directory -Force -Path $vhCore | Out-Null
-          Copy-Item $bep.FullName (Join-Path $vhCore 'BepInEx.dll')
-          Copy-Item $harmony.FullName (Join-Path $vhCore '0Harmony.dll')
-          Copy-Item $cecil.FullName (Join-Path $vhCore 'Mono.Cecil.dll')
-          "VALHEIM_INSTALL=$valheimInstall" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Enforce generic Jotunn runtime
         shell: pwsh
@@ -210,7 +187,7 @@ jobs:
       - name: Build slim Jotunn runtime
         shell: pwsh
         run: |
-          dotnet build .\valheim-jotunn-compat\src\JotunnCompat.Slim\JotunnCompat.Slim.csproj -c Release /p:ValheimInstall="$env:VALHEIM_INSTALL"
+          dotnet build .\valheim-jotunn-compat\src\JotunnCompat.Slim\JotunnCompat.Slim.csproj -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build Jotunn compatibility package
