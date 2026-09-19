@@ -108,6 +108,7 @@ try
         "m_bundleNameToLoaderIndex",
         isStatic: false);
     RequireFieldOnType(assetBundleLoader, "m_bundleLoaders", isStatic: false);
+    RequireMethodOnType(assetBundleLoader, "OnInitCompleted");
 
     var bundleLoader = RequireType(modules, "SoftReferenceableAssets.BundleLoader");
     RequireConstructor(bundleLoader, "System.String", "System.String");
@@ -116,7 +117,7 @@ try
 
     Console.WriteLine("Valheim runtime contract check passed.");
     Console.WriteLine($"  Managed assemblies scanned: {modules.Count}");
-    Console.WriteLine("  Reflection/Harmony targets checked: 35");
+    Console.WriteLine("  Reflection/Harmony targets checked: 36");
     return 0;
 }
 finally
