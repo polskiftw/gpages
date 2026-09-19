@@ -104,6 +104,12 @@ namespace Jotunn.Managers
             }
 
             namedPrefabs.Add(hash, prefab);
+
+            var terrainOp = prefab.GetComponent<TerrainOp>();
+            if (terrainOp)
+            {
+                GameInternals.RegisterTerrainOp(terrainOp);
+            }
         }
 
         public static class Cache
@@ -202,6 +208,11 @@ namespace Jotunn.Managers
                 {
                     zone.m_locations.Add(custom.ZoneLocation);
                     GameInternals.LocationHashes(zone)[hash] = custom.ZoneLocation;
+                }
+
+                if (custom.ZoneLocation.m_prefab.IsLoaded)
+                {
+                    custom.ZoneLocation.m_prefab.Release();
                 }
             }
         }
