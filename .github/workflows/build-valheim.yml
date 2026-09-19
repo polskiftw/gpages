@@ -179,6 +179,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet build .\valheim-jotunn-compat\src\JotunnCompat.ContractCheck\JotunnCompat.ContractCheck.csproj -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build .\valheim-jotunn-compat\src\JotunnCompat.CompatibilityProbe\JotunnCompat.CompatibilityProbe.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build Jotunn compatibility package
         shell: pwsh
@@ -201,6 +203,24 @@ jobs:
           $contractCheck = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.ContractCheck\bin\Release\net8.0\JotunnCompat.ContractCheck.dll'
           $compatPreloader = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.Preloader\bin\Release\net472\JotunnCompat.Preloader.dll'
           dotnet $contractCheck $upstream $compatPreloader
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          # First compatibility canary. Target-specific knowledge lives only in CI/tests;
+          # production runtime code remains completely generic.
+          $mwlVersion = '5.1.1'
+          $mwlUrl = "https://thunderstore.io/package/download/warpalicious/More_World_Locations_AIO/$mwlVersion/"
+          $mwlZip = Join-Path $env:RUNNER_TEMP "More_World_Locations_AIO-$mwlVersion.zip"
+          $mwlExtract = Join-Path $env:RUNNER_TEMP "More_World_Locations_AIO-$mwlVersion"
+          Invoke-WebRequest -Uri $mwlUrl -OutFile $mwlZip
+          Expand-Archive -Path $mwlZip -DestinationPath $mwlExtract
+
+          $mwlDll = Get-ChildItem -Path $mwlExtract -Recurse -File -Filter 'More_World_Locations_AIO.dll' | Select-Object -First 1
+          if (-not $mwlDll) {
+            throw "Could not find More_World_Locations_AIO.dll in canary package $mwlVersion"
+          }
+
+          $compatProbe = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.CompatibilityProbe\bin\Release\net8.0\JotunnCompat.CompatibilityProbe.dll'
+          dotnet $compatProbe $upstream $mwlDll.FullName
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
           $pluginDir = Join-Path $packageDir 'BepInEx\plugins\JotunnCompat'
