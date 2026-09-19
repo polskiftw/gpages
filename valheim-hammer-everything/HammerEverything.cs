@@ -2027,6 +2027,10 @@ namespace HammerEverythingMod
                     "rotation",
                     InvokeStaticWithOptionalTail(_quaternionType, "Euler", 23f, 51f, 25.8f));
 
+                // This hierarchy contains meshes/renderers only: no Piece, ZNetView,
+                // behaviours, colliders, or prefab scripts can run when activated.
+                SetGameObjectActive(spawn, true);
+
                 if (!TryGetVisualBounds(
                         spawn,
                         out float minX,
@@ -2402,59 +2406,6 @@ namespace HammerEverythingMod
                 Logger.LogWarning(
                     $"Could not add dvergrtown_arch snap point: {ex.GetType().Name}: {ex.Message}");
             }
-        }
-
-        private bool StripCloneToVisuals(object root)
-        {
-            object rawComponents = InvokeInstanceWithOptionalTail(
-                root,
-                "GetComponentsInChildren",
-                _componentType,
-                true);
-
-            if (!(rawComponents is IEnumerable components))
-                return false;
-
-            List<object> removable = new List<object>();
-
-            foreach (object component in components)
-            {
-                if (component == null)
-                    continue;
-
-                Type type = component.GetType();
-                bool keep =
-                    (_transformType != null && _transformType.IsAssignableFrom(type)) ||
-                    (_rendererType != null && _rendererType.IsAssignableFrom(type)) ||
-                    (_meshFilterType != null && _meshFilterType.IsAssignableFrom(type));
-
-                if (!keep)
-                    removable.Add(component);
-            }
-
-            while (removable.Count > 0)
-            {
-                bool madeProgress = false;
-
-                for (int i = removable.Count - 1; i >= 0; i--)
-                {
-                    try
-                    {
-                        DestroyUnityObjectImmediate(removable[i]);
-                        removable.RemoveAt(i);
-                        madeProgress = true;
-                    }
-                    catch
-                    {
-                        // A RequireComponent dependency may need another component removed first.
-                    }
-                }
-
-                if (!madeProgress)
-                    return false;
-            }
-
-            return true;
         }
 
         private void SetLayerRecursive(object root, int layer)
