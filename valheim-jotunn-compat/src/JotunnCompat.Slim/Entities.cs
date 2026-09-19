@@ -171,6 +171,7 @@ namespace Jotunn.Entities
 
     public class CustomRPC
     {
+        private const byte JotunnPackage = 1;
         internal readonly string ID;
         internal readonly NetworkManager.CoroutineHandler ServerReceive;
         internal readonly NetworkManager.CoroutineHandler ClientReceive;
@@ -185,13 +186,23 @@ namespace Jotunn.Entities
         public void SendPackage(long target, ZPackage package)
         {
             if (ZRoutedRpc.instance == null || package == null) return;
-            ZRoutedRpc.instance.InvokeRoutedRPC(target, ID, package);
+            var wrapped = new ZPackage();
+            wrapped.Write(JotunnPackage);
+            wrapped.Write(package.GetArray());
+            wrapped.SetPos(0);
+            ZRoutedRpc.instance.InvokeRoutedRPC(target, ID, wrapped);
         }
 
         internal void Receive(long sender, ZPackage package)
         {
-            var handler = ZNet.instance != null && ZNet.instance.IsServer() ? ServerReceive : ClientReceive;
-            if (handler != null && ZNet.instance != null) ZNet.instance.StartCoroutine(handler(sender, package));
+            if (package == null || package.Size() <= 0 || ZNet.instance == null) return;
+
+            var flags = package.ReadByte();
+            if ((flags & JotunnPackage) != JotunnPackage) return;
+
+            var payload = new ZPackage(package.ReadByteArray());
+            var handler = ZNet.instance.IsServer() ? ServerReceive : ClientReceive;
+            if (handler != null) ZNet.instance.StartCoroutine(handler(sender, payload));
         }
     }
 }
