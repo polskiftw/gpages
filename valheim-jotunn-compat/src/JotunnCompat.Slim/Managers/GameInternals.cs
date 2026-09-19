@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using SoftReferenceableAssets;
@@ -24,6 +25,22 @@ namespace Jotunn.Managers
         private static readonly FieldInfo RuntimeAssetLoader =
             AccessTools.Field(typeof(Runtime), "s_assetLoader");
 
+        private static readonly MethodInfo ZNetViewGetPrefabName =
+            AccessTools.Method(typeof(ZNetView), "GetPrefabName");
+        private static readonly MethodInfo RandomSpawnPrepare =
+            AccessTools.Method(typeof(RandomSpawn), "Prepare");
+        private static readonly FieldInfo RandomSpawnChildNetViews =
+            AccessTools.Field(typeof(RandomSpawn), "m_childNetViews");
+
+        private static readonly MethodInfo GetEnabledComponentsInChildrenDefinition =
+            typeof(global::Utils)
+                .GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                .FirstOrDefault(method =>
+                    method.Name == "GetEnabledComponentsInChildren" &&
+                    method.IsGenericMethodDefinition &&
+                    method.GetParameters().Length == 1 &&
+                    method.GetParameters()[0].ParameterType == typeof(GameObject));
+
         internal static Dictionary<int, GameObject> NamedPrefabs(ZNetScene scene) =>
             (Dictionary<int, GameObject>)ZNetNamedPrefabs.GetValue(scene);
 
@@ -47,5 +64,72 @@ namespace Jotunn.Managers
 
         internal static bool AssetLoaderReady =>
             AssetLoaderObject != null;
+
+        internal static IEnumerable<T> EnabledComponentsInChildren<T>(GameObject root)
+            where T : Behaviour
+        {
+            if (!root)
+            {
+                return Array.Empty<T>();
+            }
+
+            if (GetEnabledComponentsInChildrenDefinition != null)
+            {
+                try
+                {
+                    var method = GetEnabledComponentsInChildrenDefinition.MakeGenericMethod(typeof(T));
+                    if (method.Invoke(null, new object[] { root }) is IEnumerable<T> result)
+                    {
+                        return result;
+                    }
+                }
+                catch
+                {
+                    // Fall through to the Unity traversal below.
+                }
+            }
+
+            return root.GetComponentsInChildren<T>(true)
+                .Where(component => component && component.enabled);
+        }
+
+        internal static string GetPrefabName(ZNetView view)
+        {
+            if (!view)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                return (string)ZNetViewGetPrefabName?.Invoke(view, Array.Empty<object>())
+                    ?? view.gameObject.name;
+            }
+            catch
+            {
+                return view.gameObject.name;
+            }
+        }
+
+        internal static void PrepareRandomSpawn(RandomSpawn spawn)
+        {
+            if (!spawn || RandomSpawnPrepare == null)
+            {
+                return;
+            }
+
+            RandomSpawnPrepare.Invoke(spawn, Array.Empty<object>());
+        }
+
+        internal static IEnumerable<ZNetView> RandomSpawnChildViews(RandomSpawn spawn)
+        {
+            if (!spawn || RandomSpawnChildNetViews == null)
+            {
+                return Array.Empty<ZNetView>();
+            }
+
+            return RandomSpawnChildNetViews.GetValue(spawn) as IEnumerable<ZNetView>
+                ?? Array.Empty<ZNetView>();
+        }
     }
 }
