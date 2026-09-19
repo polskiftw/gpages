@@ -84,6 +84,29 @@ jobs:
           Copy-Item $harmony.FullName (Join-Path $env:GITHUB_WORKSPACE 'valheim-hammer-everything\lib\0Harmony.dll')
           Copy-Item $harmony.FullName (Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\lib\0Harmony.dll')
 
+      - name: Enforce generic Jotunn runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $runtimeRoot = '.\valheim-jotunn-compat\src\JotunnCompat.FastPath'
+          $forbidden = @(
+            'MoreWorldLocations',
+            'More_World_Locations',
+            'warpalicious.More_World_Locations',
+            'jneb802'
+          )
+
+          foreach ($needle in $forbidden) {
+            $matches = Get-ChildItem $runtimeRoot -Recurse -File -Filter '*.cs' |
+              Select-String -SimpleMatch $needle
+            if ($matches) {
+              $matches | ForEach-Object { Write-Host $_.ToString() }
+              throw "Target-specific identifier '$needle' is forbidden in Jotunn runtime code."
+            }
+          }
+
+          Write-Host 'Generic Jotunn runtime invariant passed.'
+
       - name: Audit Hammer Everything recipe coverage
         shell: pwsh
         run: |
@@ -136,9 +159,13 @@ jobs:
         shell: pwsh
         run: dotnet build .\valheim-hammer-everything\HammerEverything.csproj -c Release
 
-      - name: Build Jotunn compatibility fast path
+      - name: Build Jotunn compatibility tooling
         shell: pwsh
-        run: dotnet build .\valheim-jotunn-compat\src\JotunnCompat.FastPath\JotunnCompat.FastPath.csproj -c Release
+        run: |
+          dotnet build .\valheim-jotunn-compat\src\JotunnCompat.FastPath\JotunnCompat.FastPath.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build .\valheim-jotunn-compat\src\JotunnCompat.ContractCheck\JotunnCompat.ContractCheck.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build Jotunn compatibility package
         shell: pwsh
@@ -157,6 +184,10 @@ jobs:
           if ($actualJotunnSha256 -ne $expectedJotunnSha256) {
             throw "Upstream Jotunn.dll SHA256 mismatch. Expected $expectedJotunnSha256, got $actualJotunnSha256"
           }
+
+          $contractCheck = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.ContractCheck\bin\Release\net8.0\JotunnCompat.ContractCheck.dll'
+          dotnet $contractCheck $upstream
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
           $fastPath = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.FastPath\bin\Release\net472\JotunnCompat.FastPath.dll'
 
