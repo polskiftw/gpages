@@ -42,6 +42,7 @@ RequireMethod(game, "ZoneSystem", "SetupLocations");
 
 RequireField(game, "DungeonDB", "m_rooms", isStatic: false);
 RequireMethod(game, "DungeonDB", "GenerateHashList");
+RequireMethod(game, "DungeonDB", "GetRoom", "System.Int32");
 RequireMethod(game, "DungeonDB", "Start");
 
 RequireField(game, "DungeonGenerator", "m_availableRooms", isStatic: true);
@@ -89,7 +90,7 @@ RequireMethodOnType(bundleLoader, "SetDependencies", "System.String[]");
 Console.WriteLine($"Valheim runtime contract check passed.");
 Console.WriteLine($"  Assembly-CSharp: {game.Assembly?.Name.FullName ?? game.Name}");
 Console.WriteLine($"  SoftReferenceableAssets: {soft.Assembly?.Name.FullName ?? soft.Name}");
-Console.WriteLine("  Reflection/Harmony targets checked: 31");
+Console.WriteLine("  Reflection/Harmony targets checked: 32");
 return 0;
 
 static ModuleDefinition ReadModule(string path)
