@@ -16,7 +16,7 @@ namespace HammerEverythingMod
     {
         public const string PluginGuid = "claire.valheim.hammereverything";
         public const string PluginName = "Hammer Everything";
-        public const string PluginVersion = "1.4.9";
+        public const string PluginVersion = "1.4.10";
 
         private static readonly BindingFlags AnyInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -624,6 +624,7 @@ namespace HammerEverythingMod
         private Type _meshRendererType;
         private Type _skinnedMeshRendererType;
         private Type _meshFilterType;
+        private Type _boxColliderType;
         private Type _cameraType;
         private Type _lightComponentType;
         private Type _renderTextureType;
@@ -2588,14 +2589,32 @@ namespace HammerEverythingMod
                 return cached;
 
             float lift = 0f;
+            string measurement = null;
 
             try
             {
+                ResolveTypes();
+
                 object transform = GetPropertyValue(prefab, "transform");
                 object rootPosition = GetPropertyValue(transform, "position");
                 float rootY = GetSingleMember(rootPosition, "y");
 
-                if (TryGetVisualBounds(
+                // Location braziers carry a BoxCollider around the physical metal
+                // body. Prefer its serialized shape over renderer bounds: placement
+                // ghosts may disable colliders, but BoxCollider.center/size remain
+                // valid and give us a stable physical bottom independent of LODs.
+                if (TryGetBoxColliderBottom(prefab, out float colliderMinY))
+                {
+                    float candidate = rootY - colliderMinY;
+                    if (AreFinite(candidate) && candidate > 0.001f && candidate <= 12f)
+                    {
+                        lift = candidate;
+                        measurement = "box collider";
+                    }
+                }
+
+                if (lift <= 0.001f &&
+                    TryGetVisualBounds(
                         prefab,
                         out float minX,
                         out float minY,
@@ -2607,10 +2626,13 @@ namespace HammerEverythingMod
                     float candidate = rootY - minY;
 
                     // This is only used for the small, explicit allowlist above.
-                    // Castle/location prefabs can have roots several metres below
-                    // their visible model, so keep a generous but finite sanity cap.
+                    // Castle/location prefabs can have roots several metres above
+                    // their physical base, so keep a generous but finite sanity cap.
                     if (AreFinite(candidate) && candidate > 0.001f && candidate <= 12f)
+                    {
                         lift = candidate;
+                        measurement = "renderer bounds";
+                    }
                 }
             }
             catch (Exception ex)
@@ -2623,9 +2645,99 @@ namespace HammerEverythingMod
             // activating their renderer hierarchy a frame later, so retry until
             // a real geometric offset is available.
             if (lift > 0.001f)
+            {
                 _placementLiftByPrefab[prefabName] = lift;
 
+                if (_verboseLogging != null && _verboseLogging.Value)
+                    Logger.LogInfo($"Placement lift measured for {prefabName}: +{lift:0.###}m via {measurement}.");
+            }
+
             return lift;
+        }
+
+        private bool TryGetBoxColliderBottom(object root, out float minY)
+        {
+            minY = float.PositiveInfinity;
+
+            if (root == null || _boxColliderType == null || _vector3Type == null)
+                return false;
+
+            object rawColliders = InvokeInstanceWithOptionalTail(
+                root,
+                "GetComponentsInChildren",
+                _boxColliderType,
+                true);
+
+            if (!(rawColliders is IEnumerable colliders))
+                return false;
+
+            bool found = false;
+
+            foreach (object collider in colliders)
+            {
+                if (collider == null)
+                    continue;
+
+                object transform = GetPropertyValue(collider, "transform");
+                object center = GetPropertyValue(collider, "center");
+                object size = GetPropertyValue(collider, "size");
+                if (transform == null || center == null || size == null)
+                    continue;
+
+                float cx = GetSingleMember(center, "x");
+                float cy = GetSingleMember(center, "y");
+                float cz = GetSingleMember(center, "z");
+                float sx = GetSingleMember(size, "x");
+                float sy = GetSingleMember(size, "y");
+                float sz = GetSingleMember(size, "z");
+
+                if (!AreFinite(cx, cy, cz, sx, sy, sz) ||
+                    sx <= 0f || sy <= 0f || sz <= 0f)
+                {
+                    continue;
+                }
+
+                MethodInfo transformPoint = transform.GetType().GetMethod(
+                    "TransformPoint",
+                    AnyInstance,
+                    binder: null,
+                    types: new[] { _vector3Type },
+                    modifiers: null);
+
+                if (transformPoint == null)
+                    continue;
+
+                float hx = sx * 0.5f;
+                float hy = sy * 0.5f;
+                float hz = sz * 0.5f;
+
+                for (int ix = -1; ix <= 1; ix += 2)
+                {
+                    for (int iy = -1; iy <= 1; iy += 2)
+                    {
+                        for (int iz = -1; iz <= 1; iz += 2)
+                        {
+                            object localCorner = CreateVector3(
+                                cx + (hx * ix),
+                                cy + (hy * iy),
+                                cz + (hz * iz));
+
+                            object worldCorner = transformPoint.Invoke(
+                                transform,
+                                new[] { localCorner });
+
+                            float y = GetSingleMember(worldCorner, "y");
+                            if (!AreFinite(y))
+                                continue;
+
+                            minY = Math.Min(minY, y);
+                            found = true;
+                        }
+                    }
+                }
+            }
+
+            return found;
         }
 
         private void FinalizeManagedPlacedPiece(object piece)
@@ -2928,6 +3040,8 @@ namespace HammerEverythingMod
                 _skinnedMeshRendererType = FindLoadedType("UnityEngine.SkinnedMeshRenderer");
             if (_meshFilterType == null)
                 _meshFilterType = FindLoadedType("UnityEngine.MeshFilter");
+            if (_boxColliderType == null)
+                _boxColliderType = FindLoadedType("UnityEngine.BoxCollider");
             if (_cameraType == null)
                 _cameraType = FindLoadedType("UnityEngine.Camera");
             if (_lightComponentType == null)
