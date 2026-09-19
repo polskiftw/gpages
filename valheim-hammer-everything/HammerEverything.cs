@@ -2007,10 +2007,10 @@ namespace HammerEverythingMod
             object camera = null;
             object renderTexture = null;
             object previousRenderTexture = null;
+            List<object> isolatedMaterials = new List<object>();
 
             try
             {
-                List<object> isolatedMaterials = new List<object>();
                 spawn = CreateVisualOnlyIconClone(prefab, isolatedMaterials);
                 if (spawn == null)
                     return null;
