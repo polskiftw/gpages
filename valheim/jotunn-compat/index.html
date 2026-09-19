@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2f2f7">
+<title>Jotunn Compatibility Layer — gpages</title>
+<style>
+:root{color-scheme:light dark;--bg:#f2f2f7;--card:#fff;--text:#111;--muted:#6e6e73;--border:rgba(60,60,67,.18);--accent:#007aff;--button:#007aff;--buttonText:#fff;--warn:#ff9f0a}
+@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#f5f5f7;--muted:#98989d;--border:rgba(84,84,88,.65);--accent:#0a84ff;--button:#0a84ff;--buttonText:#fff;--warn:#ffd60a}}
+*{box-sizing:border-box}body{margin:0;padding:max(28px,env(safe-area-inset-top)) 16px max(28px,env(safe-area-inset-bottom));background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}main{width:min(100%,680px);margin:0 auto}.back{display:inline-block;color:var(--accent);text-decoration:none;margin:0 0 18px}h1{font-size:32px;margin:4px 0 8px;letter-spacing:-.7px}.sub{color:var(--muted);margin:0 0 22px;line-height:1.45}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;margin-bottom:14px}.download{display:block;width:100%;text-align:center;text-decoration:none;background:var(--button);color:var(--buttonText);font-weight:700;border-radius:14px;padding:14px 16px;margin:4px 0 12px}.secondary{display:block;width:100%;text-align:center;text-decoration:none;color:var(--accent);font-weight:650;border:1px solid var(--border);border-radius:14px;padding:12px 16px;margin:8px 0}.note{font-size:13px;color:var(--muted);line-height:1.45;margin:0}.warning{font-size:14px;line-height:1.5;margin:0;border-left:3px solid var(--warn);padding-left:12px}.title{font-size:17px;font-weight:700;margin:0 0 8px}.steps{margin:0;padding-left:22px;line-height:1.6}.meta{font-size:14px;color:var(--muted);line-height:1.55;margin:0}.meta strong{color:var(--text)}code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}
+</style>
+</head>
+<body><main>
+<a class="back" href="../">‹ Valheim</a>
+<h1>Jotunn Compatibility Layer</h1>
+<p class="sub">Drop-in Jotunn compatibility for existing Valheim mods, with startup work replaced incrementally by smaller fast paths instead of forcing mods to be ported to a new framework.</p>
+
+<div class="card">
+  <a class="download" href="JotunnCompat.zip">Download JotunnCompat.zip</a>
+  <p class="note">Recommended package. Contains the compatible <code>Jotunn.dll</code> plus <code>JotunnCompat.FastPath.dll</code>.</p>
+</div>
+
+<div class="card">
+  <p class="warning"><strong>Do not install this beside official Jotunn.</strong> This package intentionally uses the same <code>Jotunn</code> assembly identity and <code>com.jotunn.jotunn</code> BepInEx GUID so existing mods accept it as Jotunn.</p>
+</div>
+
+<div class="card">
+  <div class="title">Install</div>
+  <ol class="steps">
+    <li>Install BepInEx 5 for Valheim.</li>
+    <li>Remove the official Jotunn package if it is installed.</li>
+    <li>Extract <code>JotunnCompat.zip</code> into a folder under <code>Valheim\BepInEx\plugins\</code>.</li>
+    <li>Keep <code>Jotunn.dll</code> and <code>JotunnCompat.FastPath.dll</code> together.</li>
+    <li>Launch Valheim normally.</li>
+  </ol>
+</div>
+
+<div class="card">
+  <div class="title">Compatibility strategy</div>
+  <p class="meta">The current build uses official Jotunn <strong>2.30.1</strong> as the binary/API baseline. The build rewrites selected implementation bodies while preserving the complete public Jotunn type/member surface, assembly identity, version, and plugin GUID. CI rejects the output if that public API changes.</p>
+</div>
+
+<div class="card">
+  <div class="title">Current fast paths</div>
+  <p class="meta"><strong>Obsolete PatchInit:</strong> skips the full reflection walk for dependent assemblies that cannot contain <code>PatchInitAttribute</code>.<br><br><strong>Automatic localization:</strong> replaces five recursive BepInEx plugin-tree scans with one scan, and avoids initializing the localization manager when there are no automatic translation files.</p>
+</div>
+
+<div class="card">
+  <div class="title">Direct files</div>
+  <a class="secondary" href="Jotunn.dll">Jotunn.dll</a>
+  <a class="secondary" href="JotunnCompat.FastPath.dll">JotunnCompat.FastPath.dll</a>
+  <p class="note">Use both files. The ZIP is less error-prone.</p>
+</div>
+
+<div class="card">
+  <p class="meta"><strong>License:</strong> MIT derivative; upstream Jotunn copyright and license preserved<br><strong>Target:</strong> existing Jotunn-dependent mods without recompilation<br><strong>Baseline:</strong> Jotunn 2.30.1<br><strong>Approach:</strong> compatibility first, then replace internals subsystem by subsystem</p>
+</div>
+</main></body>
+</html>
