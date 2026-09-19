@@ -10,46 +10,23 @@
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <Deterministic>true</Deterministic>
     <DebugType>portable</DebugType>
-    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
     <ValheimManaged>$(ValheimInstall)\Valheim_Data\Managed</ValheimManaged>
     <BepInExCore>$(ValheimInstall)\BepInEx\core</BepInExCore>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
   </ItemGroup>
-
   <ItemGroup>
-    <Reference Include="BepInEx">
-      <HintPath>$(BepInExCore)\BepInEx.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="0Harmony">
-      <HintPath>$(BepInExCore)\0Harmony.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="Mono.Cecil">
-      <HintPath>$(BepInExCore)\Mono.Cecil.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-
-    <Reference Include="$(ValheimManaged)\publicized_assemblies\*.dll">
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="$(ValheimManaged)\UnityEngine*.dll">
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="$(ValheimManaged)\Unity.TextMeshPro.dll">
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="$(ValheimManaged)\PlayFab.dll">
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="$(ValheimManaged)\PlayFabParty.dll">
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="$(ValheimManaged)\Splatform.dll">
-      <Private>false</Private>
-    </Reference>
+    <Reference Include="BepInEx"><HintPath>$(BepInExCore)\BepInEx.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(BepInExCore)\0Harmony.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Assembly-CSharp"><HintPath>$(ValheimManaged)\Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="assembly_valheim"><HintPath>$(ValheimManaged)\assembly_valheim.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="assembly_utils"><HintPath>$(ValheimManaged)\assembly_utils.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="SoftReferenceableAssets"><HintPath>$(ValheimManaged)\SoftReferenceableAssets.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(ValheimManaged)\UnityEngine.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(ValheimManaged)\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.AssetBundleModule"><HintPath>$(ValheimManaged)\UnityEngine.AssetBundleModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.AudioModule"><HintPath>$(ValheimManaged)\UnityEngine.AudioModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.PhysicsModule"><HintPath>$(ValheimManaged)\UnityEngine.PhysicsModule.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
 </Project>
