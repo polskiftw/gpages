@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using HarmonyLib;
 using UnityEngine;
 
 namespace Jotunn.Extensions
@@ -80,9 +82,21 @@ namespace Jotunn
             return ZNetInstanceType.Server;
         }
 
+        private static readonly FieldInfo AdminListField =
+            AccessTools.Field(typeof(ZNet), "m_adminList");
+        private static readonly MethodInfo ListContainsIdMethod =
+            AccessTools.Method(typeof(ZNet), "ListContainsId");
+
         public static bool IsAdmin(this ZNet znet, long uid)
         {
-            if (!znet || znet.m_adminList == null)
+            if (!znet || AdminListField == null ||
+                ListContainsIdMethod == null)
+            {
+                return false;
+            }
+
+            var adminList = AdminListField.GetValue(znet);
+            if (adminList == null)
             {
                 return false;
             }
@@ -94,8 +108,21 @@ namespace Jotunn
             }
 
             var hostname = peer.m_socket.GetHostName();
-            return !string.IsNullOrEmpty(hostname) &&
-                znet.ListContainsId(znet.m_adminList, hostname);
+            if (string.IsNullOrEmpty(hostname))
+            {
+                return false;
+            }
+
+            try
+            {
+                return (bool)ListContainsIdMethod.Invoke(
+                    znet,
+                    new[] { adminList, (object)hostname });
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }
