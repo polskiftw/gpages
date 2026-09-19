@@ -5,7 +5,7 @@ using HarmonyLib;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace JotunnCompat.FastPath
+namespace JotunnCompat.Runtime
 {
     /// <summary>
     /// Positive memoization in front of Jotunn PrefabManager.Cache.
