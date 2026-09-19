@@ -97,7 +97,7 @@ jobs:
           # The Chocolatey package installs SteamCMD's bootstrap binary. Give it one
           # invocation to self-update before asking it to process app commands.
           & steamcmd +quit
-          & steamcmd +force_install_dir $valheimInstall +login anonymous +app_info_update 1 +app_update 896660 validate +quit
+          & steamcmd +@sSteamCmdForcePlatformType linux +force_install_dir $valheimInstall +login anonymous +app_info_update 1 +app_update 896660 validate +quit
           if ($LASTEXITCODE -ne 0) { throw "SteamCMD Valheim server install failed with exit code $LASTEXITCODE" }
 
           $serverData = Join-Path $valheimInstall 'valheim_server_Data'
