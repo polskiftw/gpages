@@ -341,10 +341,16 @@ jobs:
             throw "No DLLs found in ValheimRAFT canary package $raftVersion"
           }
 
+          $raftFailures = @()
           foreach ($candidate in $raftDlls) {
             Write-Host "ValheimRAFT compatibility probe: $($candidate.FullName)"
             dotnet $compatProbe $slim $candidate.FullName
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            if ($LASTEXITCODE -ne 0) {
+              $raftFailures += $candidate.Name
+            }
+          }
+          if ($raftFailures.Count -ne 0) {
+            throw "ValheimRAFT compatibility probe failed for: $($raftFailures -join ', ')"
           }
 
           $pluginDir = Join-Path $packageDir 'BepInEx\plugins\JotunnCompat'
