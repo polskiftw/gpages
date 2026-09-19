@@ -85,3 +85,68 @@ The next required validation is live Valheim testing with:
 - networking behavior checked where MWL uses custom RPCs
 
 A failure found with this target must be fixed at the underlying generic Jotunn contract level. Do not add a MWL-specific runtime branch.
+
+## ValheimRAFT
+
+Canary package: ValheimRAFT 4.3.5 (`team0/ValheimRAFT` on Thunderstore).
+
+ValheimRAFT is the second broad canary. It expands coverage beyond world-generation APIs into Jotunn's item/recipe/piece registration, GUI helpers, minimap lifecycle events, runtime texture loading, transform extensions, and network helpers.
+
+### Jotunn surface exercised
+
+The ValheimRAFT package currently exercises generic compatibility for:
+
+- `ItemConfig`, `PieceConfig`, `PieceTableConfig`, `RecipeConfig`, and `RequirementConfig`
+- `CustomItem`, `CustomPiece`, `CustomPieceTable`, and `CustomRecipe`
+- `ItemManager`: item lookup, recipe lookup, and recipe registration
+- `PieceManager`: piece/piece-table registration and lookup
+- `GUIManager`: style helpers, buttons, inputs, scroll views, wood panels, color picker, input blocking, and GUI lifecycle
+- `MinimapManager.OnVanillaMapDataLoaded`
+- `LocalizationManager.AddToken`
+- `AssetUtils.LoadTexture`
+- transform/GameObject deep-child helpers
+- `ZNetExtension` local/client/admin helpers
+- synchronization compatibility types
+
+The implementation remains generic: ValheimRAFT identifiers are rejected from production runtime source by CI.
+
+### ValheimRAFT binary compatibility status
+
+CI probes every DLL shipped in ValheimRAFT 4.3.5 against the source-built slim `Jotunn.dll`.
+
+Jotunn-referencing assemblies:
+
+- `DynamicLocations.dll`: **10 Jotunn types / 19 Jotunn members**
+- `ValheimRAFT.dll`: **9 Jotunn types / 9 Jotunn members**
+- `ValheimVehicles.dll`: **26 Jotunn types / 103 Jotunn members**
+- `ZdoWatcher.dll`: **8 Jotunn types / 13 Jotunn members**
+
+`ServerSync.dll` and `Zolantris.Shared.dll` contain no Jotunn assembly reference and are therefore skipped by the compatibility probe.
+
+All referenced Jotunn symbols in every Jotunn-dependent DLL resolve against the slim build.
+
+### Current-game binary validation
+
+The same CI run compiles the slim runtime against the SHA-256-pinned unpublished-draft `Managed.zip` from the current Valheim installation. The Cecil contract checker also verifies current private/version-sensitive bridges used for:
+
+- `ZNet` admin-list lookup
+- `GameCamera` mouse capture/input blocking
+- minimap map-ready lifecycle selection
+- Unity runtime image decoding
+- the existing ObjectDB, ZoneSystem, DungeonDB, localization, and SoftReferenceableAssets bridges
+
+The exact-game contract check and slim compilation are currently passing.
+
+### Remaining validation
+
+ValheimRAFT now passes static binary/API compatibility. The next validation is live Valheim testing with official Jotunn absent and the slim replacement installed, checking at minimum:
+
+- plugin startup without loader/Harmony exceptions
+- vehicle hammer/item/piece registration
+- recipes and custom piece tables
+- vehicle configuration UI and color picker
+- map pin/minimap behavior
+- texture loading
+- multiplayer/admin-dependent behavior
+
+A failure found with this target must be fixed at the underlying generic Jotunn contract level. Do not add a ValheimRAFT-specific runtime branch.
