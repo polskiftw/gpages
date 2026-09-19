@@ -33,8 +33,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\JotunnCompat.FastPath\Startup.cs" Link="Runtime\Startup.cs" />
-    <Compile Include="..\JotunnCompat.FastPath\PrefabCacheFastPath.cs" Link="Runtime\PrefabCacheFastPath.cs" />
-    <Compile Include="..\JotunnCompat.FastPath\ReferenceFastPath.cs" Link="Runtime\ReferenceFastPath.cs" />
+    <Compile Include="..\JotunnCompat.Runtime\Startup.cs" Link="Runtime\Startup.cs" />
+    <Compile Include="..\JotunnCompat.Runtime\PrefabCacheFastPath.cs" Link="Runtime\PrefabCacheFastPath.cs" />
+    <Compile Include="..\JotunnCompat.Runtime\ReferenceFastPath.cs" Link="Runtime\ReferenceFastPath.cs" />
   </ItemGroup>
 </Project>
