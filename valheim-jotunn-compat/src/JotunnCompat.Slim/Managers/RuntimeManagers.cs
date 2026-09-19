@@ -339,8 +339,8 @@ namespace Jotunn.Managers
         private static void ObjectDBAwakePostfix() => ItemManager.Instance.InvokeRegistered();
 
         [HarmonyPatch(typeof(ZoneSystem), nameof(ZoneSystem.SetupLocations))]
-        [HarmonyPrefix]
-        private static void ZoneSetupPrefix(ZoneSystem __instance)
+        [HarmonyPostfix]
+        private static void ZoneSetupPostfix(ZoneSystem __instance)
         {
             PrefabManager.Cache.Clear();
             ZoneManager.Instance.Setup(__instance);
