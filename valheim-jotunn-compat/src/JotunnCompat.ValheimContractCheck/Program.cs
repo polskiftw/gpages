@@ -59,15 +59,15 @@ RequireMethod(
     "GetAllAssetPathsInBundleMappedToAssetID");
 
 var assetLoader = RequireType(soft, "SoftReferenceableAssets.AssetLoader");
-RequireField(assetLoader, "m_assetID", isStatic: false);
-RequireField(assetLoader, "m_asset", isStatic: false);
-RequireField(assetLoader, "m_bundleLoaderIndex", isStatic: false);
+RequireFieldOnType(assetLoader, "m_assetID", isStatic: false);
+RequireFieldOnType(assetLoader, "m_asset", isStatic: false);
+RequireFieldOnType(assetLoader, "m_bundleLoaderIndex", isStatic: false);
 RequireConstructor(
     assetLoader,
     "SoftReferenceableAssets.AssetID",
     "SoftReferenceableAssets.AssetLocation");
-RequireMethod(assetLoader, "HoldReference");
-RequireMethod(
+RequireMethodOnType(assetLoader, "HoldReference");
+RequireMethodOnType(
     assetLoader,
     "InvokeCallbacks",
     "SoftReferenceableAssets.LoadResult");
@@ -76,15 +76,15 @@ var assetLocation = RequireType(soft, "SoftReferenceableAssets.AssetLocation");
 RequireConstructor(assetLocation, "System.String", "System.String");
 
 var assetBundleLoader = RequireType(soft, "SoftReferenceableAssets.AssetBundleLoader");
-RequireField(assetBundleLoader, "m_assetIDToLoaderIndex", isStatic: false);
-RequireField(assetBundleLoader, "m_assetLoaders", isStatic: false);
-RequireField(assetBundleLoader, "m_bundleNameToLoaderIndex", isStatic: false);
-RequireField(assetBundleLoader, "m_bundleLoaders", isStatic: false);
+RequireFieldOnType(assetBundleLoader, "m_assetIDToLoaderIndex", isStatic: false);
+RequireFieldOnType(assetBundleLoader, "m_assetLoaders", isStatic: false);
+RequireFieldOnType(assetBundleLoader, "m_bundleNameToLoaderIndex", isStatic: false);
+RequireFieldOnType(assetBundleLoader, "m_bundleLoaders", isStatic: false);
 
 var bundleLoader = RequireType(soft, "SoftReferenceableAssets.BundleLoader");
 RequireConstructor(bundleLoader, "System.String", "System.String");
-RequireMethod(bundleLoader, "HoldReference");
-RequireMethod(bundleLoader, "SetDependencies", "System.String[]");
+RequireMethodOnType(bundleLoader, "HoldReference");
+RequireMethodOnType(bundleLoader, "SetDependencies", "System.String[]");
 
 Console.WriteLine($"Valheim runtime contract check passed.");
 Console.WriteLine($"  Assembly-CSharp: {game.Assembly?.Name.FullName ?? game.Name}");
@@ -141,13 +141,13 @@ static FieldDefinition RequireField(
     string fieldName,
     bool isStatic)
 {
-    return RequireField(
+    return RequireFieldOnType(
         RequireType(module, typeFullName),
         fieldName,
         isStatic);
 }
 
-static FieldDefinition RequireField(
+static FieldDefinition RequireFieldOnType(
     TypeDefinition type,
     string fieldName,
     bool isStatic)
@@ -178,13 +178,13 @@ static MethodDefinition RequireMethod(
     string methodName,
     params string[] parameterTypes)
 {
-    return RequireMethod(
+    return RequireMethodOnType(
         RequireType(module, typeFullName),
         methodName,
         parameterTypes);
 }
 
-static MethodDefinition RequireMethod(
+static MethodDefinition RequireMethodOnType(
     TypeDefinition type,
     string methodName,
     params string[] parameterTypes)
@@ -250,5 +250,5 @@ static MethodDefinition RequireConstructor(
     TypeDefinition type,
     params string[] parameterTypes)
 {
-    return RequireMethod(type, ".ctor", parameterTypes);
+    return RequireMethodOnType(type, ".ctor", parameterTypes);
 }
