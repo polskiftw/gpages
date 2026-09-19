@@ -121,7 +121,6 @@ namespace Jotunn.Entities
             RoomData = new DungeonDB.RoomData
             {
                 m_prefab = softReferencePrefab,
-                m_loadedRoom = null,
                 m_enabled = config.Enabled ?? true,
                 m_theme = GetRoomTheme(ThemeName)
             };
@@ -157,16 +156,16 @@ namespace Jotunn.Entities
             {
                 var key = kv.Key.TrimStart('$');
                 lang[key] = kv.Value;
-                if (Localization.m_instance != null) Localization.m_instance.AddWord(key, kv.Value);
+                if (Localization.instance != null) Localization.instance.AddWord(key, kv.Value);
             }
         }
 
         internal void ApplyCurrent()
         {
-            if (Localization.m_instance == null) return;
-            var language = Localization.m_instance.GetSelectedLanguage();
+            if (Localization.instance == null) return;
+            var language = Localization.instance.GetSelectedLanguage();
             if (!map.TryGetValue(language, out var words) && !map.TryGetValue("English", out words)) return;
-            foreach (var kv in words) Localization.m_instance.AddWord(kv.Key, kv.Value);
+            foreach (var kv in words) Localization.instance.AddWord(kv.Key, kv.Value);
         }
     }
 
