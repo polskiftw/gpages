@@ -16,7 +16,7 @@ namespace HammerEverythingMod
     {
         public const string PluginGuid = "claire.valheim.hammereverything";
         public const string PluginName = "Hammer Everything";
-        public const string PluginVersion = "1.4.10";
+        public const string PluginVersion = "1.4.11";
 
         private static readonly BindingFlags AnyInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -703,7 +703,7 @@ namespace HammerEverythingMod
                 "Advanced",
                 "VerboseLogging",
                 false,
-                "Log each prefab added to the Hammer.");
+                "Log prefab registration and placement-alignment diagnostics.");
 
             _enabled.SettingChanged += OnConfigChanged;
             _automaticPropScan.SettingChanged += OnConfigChanged;
@@ -2537,7 +2537,14 @@ namespace HammerEverythingMod
                 return;
 
             string name = NormalizeInstanceName(GetUnityName(ghost));
-            if (string.IsNullOrEmpty(name) || !GroundAlignedPrefabNames.Contains(name))
+            bool explicitGroundAlignment =
+                !string.IsNullOrEmpty(name) &&
+                GroundAlignedPrefabNames.Contains(name);
+            bool automaticMicroAlignment =
+                !string.IsNullOrEmpty(name) &&
+                _managedPrefabNames.Contains(name);
+
+            if (!explicitGroundAlignment && !automaticMicroAlignment)
             {
                 _placementGhostCorrections.Remove(ghost);
                 return;
@@ -2603,17 +2610,44 @@ namespace HammerEverythingMod
                 // body. Prefer its serialized shape over renderer bounds: placement
                 // ghosts may disable colliders, but BoxCollider.center/size remain
                 // valid and give us a stable physical bottom independent of LODs.
-                if (TryGetBoxColliderBottom(prefab, out float colliderMinY))
+                if (TryGetBoxColliderVerticalBounds(
+                        prefab,
+                        out float colliderMinY,
+                        out float colliderMaxY))
                 {
                     float candidate = rootY - colliderMinY;
-                    if (AreFinite(candidate) && candidate > 0.001f && candidate <= 12f)
+                    float colliderHeight = colliderMaxY - colliderMinY;
+                    bool explicitGroundAlignment = GroundAlignedPrefabNames.Contains(prefabName);
+
+                    // Explicitly audited problem props may have wildly displaced
+                    // roots, so retain the broad correction range for those.
+                    // Every other Hammer Everything prefab gets only a conservative
+                    // micro-correction: <= 12 cm and <= 20% of its physical height.
+                    // That fixes small floor clipping without reinterpreting a
+                    // deliberately center-anchored wall/ceiling prop as ground-based.
+                    bool acceptable =
+                        explicitGroundAlignment
+                            ? candidate <= 12f
+                            : candidate <= 0.12f &&
+                              colliderHeight > 0.001f &&
+                              candidate <= colliderHeight * 0.20f;
+
+                    if (AreFinite(candidate, colliderHeight) &&
+                        candidate > 0.001f &&
+                        acceptable)
                     {
                         lift = candidate;
-                        measurement = "box collider";
+                        measurement = explicitGroundAlignment
+                            ? "box collider (explicit)"
+                            : "box collider (automatic micro-alignment)";
                     }
                 }
 
+                // Renderer fallback is intentionally restricted to the explicit
+                // allowlist. It is too easy for LOD/decorative renderer hierarchies
+                // to imply a false floor on arbitrary hidden props.
                 if (lift <= 0.001f &&
+                    GroundAlignedPrefabNames.Contains(prefabName) &&
                     TryGetVisualBounds(
                         prefab,
                         out float minX,
@@ -2655,9 +2689,13 @@ namespace HammerEverythingMod
             return lift;
         }
 
-        private bool TryGetBoxColliderBottom(object root, out float minY)
+        private bool TryGetBoxColliderVerticalBounds(
+            object root,
+            out float minY,
+            out float maxY)
         {
             minY = float.PositiveInfinity;
+            maxY = float.NegativeInfinity;
 
             if (root == null || _boxColliderType == null || _vector3Type == null)
                 return false;
@@ -2731,13 +2769,14 @@ namespace HammerEverythingMod
                                 continue;
 
                             minY = Math.Min(minY, y);
+                            maxY = Math.Max(maxY, y);
                             found = true;
                         }
                     }
                 }
             }
 
-            return found;
+            return found && maxY > minY;
         }
 
         private void FinalizeManagedPlacedPiece(object piece)
