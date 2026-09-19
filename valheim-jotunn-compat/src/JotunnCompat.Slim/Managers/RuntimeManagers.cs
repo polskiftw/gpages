@@ -326,19 +326,19 @@ namespace Jotunn.Managers
         [HarmonyPrefix]
         private static void ObjectDBCopyPrefix() => PrefabManager.Instance.InvokeVanilla();
 
-        [HarmonyPatch(typeof(ZNetScene), nameof(ZNetScene.Awake))]
+        [HarmonyPatch(typeof(ZNetScene), "Awake")]
         [HarmonyPostfix]
         private static void ZNetSceneAwake(ZNetScene __instance) => PrefabManager.Instance.RegisterAll(__instance);
 
-        [HarmonyPatch(typeof(ObjectDB), nameof(ObjectDB.Awake))]
+        [HarmonyPatch(typeof(ObjectDB), "Awake")]
         [HarmonyPrefix]
         private static void ObjectDBAwakePrefix(ObjectDB __instance) => ItemManager.Instance.Register(__instance);
 
-        [HarmonyPatch(typeof(ObjectDB), nameof(ObjectDB.Awake))]
+        [HarmonyPatch(typeof(ObjectDB), "Awake")]
         [HarmonyPostfix]
         private static void ObjectDBAwakePostfix() => ItemManager.Instance.InvokeRegistered();
 
-        [HarmonyPatch(typeof(ZoneSystem), nameof(ZoneSystem.SetupLocations))]
+        [HarmonyPatch(typeof(ZoneSystem), "SetupLocations")]
         [HarmonyPostfix]
         private static void ZoneSetupPostfix(ZoneSystem __instance)
         {
@@ -350,11 +350,11 @@ namespace Jotunn.Managers
         [HarmonyPostfix]
         private static void DungeonStart(DungeonDB __instance) => DungeonManager.Instance.StartDungeonDB(__instance);
 
-        [HarmonyPatch(typeof(DungeonGenerator), nameof(DungeonGenerator.SetupAvailableRooms))]
+        [HarmonyPatch(typeof(DungeonGenerator), "SetupAvailableRooms")]
         [HarmonyPostfix]
         private static void DungeonRooms(DungeonGenerator __instance) => DungeonManager.Instance.AppendRooms(__instance);
 
-        [HarmonyPatch(typeof(Game), nameof(Game.Start))]
+        [HarmonyPatch(typeof(Game), "Start")]
         [HarmonyPostfix]
         private static void GameStart() => NetworkManager.Instance.RegisterAll();
 
