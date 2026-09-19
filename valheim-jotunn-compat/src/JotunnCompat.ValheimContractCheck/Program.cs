@@ -14,110 +14,141 @@ if (!Directory.Exists(managed))
         $"Valheim managed directory not found: {managed}");
 }
 
-var assemblyCSharpPath = Path.Combine(managed, "Assembly-CSharp.dll");
-var softRefsPath = Path.Combine(managed, "SoftReferenceableAssets.dll");
-
-if (!File.Exists(assemblyCSharpPath))
+var modules = new List<ModuleDefinition>();
+foreach (var path in Directory.EnumerateFiles(managed, "*.dll"))
 {
-    throw new FileNotFoundException("Assembly-CSharp.dll not found", assemblyCSharpPath);
-}
-if (!File.Exists(softRefsPath))
-{
-    throw new FileNotFoundException("SoftReferenceableAssets.dll not found", softRefsPath);
-}
-
-using var game = ReadModule(assemblyCSharpPath);
-using var soft = ReadModule(softRefsPath);
-
-// Private Valheim members reached by GameInternals and Harmony string targets.
-RequireField(game, "ZNetScene", "m_namedPrefabs", isStatic: false);
-RequireMethod(game, "ZNetScene", "Awake");
-
-RequireField(game, "ObjectDB", "m_itemByHash", isStatic: false);
-RequireMethod(game, "ObjectDB", "Awake");
-RequireMethod(game, "ObjectDB", "CopyOtherDB", "ObjectDB");
-
-RequireField(game, "ZoneSystem", "m_locationsByHash", isStatic: false);
-RequireMethod(game, "ZoneSystem", "SetupLocations");
-
-RequireField(game, "DungeonDB", "m_rooms", isStatic: false);
-RequireMethod(game, "DungeonDB", "GenerateHashList");
-RequireMethod(game, "DungeonDB", "GetRoom", "System.Int32");
-RequireMethod(game, "DungeonDB", "Start");
-
-RequireField(game, "DungeonGenerator", "m_availableRooms", isStatic: true);
-RequireMethod(game, "DungeonGenerator", "SetupAvailableRooms");
-
-RequireMethod(game, "Game", "Start");
-RequireMethod(game, "Localization", "AddWord", "System.String", "System.String");
-RequireUniqueMethod(game, "Localization", "SetupLanguage");
-
-// SoftReferenceableAssets internals used by the slim runtime asset bridge.
-RequireField(soft, "SoftReferenceableAssets.Runtime", "s_assetLoader", isStatic: true);
-RequireMethod(
-    soft,
-    "SoftReferenceableAssets.Runtime",
-    "GetAllAssetPathsInBundleMappedToAssetID");
-
-var assetLoader = RequireType(soft, "SoftReferenceableAssets.AssetLoader");
-RequireFieldOnType(assetLoader, "m_assetID", isStatic: false);
-RequireFieldOnType(assetLoader, "m_asset", isStatic: false);
-RequireFieldOnType(assetLoader, "m_bundleLoaderIndex", isStatic: false);
-RequireConstructor(
-    assetLoader,
-    "SoftReferenceableAssets.AssetID",
-    "SoftReferenceableAssets.AssetLocation");
-RequireMethodOnType(assetLoader, "HoldReference");
-RequireMethodOnType(
-    assetLoader,
-    "InvokeCallbacks",
-    "SoftReferenceableAssets.LoadResult");
-
-var assetLocation = RequireType(soft, "SoftReferenceableAssets.AssetLocation");
-RequireConstructor(assetLocation, "System.String", "System.String");
-
-var assetBundleLoader = RequireType(soft, "SoftReferenceableAssets.AssetBundleLoader");
-RequireFieldOnType(assetBundleLoader, "m_assetIDToLoaderIndex", isStatic: false);
-RequireFieldOnType(assetBundleLoader, "m_assetLoaders", isStatic: false);
-RequireFieldOnType(assetBundleLoader, "m_bundleNameToLoaderIndex", isStatic: false);
-RequireFieldOnType(assetBundleLoader, "m_bundleLoaders", isStatic: false);
-
-var bundleLoader = RequireType(soft, "SoftReferenceableAssets.BundleLoader");
-RequireConstructor(bundleLoader, "System.String", "System.String");
-RequireMethodOnType(bundleLoader, "HoldReference");
-RequireMethodOnType(bundleLoader, "SetDependencies", "System.String[]");
-
-Console.WriteLine($"Valheim runtime contract check passed.");
-Console.WriteLine($"  Assembly-CSharp: {game.Assembly?.Name.FullName ?? game.Name}");
-Console.WriteLine($"  SoftReferenceableAssets: {soft.Assembly?.Name.FullName ?? soft.Name}");
-Console.WriteLine("  Reflection/Harmony targets checked: 32");
-return 0;
-
-static ModuleDefinition ReadModule(string path)
-{
-    return ModuleDefinition.ReadModule(path, new ReaderParameters
+    try
     {
-        ReadingMode = ReadingMode.Deferred,
-        ReadSymbols = false
-    });
+        modules.Add(ModuleDefinition.ReadModule(
+            path,
+            new ReaderParameters
+            {
+                ReadingMode = ReadingMode.Deferred,
+                ReadSymbols = false
+            }));
+    }
+    catch (BadImageFormatException)
+    {
+        // Ignore any native/helper DLL that is not a managed assembly.
+    }
 }
 
-static TypeDefinition RequireType(ModuleDefinition module, string fullName)
+if (modules.Count == 0)
 {
-    foreach (var type in module.Types)
+    throw new InvalidDataException(
+        $"No managed assemblies could be read from {managed}");
+}
+
+try
+{
+    // Private Valheim members reached by GameInternals and Harmony string targets.
+    RequireField(modules, "ZNetScene", "m_namedPrefabs", isStatic: false);
+    RequireMethod(modules, "ZNetScene", "Awake");
+
+    RequireField(modules, "ObjectDB", "m_itemByHash", isStatic: false);
+    RequireMethod(modules, "ObjectDB", "Awake");
+    RequireMethod(modules, "ObjectDB", "CopyOtherDB", "ObjectDB");
+
+    RequireField(modules, "ZoneSystem", "m_locationsByHash", isStatic: false);
+    RequireMethod(modules, "ZoneSystem", "SetupLocations");
+
+    RequireField(modules, "DungeonDB", "m_rooms", isStatic: false);
+    RequireMethod(modules, "DungeonDB", "GenerateHashList");
+    RequireMethod(modules, "DungeonDB", "GetRoom", "System.Int32");
+    RequireMethod(modules, "DungeonDB", "Start");
+
+    RequireField(modules, "DungeonGenerator", "m_availableRooms", isStatic: true);
+    RequireMethod(modules, "DungeonGenerator", "SetupAvailableRooms");
+
+    RequireMethod(modules, "Game", "Start");
+    RequireMethod(modules, "Localization", "AddWord", "System.String", "System.String");
+    RequireUniqueMethod(modules, "Localization", "SetupLanguage");
+
+    // SoftReferenceableAssets internals used by the slim runtime asset bridge.
+    RequireField(
+        modules,
+        "SoftReferenceableAssets.Runtime",
+        "s_assetLoader",
+        isStatic: true);
+    RequireMethod(
+        modules,
+        "SoftReferenceableAssets.Runtime",
+        "GetAllAssetPathsInBundleMappedToAssetID");
+
+    var assetLoader = RequireType(modules, "SoftReferenceableAssets.AssetLoader");
+    RequireFieldOnType(assetLoader, "m_assetID", isStatic: false);
+    RequireFieldOnType(assetLoader, "m_asset", isStatic: false);
+    RequireFieldOnType(assetLoader, "m_bundleLoaderIndex", isStatic: false);
+    RequireConstructor(
+        assetLoader,
+        "SoftReferenceableAssets.AssetID",
+        "SoftReferenceableAssets.AssetLocation");
+    RequireMethodOnType(assetLoader, "HoldReference");
+    RequireMethodOnType(
+        assetLoader,
+        "InvokeCallbacks",
+        "SoftReferenceableAssets.LoadResult");
+
+    var assetLocation = RequireType(modules, "SoftReferenceableAssets.AssetLocation");
+    RequireConstructor(assetLocation, "System.String", "System.String");
+
+    var assetBundleLoader = RequireType(
+        modules,
+        "SoftReferenceableAssets.AssetBundleLoader");
+    RequireFieldOnType(
+        assetBundleLoader,
+        "m_assetIDToLoaderIndex",
+        isStatic: false);
+    RequireFieldOnType(assetBundleLoader, "m_assetLoaders", isStatic: false);
+    RequireFieldOnType(
+        assetBundleLoader,
+        "m_bundleNameToLoaderIndex",
+        isStatic: false);
+    RequireFieldOnType(assetBundleLoader, "m_bundleLoaders", isStatic: false);
+
+    var bundleLoader = RequireType(modules, "SoftReferenceableAssets.BundleLoader");
+    RequireConstructor(bundleLoader, "System.String", "System.String");
+    RequireMethodOnType(bundleLoader, "HoldReference");
+    RequireMethodOnType(bundleLoader, "SetDependencies", "System.String[]");
+
+    Console.WriteLine("Valheim runtime contract check passed.");
+    Console.WriteLine($"  Managed assemblies scanned: {modules.Count}");
+    Console.WriteLine("  Reflection/Harmony targets checked: 32");
+    return 0;
+}
+finally
+{
+    foreach (var module in modules)
     {
-        var found = FindTypeRecursive(type, fullName);
-        if (found != null)
+        module.Dispose();
+    }
+}
+
+static TypeDefinition RequireType(
+    IEnumerable<ModuleDefinition> modules,
+    string fullName)
+{
+    foreach (var module in modules)
+    {
+        foreach (var type in module.Types)
         {
-            return found;
+            var found = FindTypeRecursive(type, fullName);
+            if (found != null)
+            {
+                Console.WriteLine(
+                    $"  TYPE {fullName} [{module.Name}]");
+                return found;
+            }
         }
     }
 
     throw new MissingMemberException(
-        $"{module.Name}: required type not found: {fullName}");
+        $"Required type not found in Valheim managed assemblies: {fullName}");
 }
 
-static TypeDefinition? FindTypeRecursive(TypeDefinition type, string fullName)
+static TypeDefinition? FindTypeRecursive(
+    TypeDefinition type,
+    string fullName)
 {
     if (string.Equals(type.FullName, fullName, StringComparison.Ordinal))
     {
@@ -137,13 +168,13 @@ static TypeDefinition? FindTypeRecursive(TypeDefinition type, string fullName)
 }
 
 static FieldDefinition RequireField(
-    ModuleDefinition module,
+    IEnumerable<ModuleDefinition> modules,
     string typeFullName,
     string fieldName,
     bool isStatic)
 {
     return RequireFieldOnType(
-        RequireType(module, typeFullName),
+        RequireType(modules, typeFullName),
         fieldName,
         isStatic);
 }
@@ -174,13 +205,13 @@ static FieldDefinition RequireFieldOnType(
 }
 
 static MethodDefinition RequireMethod(
-    ModuleDefinition module,
+    IEnumerable<ModuleDefinition> modules,
     string typeFullName,
     string methodName,
     params string[] parameterTypes)
 {
     return RequireMethodOnType(
-        RequireType(module, typeFullName),
+        RequireType(modules, typeFullName),
         methodName,
         parameterTypes);
 }
@@ -226,11 +257,11 @@ static MethodDefinition RequireMethodOnType(
 }
 
 static MethodDefinition RequireUniqueMethod(
-    ModuleDefinition module,
+    IEnumerable<ModuleDefinition> modules,
     string typeFullName,
     string methodName)
 {
-    var type = RequireType(module, typeFullName);
+    var type = RequireType(modules, typeFullName);
     var methods = type.Methods
         .Where(m => string.Equals(m.Name, methodName, StringComparison.Ordinal))
         .ToArray();
@@ -242,8 +273,7 @@ static MethodDefinition RequireUniqueMethod(
             $"found {methods.Length}.");
     }
 
-    Console.WriteLine(
-        $"  METHOD {methods[0].FullName}");
+    Console.WriteLine($"  METHOD {methods[0].FullName}");
     return methods[0];
 }
 
