@@ -273,15 +273,37 @@ jobs:
           $mwlUrl = "https://thunderstore.io/package/download/warpalicious/More_World_Locations_AIO/$mwlVersion/"
           $mwlZip = Join-Path $env:RUNNER_TEMP "More_World_Locations_AIO-$mwlVersion.zip"
           $mwlExtract = Join-Path $env:RUNNER_TEMP "More_World_Locations_AIO-$mwlVersion"
-          Invoke-WebRequest -Uri $mwlUrl -OutFile $mwlZip
+
+          $mwlDownloaded = $false
+          for ($attempt = 1; $attempt -le 4; $attempt++) {
+            try {
+              Invoke-WebRequest -Uri $mwlUrl -OutFile $mwlZip
+              $mwlDownloaded = $true
+              break
+            }
+            catch {
+              if ($attempt -eq 4) { throw }
+              Start-Sleep -Seconds (3 * $attempt)
+            }
+          }
+          if (-not $mwlDownloaded) { throw "Could not download MWL canary package $mwlVersion" }
+
           Expand-Archive -Path $mwlZip -DestinationPath $mwlExtract
 
-          $mwlDll = Get-ChildItem -Path $mwlExtract -Recurse -File -Filter 'More_World_Locations_AIO.dll' | Select-Object -First 1
-          if (-not $mwlDll) { throw "Could not find More_World_Locations_AIO.dll in canary package $mwlVersion" }
+          $mwlDlls = @(
+            Get-ChildItem -Path $mwlExtract -Recurse -File -Filter '*.dll' |
+              Sort-Object FullName
+          )
+          if ($mwlDlls.Count -eq 0) {
+            throw "No DLLs found in MWL canary package $mwlVersion"
+          }
 
           $compatProbe = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.CompatibilityProbe\bin\Release\net8.0\JotunnCompat.CompatibilityProbe.dll'
-          dotnet $compatProbe $slim $mwlDll.FullName
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($candidate in $mwlDlls) {
+            Write-Host "Compatibility probe: $($candidate.FullName)"
+            dotnet $compatProbe $slim $candidate.FullName
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
 
           $pluginDir = Join-Path $packageDir 'BepInEx\plugins\JotunnCompat'
           New-Item -ItemType Directory -Force -Path $pluginDir | Out-Null
