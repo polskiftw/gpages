@@ -145,23 +145,24 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $version = '2.30.1'
-          $url = "https://thunderstore.io/package/download/ValheimModding/Jotunn/$version/"
-          $zip = Join-Path $env:RUNNER_TEMP "jotunn-$version.zip"
-          $extract = Join-Path $env:RUNNER_TEMP "jotunn-$version"
+          $expectedJotunnSha256 = '493754EB0CA7EAA416B82910FFBCA661FA760EEEB1C560D4C85A67CB4AFFB4A1'
+          $url = "https://github.com/Valheim-Modding/Jotunn/releases/download/v$version/Jotunn.dll"
+          $upstream = Join-Path $env:RUNNER_TEMP "Jotunn-$version.dll"
           $packageDir = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\bin\Release\package'
           $packageZip = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\bin\Release\JotunnCompat.zip'
 
-          Invoke-WebRequest -Uri $url -OutFile $zip
-          Expand-Archive -Path $zip -DestinationPath $extract
+          Invoke-WebRequest -Uri $url -OutFile $upstream
 
-          $upstream = Get-ChildItem -Path $extract -Recurse -File -Filter 'Jotunn.dll' | Select-Object -First 1
-          if (-not $upstream) { throw "Could not find Jotunn.dll in upstream Jotunn $version package" }
+          $actualJotunnSha256 = (Get-FileHash $upstream -Algorithm SHA256).Hash
+          if ($actualJotunnSha256 -ne $expectedJotunnSha256) {
+            throw "Upstream Jotunn.dll SHA256 mismatch. Expected $expectedJotunnSha256, got $actualJotunnSha256"
+          }
 
           $fastPath = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.FastPath\bin\Release\net472\JotunnCompat.FastPath.dll'
 
           New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
 
-          Copy-Item -Force $upstream.FullName (Join-Path $packageDir 'Jotunn.dll')
+          Copy-Item -Force $upstream (Join-Path $packageDir 'Jotunn.dll')
           Copy-Item -Force $fastPath (Join-Path $packageDir 'JotunnCompat.FastPath.dll')
           Copy-Item -Force '.\valheim-jotunn-compat\LICENSE' (Join-Path $packageDir 'LICENSE')
           Copy-Item -Force '.\valheim-jotunn-compat\README.md' (Join-Path $packageDir 'README.md')
