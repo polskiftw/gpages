@@ -14,6 +14,12 @@ namespace Jotunn.Managers
             AccessTools.Field(typeof(ZNetScene), "m_namedPrefabs");
         private static readonly FieldInfo ObjectDbItemByHash =
             AccessTools.Field(typeof(ObjectDB), "m_itemByHash");
+        private static readonly FieldInfo ObjectDbTerrainOps =
+            AccessTools.Field(typeof(ObjectDB), "m_terrainOps");
+        private static readonly FieldInfo ObjectDbTerrainOpsByHash =
+            AccessTools.Field(typeof(ObjectDB), "m_terrainOpsByHash");
+        private static readonly MethodInfo ObjectDbGetPrefabHash =
+            AccessTools.Method(typeof(ObjectDB), "GetPrefabHash", new[] { typeof(GameObject) });
         private static readonly FieldInfo ZoneLocationsByHash =
             AccessTools.Field(typeof(ZoneSystem), "m_locationsByHash");
         private static readonly FieldInfo DungeonDbRooms =
@@ -46,6 +52,43 @@ namespace Jotunn.Managers
 
         internal static Dictionary<int, GameObject> ItemByHash(ObjectDB db) =>
             (Dictionary<int, GameObject>)ObjectDbItemByHash.GetValue(db);
+
+        internal static void RegisterTerrainOp(TerrainOp terrainOp)
+        {
+            var db = ObjectDB.instance;
+            if (db == null || !terrainOp ||
+                ObjectDbTerrainOps == null ||
+                ObjectDbTerrainOpsByHash == null ||
+                ObjectDbGetPrefabHash == null)
+            {
+                return;
+            }
+
+            var terrainOps = (List<TerrainOp>)ObjectDbTerrainOps.GetValue(db);
+            var terrainOpsByHash =
+                (Dictionary<int, TerrainOp>)ObjectDbTerrainOpsByHash.GetValue(db);
+            int hash = (int)ObjectDbGetPrefabHash.Invoke(
+                db,
+                new object[] { terrainOp.gameObject });
+
+            if (terrainOpsByHash.TryGetValue(hash, out var registered))
+            {
+                if (registered != terrainOp)
+                {
+                    Logger.LogWarning(
+                        $"TerrainOp prefab hash collision for " +
+                        $"{terrainOp.gameObject.name} ({hash})");
+                }
+                return;
+            }
+
+            if (!terrainOps.Contains(terrainOp))
+            {
+                terrainOps.Add(terrainOp);
+            }
+
+            terrainOpsByHash.Add(hash, terrainOp);
+        }
 
         internal static Dictionary<int, ZoneSystem.ZoneLocation> LocationHashes(ZoneSystem zone) =>
             (Dictionary<int, ZoneSystem.ZoneLocation>)ZoneLocationsByHash.GetValue(zone);
