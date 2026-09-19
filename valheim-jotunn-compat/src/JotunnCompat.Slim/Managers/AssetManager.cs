@@ -31,7 +31,96 @@ namespace Jotunn.Managers
             if (!asset) return default;
             var id = GenerateAssetID(asset.name);
             runtimeAssets[id] = asset;
+            if (IsReady())
+            {
+                TryRegisterRuntimeAsset(id, asset);
+            }
             return id;
+        }
+
+
+        private void TryRegisterRuntimeAsset(AssetID assetID, Object asset)
+        {
+            var loader = GameInternals.AssetLoaderObject;
+            if (loader == null || !asset) return;
+
+            try
+            {
+                var loaderType = loader.GetType();
+                var idMapField = AccessTools.Field(loaderType, "m_assetIDToLoaderIndex");
+                var assetLoadersField = AccessTools.Field(loaderType, "m_assetLoaders");
+                var bundleMapField = AccessTools.Field(loaderType, "m_bundleNameToLoaderIndex");
+                var bundleLoadersField = AccessTools.Field(loaderType, "m_bundleLoaders");
+                if (idMapField == null || assetLoadersField == null || bundleMapField == null || bundleLoadersField == null) return;
+
+                var idMap = idMapField.GetValue(loader);
+                var containsKey = AccessTools.Method(idMap.GetType(), "ContainsKey");
+                if ((bool)containsKey.Invoke(idMap, new object[] { assetID })) return;
+
+                var bundleMap = (System.Collections.IDictionary)bundleMapField.GetValue(loader);
+                var bundleLoaders = (Array)bundleLoadersField.GetValue(loader);
+                var bundleLoaderType = bundleLoaders.GetType().GetElementType();
+                var bundleName = "JVL_Slim_" + assetID.ToString();
+                int bundleIndex;
+
+                if (bundleMap.Contains(bundleName))
+                {
+                    bundleIndex = (int)bundleMap[bundleName];
+                }
+                else
+                {
+                    var bundleLoader = Activator.CreateInstance(
+                        bundleLoaderType,
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                        binder: null,
+                        args: new object[] { bundleName, string.Empty },
+                        culture: null);
+                    AccessTools.Method(bundleLoaderType, "HoldReference")?.Invoke(bundleLoader, Array.Empty<object>());
+                    AccessTools.Method(bundleLoaderType, "SetDependencies")?.Invoke(bundleLoader, new object[] { Array.Empty<string>() });
+
+                    bundleIndex = bundleLoaders.Length;
+                    var expandedBundles = Array.CreateInstance(bundleLoaderType, bundleIndex + 1);
+                    Array.Copy(bundleLoaders, expandedBundles, bundleIndex);
+                    expandedBundles.SetValue(bundleLoader, bundleIndex);
+                    bundleLoadersField.SetValue(loader, expandedBundles);
+                    bundleMap.Add(bundleName, bundleIndex);
+                }
+
+                var assetLocationType = AccessTools.TypeByName("SoftReferenceableAssets.AssetLocation");
+                var assetLoaderType = AccessTools.TypeByName("SoftReferenceableAssets.AssetLoader");
+                if (assetLocationType == null || assetLoaderType == null) return;
+
+                var location = Activator.CreateInstance(
+                    assetLocationType,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                    binder: null,
+                    args: new object[] { bundleName, "JotunnSlim/Prefabs/" + asset.name },
+                    culture: null);
+                var assetLoader = Activator.CreateInstance(
+                    assetLoaderType,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                    binder: null,
+                    args: new object[] { assetID, location },
+                    culture: null);
+
+                AccessTools.Field(assetLoaderType, "m_asset")?.SetValue(assetLoader, asset);
+                AccessTools.Field(assetLoaderType, "m_bundleLoaderIndex")?.SetValue(assetLoader, bundleIndex);
+                AccessTools.Method(assetLoaderType, "HoldReference")?.Invoke(assetLoader, Array.Empty<object>());
+
+                var assetLoaders = (Array)assetLoadersField.GetValue(loader);
+                int assetIndex = assetLoaders.Length;
+                var expandedAssets = Array.CreateInstance(assetLoaderType, assetIndex + 1);
+                Array.Copy(assetLoaders, expandedAssets, assetIndex);
+                expandedAssets.SetValue(assetLoader, assetIndex);
+                assetLoadersField.SetValue(loader, expandedAssets);
+
+                var add = AccessTools.Method(idMap.GetType(), "Add");
+                add.Invoke(idMap, new object[] { assetID, assetIndex });
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("Could not register runtime soft-reference asset '" + asset.name + "': " + ex.Message);
+            }
         }
 
         internal bool IsReady() => GameInternals.AssetLoaderReady;
