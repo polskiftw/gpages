@@ -90,10 +90,17 @@ foreach (var member in jotunnMembers)
 {
     try
     {
-        var resolved = member.Resolve();
-        if (resolved == null ||
+        ModuleDefinition? resolvedModule = member switch
+        {
+            MethodReference method => method.Resolve()?.Module,
+            FieldReference field => field.Resolve()?.Module,
+            TypeReference type => type.Resolve()?.Module,
+            _ => null
+        };
+
+        if (resolvedModule == null ||
             !string.Equals(
-                resolved.Module.Assembly.Name.Name,
+                resolvedModule.Assembly.Name.Name,
                 "Jotunn",
                 StringComparison.Ordinal))
         {
