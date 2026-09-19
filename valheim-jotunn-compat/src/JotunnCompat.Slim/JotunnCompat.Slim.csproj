@@ -37,6 +37,8 @@
                               Condition="Exists('$(ValheimManaged)\assembly_valheim.dll')" />
     <_ValheimManagedReference Include="$(ValheimManaged)\assembly_utils.dll"
                               Condition="Exists('$(ValheimManaged)\assembly_utils.dll')" />
+    <_ValheimManagedReference Include="$(ValheimManaged)\assembly_guiutils.dll"
+                              Condition="Exists('$(ValheimManaged)\assembly_guiutils.dll')" />
     <_ValheimManagedReference Include="$(ValheimManaged)\SoftReferenceableAssets.dll" />
     <_ValheimManagedReference Include="$(ValheimManaged)\UnityEngine*.dll" />
 
