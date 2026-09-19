@@ -3,7 +3,7 @@ using System.Linq;
 using System.Reflection;
 using BepInEx.Logging;
 using HarmonyLib;
-using JotunnCompat.FastPath;
+using JotunnCompat.Runtime;
 
 namespace JotunnCompat.Preloader
 {
