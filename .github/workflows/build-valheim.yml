@@ -50,6 +50,12 @@ jobs:
           $harmony = Get-ChildItem -Path "$env:RUNNER_TEMP\bepinex" -Recurse -File -Filter '0Harmony.dll' | Select-Object -First 1
           if (-not $harmony) { throw 'Could not find 0Harmony.dll in BepInEx pack' }
 
+          $preloader = Get-ChildItem -Path "$env:RUNNER_TEMP\bepinex" -Recurse -File -Filter 'BepInEx.Preloader.dll' | Select-Object -First 1
+          if (-not $preloader) { throw 'Could not find BepInEx.Preloader.dll in BepInEx pack' }
+
+          $cecil = Get-ChildItem -Path "$env:RUNNER_TEMP\bepinex" -Recurse -File -Filter 'Mono.Cecil.dll' | Select-Object -First 1
+          if (-not $cecil) { throw 'Could not find Mono.Cecil.dll in BepInEx pack' }
+
           @'
           <Project Sdk="Microsoft.NET.Sdk">
             <PropertyGroup>
@@ -83,12 +89,17 @@ jobs:
 
           Copy-Item $harmony.FullName (Join-Path $env:GITHUB_WORKSPACE 'valheim-hammer-everything\lib\0Harmony.dll')
           Copy-Item $harmony.FullName (Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\lib\0Harmony.dll')
+          Copy-Item $preloader.FullName (Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\lib\BepInEx.Preloader.dll')
+          Copy-Item $cecil.FullName (Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\lib\Mono.Cecil.dll')
 
       - name: Enforce generic Jotunn runtime
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $runtimeRoot = '.\valheim-jotunn-compat\src\JotunnCompat.FastPath'
+          $runtimeRoots = @(
+            '.\valheim-jotunn-compat\src\JotunnCompat.Runtime',
+            '.\valheim-jotunn-compat\src\JotunnCompat.Preloader'
+          )
           $forbidden = @(
             'MoreWorldLocations',
             'More_World_Locations',
@@ -97,11 +108,13 @@ jobs:
           )
 
           foreach ($needle in $forbidden) {
-            $matches = Get-ChildItem $runtimeRoot -Recurse -File -Filter '*.cs' |
-              Select-String -SimpleMatch $needle
-            if ($matches) {
-              $matches | ForEach-Object { Write-Host $_.ToString() }
-              throw "Target-specific identifier '$needle' is forbidden in Jotunn runtime code."
+            foreach ($runtimeRoot in $runtimeRoots) {
+              $matches = Get-ChildItem $runtimeRoot -Recurse -File -Filter '*.cs' |
+                Select-String -SimpleMatch $needle
+              if ($matches) {
+                $matches | ForEach-Object { Write-Host $_.ToString() }
+                throw "Target-specific identifier '$needle' is forbidden in Jotunn runtime code."
+              }
             }
           }
 
@@ -162,7 +175,7 @@ jobs:
       - name: Build Jotunn compatibility tooling
         shell: pwsh
         run: |
-          dotnet build .\valheim-jotunn-compat\src\JotunnCompat.FastPath\JotunnCompat.FastPath.csproj -c Release
+          dotnet build .\valheim-jotunn-compat\src\JotunnCompat.Preloader\JotunnCompat.Preloader.csproj -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet build .\valheim-jotunn-compat\src\JotunnCompat.ContractCheck\JotunnCompat.ContractCheck.csproj -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -186,15 +199,18 @@ jobs:
           }
 
           $contractCheck = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.ContractCheck\bin\Release\net8.0\JotunnCompat.ContractCheck.dll'
-          dotnet $contractCheck $upstream
+          $compatPreloader = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.Preloader\bin\Release\net472\JotunnCompat.Preloader.dll'
+          dotnet $contractCheck $upstream $compatPreloader
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-          $fastPath = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.FastPath\bin\Release\net472\JotunnCompat.FastPath.dll'
+          $pluginDir = Join-Path $packageDir 'BepInEx\plugins\JotunnCompat'
+          $patcherDir = Join-Path $packageDir 'BepInEx\patchers'
 
-          New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
+          New-Item -ItemType Directory -Force -Path $pluginDir | Out-Null
+          New-Item -ItemType Directory -Force -Path $patcherDir | Out-Null
 
-          Copy-Item -Force $upstream (Join-Path $packageDir 'Jotunn.dll')
-          Copy-Item -Force $fastPath (Join-Path $packageDir 'JotunnCompat.FastPath.dll')
+          Copy-Item -Force $upstream (Join-Path $pluginDir 'Jotunn.dll')
+          Copy-Item -Force $compatPreloader (Join-Path $patcherDir 'JotunnCompat.Preloader.dll')
           Copy-Item -Force '.\valheim-jotunn-compat\LICENSE' (Join-Path $packageDir 'LICENSE')
           Copy-Item -Force '.\valheim-jotunn-compat\README.md' (Join-Path $packageDir 'README.md')
 
@@ -207,8 +223,8 @@ jobs:
           $files = @(
             '.\valheim-ward-hit-sound\bin\Release\net472\WardHitSoundToggle.dll',
             '.\valheim-hammer-everything\bin\Release\net472\HammerEverything.dll',
-            '.\valheim-jotunn-compat\bin\Release\package\Jotunn.dll',
-            '.\valheim-jotunn-compat\bin\Release\package\JotunnCompat.FastPath.dll',
+            '.\valheim-jotunn-compat\bin\Release\package\BepInEx\plugins\JotunnCompat\Jotunn.dll',
+            '.\valheim-jotunn-compat\bin\Release\package\BepInEx\patchers\JotunnCompat.Preloader.dll',
             '.\valheim-jotunn-compat\bin\Release\JotunnCompat.zip'
           )
           foreach ($file in $files) {
@@ -229,11 +245,12 @@ jobs:
 
           Copy-Item -Force '.\valheim-ward-hit-sound\bin\Release\net472\WardHitSoundToggle.dll' '.\valheim\ward-hit-sound\WardHitSoundToggle.dll'
           Copy-Item -Force '.\valheim-hammer-everything\bin\Release\net472\HammerEverything.dll' '.\valheim\hammer-everything\HammerEverything.dll'
-          Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\package\Jotunn.dll' '.\valheim\jotunn-compat\Jotunn.dll'
-          Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\package\JotunnCompat.FastPath.dll' '.\valheim\jotunn-compat\JotunnCompat.FastPath.dll'
+          Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\package\BepInEx\plugins\JotunnCompat\Jotunn.dll' '.\valheim\jotunn-compat\Jotunn.dll'
+          Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\package\BepInEx\patchers\JotunnCompat.Preloader.dll' '.\valheim\jotunn-compat\JotunnCompat.Preloader.dll'
           Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\JotunnCompat.zip' '.\valheim\jotunn-compat\JotunnCompat.zip'
 
-          git add -- "valheim/ward-hit-sound/WardHitSoundToggle.dll" "valheim/hammer-everything/HammerEverything.dll" "valheim/jotunn-compat/Jotunn.dll" "valheim/jotunn-compat/JotunnCompat.FastPath.dll" "valheim/jotunn-compat/JotunnCompat.zip"
+          git rm -f --ignore-unmatch "valheim/jotunn-compat/JotunnCompat.FastPath.dll"
+          git add -- "valheim/ward-hit-sound/WardHitSoundToggle.dll" "valheim/hammer-everything/HammerEverything.dll" "valheim/jotunn-compat/Jotunn.dll" "valheim/jotunn-compat/JotunnCompat.Preloader.dll" "valheim/jotunn-compat/JotunnCompat.zip"
 
           git diff --cached --quiet
           if ($LASTEXITCODE -eq 0) {
