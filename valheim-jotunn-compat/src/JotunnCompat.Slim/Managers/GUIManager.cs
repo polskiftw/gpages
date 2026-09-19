@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.UI;
+using HarmonyLib;
 
 namespace Jotunn.Managers
 {
@@ -95,8 +96,17 @@ namespace Jotunn.Managers
 
             if (GameCamera.instance)
             {
-                GameCamera.instance.m_mouseCapture = !inputBlocked;
-                GameCamera.instance.UpdateMouseCapture();
+                var captureField =
+                    AccessTools.Field(typeof(GameCamera), "m_mouseCapture");
+                captureField?.SetValue(
+                    GameCamera.instance,
+                    !inputBlocked);
+
+                var updateMethod =
+                    AccessTools.Method(typeof(GameCamera), "UpdateMouseCapture");
+                updateMethod?.Invoke(
+                    GameCamera.instance,
+                    Array.Empty<object>());
             }
         }
 
