@@ -111,6 +111,20 @@ namespace Jotunn.Managers
         public static PieceManager Instance =>
             instance ??= new PieceManager();
 
+        private sealed class CustomUsageTag
+        {
+            internal string Name { get; }
+            internal Piece.PieceCategory Category { get; }
+
+            internal CustomUsageTag(
+                string name,
+                Piece.PieceCategory category)
+            {
+                Name = name;
+                Category = category;
+            }
+        }
+
         private readonly Dictionary<string, Jotunn.Entities.CustomPiece> pieces =
             new Dictionary<string, Jotunn.Entities.CustomPiece>();
         private readonly Dictionary<string, Jotunn.Entities.CustomPieceTable> customTables =
@@ -120,6 +134,12 @@ namespace Jotunn.Managers
         private readonly Dictionary<string, Piece.PieceCategory> categories =
             new Dictionary<string, Piece.PieceCategory>(
                 StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<
+            ByUsagePieceList,
+            Dictionary<int, CustomUsageTag>> customAvailableTags =
+                new Dictionary<
+                    ByUsagePieceList,
+                    Dictionary<int, CustomUsageTag>>();
 
         private PieceManager() { }
 
@@ -251,7 +271,8 @@ namespace Jotunn.Managers
             }
 
             var id = 0;
-            while (used.Contains(id) || id == 100)
+            var all = (int)Piece.PieceCategory.All;
+            while (used.Contains(id) || id == all)
             {
                 id++;
             }
@@ -259,7 +280,7 @@ namespace Jotunn.Managers
             var category = (Piece.PieceCategory)id;
             categories[name] = category;
             LocalizationManager.Instance.AddToken(
-                "jotunn_cat_" + NormalizeToken(name),
+                GetCategoryToken(name),
                 name,
                 false);
             return category;
@@ -272,6 +293,193 @@ namespace Jotunn.Managers
             {
                 TryRegisterPiece(custom);
             }
+        }
+
+        internal static int MaxCategory()
+        {
+            var count =
+                Enum.GetValues(typeof(Piece.PieceCategory)).Length - 1;
+            return count < (int)Piece.PieceCategory.All
+                ? count
+                : count + 1;
+        }
+
+        internal void EnumGetValuesPatch(
+            Type enumType,
+            ref Array result)
+        {
+            if (enumType != typeof(Piece.PieceCategory) ||
+                categories.Count == 0)
+            {
+                return;
+            }
+
+            var expanded = new Piece.PieceCategory[
+                result.Length + categories.Count];
+            result.CopyTo(expanded, 0);
+            categories.Values.CopyTo(expanded, result.Length);
+            result = expanded;
+        }
+
+        internal void EnumGetNamesPatch(
+            Type enumType,
+            ref string[] result)
+        {
+            if (enumType != typeof(Piece.PieceCategory) ||
+                categories.Count == 0)
+            {
+                return;
+            }
+
+            var expanded = new string[
+                result.Length + categories.Count];
+            Array.Copy(result, expanded, result.Length);
+            categories.Keys.CopyTo(expanded, result.Length);
+            result = expanded;
+        }
+
+        internal void ExpandAvailablePieces(PieceTable table)
+        {
+            if (!table || table.m_availablePiecesByCategory == null ||
+                table.m_availablePiecesByCategory.Count == 0)
+            {
+                return;
+            }
+
+            var missing =
+                MaxCategory() - table.m_availablePiecesByCategory.Count;
+            for (var i = 0; i < missing; i++)
+            {
+                table.m_availablePiecesByCategory.Add(new List<Piece>());
+            }
+        }
+
+        internal void AdjustPieceTable(PieceTable table)
+        {
+            if (!table || table.m_availablePiecesByCategory == null)
+            {
+                return;
+            }
+
+            Array.Resize(
+                ref table.m_selectedPiece,
+                table.m_availablePiecesByCategory.Count);
+            Array.Resize(
+                ref table.m_lastSelectedPiece,
+                table.m_availablePiecesByCategory.Count);
+
+            UpdatePieceTableCategories(table);
+        }
+
+        internal void UpdateCustomAvailableTags(
+            ByUsagePieceList list,
+            PieceTable table)
+        {
+            if (list == null || !table ||
+                table.m_availablePieces == null)
+            {
+                return;
+            }
+
+            var categoryToName =
+                new Dictionary<Piece.PieceCategory, string>();
+            foreach (var pair in categories)
+            {
+                categoryToName[pair.Value] = pair.Key;
+            }
+
+            var tagIndexByCategory =
+                new Dictionary<Piece.PieceCategory, int>();
+            var tags = new Dictionary<int, CustomUsageTag>();
+
+            foreach (var piece in table.m_availablePieces)
+            {
+                if (!piece ||
+                    tagIndexByCategory.ContainsKey(piece.m_category) ||
+                    !categoryToName.TryGetValue(
+                        piece.m_category,
+                        out var categoryName))
+                {
+                    continue;
+                }
+
+                var tagIndex =
+                    list.m_usageTags.Length +
+                    list.m_availableTags.Count;
+                tagIndexByCategory[piece.m_category] = tagIndex;
+                list.m_availableTags.Add(tagIndex);
+                tags[tagIndex] =
+                    new CustomUsageTag(
+                        categoryName,
+                        piece.m_category);
+            }
+
+            customAvailableTags[list] = tags;
+        }
+
+        internal bool TryGetCustomCategoryDisplayName(
+            ByUsagePieceList list,
+            int index,
+            out string result)
+        {
+            result = null;
+            if (list == null ||
+                index < 0 ||
+                index >= list.m_availableTags.Count ||
+                !customAvailableTags.TryGetValue(list, out var tags))
+            {
+                return false;
+            }
+
+            var tagId = list.m_availableTags[index];
+            if (!tags.TryGetValue(tagId, out var tag))
+            {
+                return false;
+            }
+
+            result = "$" + GetCategoryToken(tag.Name);
+            return true;
+        }
+
+        internal void AddPiecesForCustomCategory(
+            ByUsagePieceList list,
+            int tagId,
+            PieceTable table,
+            IList<Piece> result)
+        {
+            if (list == null || !table || result == null ||
+                !customAvailableTags.TryGetValue(list, out var tags) ||
+                !tags.TryGetValue(tagId, out var tag))
+            {
+                return;
+            }
+
+            foreach (var piece in table.m_availablePieces)
+            {
+                if (piece &&
+                    piece.m_category == tag.Category &&
+                    !result.Contains(piece))
+                {
+                    result.Add(piece);
+                }
+            }
+        }
+
+        internal bool TryGetUsageTag(
+            ByUsagePieceList list,
+            int id,
+            out Piece.UsageTagFlags result)
+        {
+            result = default;
+            if (list == null ||
+                id < 0 ||
+                id >= list.m_usageTags.Length)
+            {
+                result = (Piece.UsageTagFlags)(-1);
+                return true;
+            }
+
+            return false;
         }
 
         private void RefreshPieceTables(ObjectDB db)
@@ -327,13 +535,83 @@ namespace Jotunn.Managers
 
             if (!string.IsNullOrEmpty(custom.Category) && custom.Piece)
             {
-                custom.Piece.m_category = AddPieceCategory(custom.Category);
+                custom.Piece.m_category =
+                    AddPieceCategory(custom.Category);
             }
 
             if (!table.m_pieces.Contains(custom.PiecePrefab))
             {
                 table.m_pieces.Add(custom.PiecePrefab);
             }
+        }
+
+        private void UpdatePieceTableCategories(PieceTable table)
+        {
+            if (table.m_enabledPieces == null ||
+                table.m_categories == null ||
+                table.m_categoryLabels == null)
+            {
+                return;
+            }
+
+            var available = new List<Piece.PieceCategory>();
+            foreach (var piece in table.m_enabledPieces)
+            {
+                if (piece &&
+                    piece.m_category != Piece.PieceCategory.All &&
+                    !available.Contains(piece.m_category))
+                {
+                    available.Add(piece.m_category);
+                }
+            }
+
+            available.Sort();
+            if (table.m_categories.SequenceEqual(available))
+            {
+                return;
+            }
+
+            var labels =
+                new Dictionary<Piece.PieceCategory, string>();
+            for (var i = 0;
+                 i < table.m_categories.Count &&
+                 i < table.m_categoryLabels.Count;
+                 i++)
+            {
+                labels[table.m_categories[i]] =
+                    table.m_categoryLabels[i];
+            }
+
+            table.m_categories.Clear();
+            table.m_categoryLabels.Clear();
+
+            foreach (var category in available)
+            {
+                table.m_categories.Add(category);
+                table.m_categoryLabels.Add(
+                    labels.TryGetValue(category, out var label)
+                        ? label
+                        : GetCategoryLabel(category));
+            }
+        }
+
+        private string GetCategoryLabel(
+            Piece.PieceCategory category)
+        {
+            foreach (var pair in categories)
+            {
+                if (pair.Value == category)
+                {
+                    return "$" + GetCategoryToken(pair.Key);
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private static string GetCategoryToken(string value)
+        {
+            return "jotunn_cat_" + NormalizeToken(value);
         }
 
         private static string NormalizeToken(string value)
