@@ -89,3 +89,10 @@ Useful settings:
 - `BlockedPrefabNames` — comma-separated exclusions.
 
 `CargoCrate` is deliberately blocked because vanilla treats an empty cargo crate as disposable.
+
+
+## License
+
+Hammer Everything is licensed under the **GNU General Public License v3.0 only (GPL-3.0-only)**. The license applies to the contents of this `valheim-hammer-everything/` directory unless a file explicitly says otherwise.
+
+This licensing choice allows Hammer Everything to incorporate and adapt GPLv3-compatible implementation work from other Valheim projects when appropriate. When third-party GPL code is incorporated, its required copyright and attribution notices must be preserved.
