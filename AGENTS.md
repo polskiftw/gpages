@@ -30,3 +30,22 @@ When exercising this authority:
 - if no lawful license-compatible path exists, do not copy the code merely by changing this repository's license.
 
 **No additional approval from Claire is required for a license change made under this rule.**
+
+
+# Jotunn Compatibility Layer: Generality Invariant
+
+The `valheim-jotunn-compat` project is a **general-purpose drop-in compatibility layer for Jotunn**, not a compatibility patch for any individual mod.
+
+Individual Jotunn-dependent mods may be selected as compatibility targets, canaries, regression tests, benchmarks, or API-coverage examples. Those targets are used to discover which **general Jotunn contracts and behaviors** the compatibility layer must implement correctly.
+
+Runtime code in `valheim-jotunn-compat` must therefore:
+
+- implement or optimize Jotunn APIs and behaviors generically;
+- preserve compatibility for any mod using the same Jotunn contract;
+- never branch on, probe for, hardcode, or special-case a target mod's GUID, assembly name, plugin name, prefab names, configuration keys, or other mod-specific identifiers merely to make that target pass;
+- never require a target mod to be present;
+- keep target-specific knowledge in tests, compatibility matrices, benchmarks, fixtures, or documentation rather than production runtime logic.
+
+**MoreWorldLocations_All is the first compatibility target/canary, not a runtime dependency or special case.**
+
+When a target exposes a missing Jotunn behavior, fix the underlying generic compatibility layer so that target and other mods using the same behavior benefit automatically.
