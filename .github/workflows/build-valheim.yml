@@ -78,6 +78,7 @@ jobs:
           }
 
           Copy-Item $harmony.FullName (Join-Path $env:GITHUB_WORKSPACE 'valheim-hammer-everything\lib\0Harmony.dll')
+          Copy-Item $harmony.FullName (Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\lib\0Harmony.dll')
 
       - name: Audit Hammer Everything recipe coverage
         shell: pwsh
@@ -131,13 +132,9 @@ jobs:
         shell: pwsh
         run: dotnet build .\valheim-hammer-everything\HammerEverything.csproj -c Release
 
-      - name: Build Jotunn compatibility tooling
+      - name: Build Jotunn compatibility fast path
         shell: pwsh
-        run: |
-          dotnet build .\valheim-jotunn-compat\src\JotunnCompat.FastPath\JotunnCompat.FastPath.csproj -c Release
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          dotnet build .\valheim-jotunn-compat\src\JotunnCompat.Patcher\JotunnCompat.Patcher.csproj -c Release
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        run: dotnet build .\valheim-jotunn-compat\src\JotunnCompat.FastPath\JotunnCompat.FastPath.csproj -c Release
 
       - name: Build Jotunn compatibility package
         shell: pwsh
@@ -157,11 +154,10 @@ jobs:
           if (-not $upstream) { throw "Could not find Jotunn.dll in upstream Jotunn $version package" }
 
           $fastPath = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.FastPath\bin\Release\net472\JotunnCompat.FastPath.dll'
-          $patcher = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.Patcher\bin\Release\net8.0\JotunnCompat.Patcher.dll'
 
           New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
 
-          dotnet $patcher $upstream.FullName $fastPath (Join-Path $packageDir 'Jotunn.dll')
+          Copy-Item -Force $upstream.FullName (Join-Path $packageDir 'Jotunn.dll')
           Copy-Item -Force $fastPath (Join-Path $packageDir 'JotunnCompat.FastPath.dll')
           Copy-Item -Force '.\valheim-jotunn-compat\LICENSE' (Join-Path $packageDir 'LICENSE')
           Copy-Item -Force '.\valheim-jotunn-compat\README.md' (Join-Path $packageDir 'README.md')
