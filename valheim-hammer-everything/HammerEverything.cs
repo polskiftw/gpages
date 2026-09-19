@@ -16,7 +16,7 @@ namespace HammerEverythingMod
     {
         public const string PluginGuid = "claire.valheim.hammereverything";
         public const string PluginName = "Hammer Everything";
-        public const string PluginVersion = "1.4.8";
+        public const string PluginVersion = "1.4.9";
 
         private static readonly BindingFlags AnyInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -94,6 +94,9 @@ namespace HammerEverythingMod
             {
                 "barrell",
                 "CastleKit_brazier",
+                "MountainKit_brazier",
+                "MountainKit_brazier_blue",
+                "MountainKit_brazier_purple",
                 "prop_piece_brazierfloor01"
             };
 
