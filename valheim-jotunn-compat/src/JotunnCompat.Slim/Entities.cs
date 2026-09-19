@@ -345,12 +345,19 @@ namespace Jotunn.Entities
             new[] { typeof(string), typeof(string) },
             null);
 
-        private readonly Dictionary<string, Dictionary<string, string>> map = new Dictionary<string, Dictionary<string, string>>();
+        private readonly Dictionary<string, Dictionary<string, string>> map =
+            new Dictionary<string, Dictionary<string, string>>();
 
         private static void AddWord(string key, string value)
         {
-            if (Localization.instance == null || AddWordMethod == null) return;
-            AddWordMethod.Invoke(Localization.instance, new object[] { key, value });
+            if (Localization.instance == null || AddWordMethod == null)
+            {
+                return;
+            }
+
+            AddWordMethod.Invoke(
+                Localization.instance,
+                new object[] { key, value });
         }
 
         internal void AddToken(string token, string value, bool force)
@@ -360,23 +367,54 @@ namespace Jotunn.Entities
                 return;
             }
 
-            var key = token.TrimStart('(string language, string fileContent)
+            var key = token.TrimStart('$');
+            if (!map.TryGetValue("English", out var lang))
+            {
+                map["English"] = lang =
+                    new Dictionary<string, string>();
+            }
+
+            if (force || !lang.ContainsKey(key))
+            {
+                lang[key] = value ?? string.Empty;
+            }
+
+            AddWord(key, lang[key]);
+        }
+
+        public void AddYamlFile(string language, string fileContent)
         {
-            if (string.IsNullOrEmpty(language) || string.IsNullOrEmpty(fileContent)) return;
+            if (string.IsNullOrEmpty(language) ||
+                string.IsNullOrEmpty(fileContent))
+            {
+                return;
+            }
+
             Dictionary<string, string> parsed;
             try
             {
-                parsed = new YamlDotNet.Serialization.DeserializerBuilder().Build()
+                parsed = new YamlDotNet.Serialization.DeserializerBuilder()
+                    .Build()
                     .Deserialize<Dictionary<string, string>>(fileContent);
             }
             catch (Exception ex)
             {
-                Logger.LogWarning("Could not parse localization YAML: " + ex.Message);
+                Logger.LogWarning(
+                    "Could not parse localization YAML: " + ex.Message);
                 return;
             }
-            if (parsed == null) return;
+
+            if (parsed == null)
+            {
+                return;
+            }
+
             if (!map.TryGetValue(language, out var lang))
-                map[language] = lang = new Dictionary<string, string>();
+            {
+                map[language] = lang =
+                    new Dictionary<string, string>();
+            }
+
             foreach (var kv in parsed)
             {
                 var key = kv.Key.TrimStart('$');
@@ -387,10 +425,22 @@ namespace Jotunn.Entities
 
         internal void ApplyCurrent()
         {
-            if (Localization.instance == null) return;
+            if (Localization.instance == null)
+            {
+                return;
+            }
+
             var language = Localization.instance.GetSelectedLanguage();
-            if (!map.TryGetValue(language, out var words) && !map.TryGetValue("English", out words)) return;
-            foreach (var kv in words) AddWord(kv.Key, kv.Value);
+            if (!map.TryGetValue(language, out var words) &&
+                !map.TryGetValue("English", out words))
+            {
+                return;
+            }
+
+            foreach (var kv in words)
+            {
+                AddWord(kv.Key, kv.Value);
+            }
         }
     }
 
