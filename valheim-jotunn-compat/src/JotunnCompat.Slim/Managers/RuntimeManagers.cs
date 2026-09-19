@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using Jotunn.Entities;
+using Jotunn.Utils;
 using SoftReferenceableAssets;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -42,8 +43,8 @@ namespace Jotunn.Managers
             if (string.IsNullOrEmpty(name)) return null;
             if (prefabs.TryGetValue(name, out var custom)) return custom.Prefab;
             int hash = name.GetStableHashCode();
-            if (ZNetScene.instance != null && ZNetScene.instance.m_namedPrefabs.TryGetValue(hash, out var networked)) return networked;
-            if (ObjectDB.instance != null && ObjectDB.instance.m_itemByHash.TryGetValue(hash, out var item)) return item;
+            if (ZNetScene.instance != null && GameInternals.NamedPrefabs(ZNetScene.instance).TryGetValue(hash, out var networked)) return networked;
+            if (ObjectDB.instance != null && GameInternals.ItemByHash(ObjectDB.instance).TryGetValue(hash, out var item)) return item;
             return Cache.GetPrefab<GameObject>(name);
         }
 
@@ -68,11 +69,11 @@ namespace Jotunn.Managers
                 if (!prefab) continue;
                 if (custom.FixReference) { prefab.FixReferences(true); custom.FixReference = false; }
                 int hash = prefab.name.GetStableHashCode();
-                if (!scene.m_namedPrefabs.ContainsKey(hash))
+                if (!GameInternals.NamedPrefabs(scene).ContainsKey(hash))
                 {
                     if (prefab.GetComponent<ZNetView>() != null) scene.m_prefabs.Add(prefab);
                     else scene.m_nonNetViewPrefabs.Add(prefab);
-                    scene.m_namedPrefabs.Add(hash, prefab);
+                    GameInternals.NamedPrefabs(scene).Add(hash, prefab);
                 }
             }
         }
@@ -158,10 +159,10 @@ namespace Jotunn.Managers
             {
                 if (custom.FixReference && custom.Prefab) { custom.Prefab.FixReferences(true); custom.FixReference = false; }
                 int hash = custom.Name.GetStableHashCode();
-                if (!zone.m_locationsByHash.ContainsKey(hash))
+                if (!GameInternals.LocationHashes(zone).ContainsKey(hash))
                 {
                     zone.m_locations.Add(custom.ZoneLocation);
-                    zone.m_locationsByHash[hash] = custom.ZoneLocation;
+                    GameInternals.LocationHashes(zone)[hash] = custom.ZoneLocation;
                 }
             }
         }
@@ -210,14 +211,14 @@ namespace Jotunn.Managers
         {
             OnVanillaRoomsAvailable?.Invoke();
             foreach (var room in Rooms.Values)
-                if (CustomRoom.IsVanillaTheme(room.ThemeName) && !db.m_rooms.Contains(room.RoomData))
-                    db.m_rooms.Add(room.RoomData);
-            db.GenerateHashList();
+                if (CustomRoom.IsVanillaTheme(room.ThemeName) && !GameInternals.DungeonRooms(db).Contains(room.RoomData))
+                    GameInternals.DungeonRooms(db).Add(room.RoomData);
+            GameInternals.GenerateDungeonHashList(db);
         }
 
         internal void AppendRooms(DungeonGenerator generator)
         {
-            if (DungeonGenerator.m_availableRooms == null) return;
+            if (GameInternals.AvailableRooms == null) return;
             var proxy = generator.GetComponent<DungeonGeneratorTheme>();
             IEnumerable<CustomRoom> selected;
             if (proxy != null && !string.IsNullOrEmpty(proxy.m_themeName))
@@ -226,7 +227,7 @@ namespace Jotunn.Managers
                 selected = Rooms.Values.Where(r => r.RoomData.m_enabled && CustomRoom.IsVanillaTheme(r.ThemeName) &&
                     Enum.TryParse(r.ThemeName, false, out Room.Theme theme) && theme != Room.Theme.None && generator.m_themes.HasFlag(theme));
             foreach (var room in selected)
-                if (!DungeonGenerator.m_availableRooms.Contains(room.RoomData)) DungeonGenerator.m_availableRooms.Add(room.RoomData);
+                if (!GameInternals.AvailableRooms.Contains(room.RoomData)) GameInternals.AvailableRooms.Add(room.RoomData);
         }
     }
 
@@ -263,10 +264,10 @@ namespace Jotunn.Managers
                 if (!item.ItemPrefab || !item.ItemDrop) continue;
                 item.ItemDrop.m_itemData.m_dropPrefab = item.ItemPrefab;
                 int hash = item.ItemPrefab.name.GetStableHashCode();
-                if (!db.m_itemByHash.ContainsKey(hash))
+                if (!GameInternals.ItemByHash(db).ContainsKey(hash))
                 {
                     db.m_items.Add(item.ItemPrefab);
-                    db.m_itemByHash.Add(hash, item.ItemPrefab);
+                    GameInternals.ItemByHash(db).Add(hash, item.ItemPrefab);
                 }
             }
             foreach (var effect in effects)
