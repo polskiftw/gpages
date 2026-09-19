@@ -105,8 +105,36 @@ namespace Jotunn.Managers
         internal static object AssetLoaderObject =>
             RuntimeAssetLoader?.GetValue(null);
 
-        internal static bool AssetLoaderReady =>
-            AssetLoaderObject != null;
+        internal static bool AssetLoaderReady
+        {
+            get
+            {
+                var loader = AssetLoaderObject;
+                if (loader == null)
+                {
+                    return false;
+                }
+
+                var initializedProperty =
+                    AccessTools.Property(loader.GetType(), "Initialized");
+                if (initializedProperty != null &&
+                    initializedProperty.PropertyType == typeof(bool))
+                {
+                    return (bool)initializedProperty.GetValue(loader, null);
+                }
+
+                var initializedField =
+                    AccessTools.Field(loader.GetType(), "Initialized") ??
+                    AccessTools.Field(loader.GetType(), "m_initialized");
+                if (initializedField != null &&
+                    initializedField.FieldType == typeof(bool))
+                {
+                    return (bool)initializedField.GetValue(loader);
+                }
+
+                return true;
+            }
+        }
 
         internal static IEnumerable<T> EnabledComponentsInChildren<T>(GameObject root)
             where T : Behaviour
