@@ -622,9 +622,7 @@ namespace Jotunn.Managers
         [HarmonyPostfix]
         private static void LocalizationSetup() => LocalizationManager.Instance.Apply();
 
-        [HarmonyPatch(typeof(Minimap), nameof(Minimap.LoadMapData))]
-        [HarmonyPostfix]
-        private static void MinimapLoadMapData() =>
+        internal static void MinimapDataLoaded() =>
             MinimapManager.InvokeVanillaMapDataLoaded();
     }
 }
