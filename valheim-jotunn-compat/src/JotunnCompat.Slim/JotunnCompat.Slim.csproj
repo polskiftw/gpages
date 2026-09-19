@@ -40,7 +40,8 @@
     <_ValheimManagedReference Include="$(ValheimManaged)\assembly_guiutils.dll"
                               Condition="Exists('$(ValheimManaged)\assembly_guiutils.dll')" />
     <_ValheimManagedReference Include="$(ValheimManaged)\SoftReferenceableAssets.dll" />
-    <_ValheimManagedReference Include="$(ValheimManaged)\UnityEngine*.dll" />
+    <_ValheimManagedReference Include="$(ValheimManaged)\UnityEngine*.dll"
+                              Exclude="$(ValheimManaged)\UnityEngine.ImageConversionModule.dll" />
 
     <Reference Include="@(_ValheimManagedReference)">
       <Private>false</Private>
