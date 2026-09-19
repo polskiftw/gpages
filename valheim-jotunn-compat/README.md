@@ -15,7 +15,7 @@ This is intentionally different from inventing a new mod framework. Existing mod
 
 ## Current implementation
 
-The first release bundles the **unmodified official Jotunn 2.30.1 DLL** and a tiny companion BepInEx plugin, `JotunnCompat.FastPath.dll`.
+The current release bundles the **unmodified official Jotunn 2.30.1 release DLL** and a tiny companion BepInEx plugin, `JotunnCompat.FastPath.dll`. CI downloads that DLL directly from Jotunn's GitHub release and verifies its pinned SHA-256 before packaging.
 
 The companion has a hard BepInEx dependency on Jotunn, so Jotunn's `Awake` runs first. The companion then installs Harmony prefixes before Unity calls Jotunn's `Start`. That lets us replace expensive Start-time internals without rewriting Jotunn metadata or changing any API that existing mods bind against.
 
@@ -39,6 +39,20 @@ Jotunn's automatic translation discovery recursively scans the full BepInEx plug
 
 The replacement performs one recursive filesystem walk, classifies matching files in memory, and feeds them into Jotunn's existing localization implementation. If no automatic translation files exist, it also avoids initializing the localization manager just for discovery.
 
+### Prefab cache fast path
+
+Jotunn already caches the expensive `Resources.FindObjectsOfTypeAll` fallback, but every `PrefabManager.Cache.GetPrefab(Type, string)` call still checks `AssetManager`, creates a SoftReference, and calls `Load` before consulting that cache.
+
+The compatibility layer memoizes **successful lookups only**. Upstream Jotunn intentionally keeps those SoftReference assets loaded, so repeating the same lookup path is unnecessary. The memoizer is cleared whenever Jotunn clears its own cache, and texture-family lookups are deliberately excluded because Jotunn selectively invalidates textures later in startup.
+
+### Mock-reference traversal fast path
+
+Jotunn's `JVLmock_` resolver recursively reflects arbitrary component/object graphs with a depth limit of five. Cyclic and multiply-referenced graphs can cause the same object to be walked repeatedly.
+
+The compatibility layer records the shallowest depth at which an object has already been processed during one top-level reference-fix operation. A duplicate visit is skipped only when the earlier visit had equal or greater remaining traversal reach. Successful mock resolutions are also reused inside that one traversal.
+
+The cache is traversal-local, so arbitrary mod objects are not retained after reference fixing completes.
+
 ## Why start this way?
 
 A hand-written shim that implements only common Jotunn calls is not a real drop-in replacement. Already-compiled mods contain metadata references to exact Jotunn types and signatures; missing one uncommon member can prevent a mod from loading at all.
@@ -57,7 +71,7 @@ The recommended download is `JotunnCompat.zip`, which contains both DLLs.
 
 The compatibility contract is permanent; the implementation underneath it can keep shrinking.
 
-Future work should profile real mod packs and replace one Jotunn subsystem at a time while maintaining a corpus of existing Jotunn-dependent mods as compatibility tests. Candidate areas include manager initialization, asset handling, GUI helpers, synchronization, prefab/item/piece registration, and location/zone management.
+Future work should profile real mod packs and replace one Jotunn subsystem at a time while maintaining a corpus of existing Jotunn-dependent mods as compatibility tests. See [COMPATIBILITY.md](COMPATIBILITY.md) for the canary matrix. Candidate areas include manager initialization, asset handling, GUI helpers, synchronization, prefab/item/piece registration, and location/zone management.
 
 The important rule is that optimization happens behind the existing Jotunn contract. Mods do not get forced onto a new API.
 
