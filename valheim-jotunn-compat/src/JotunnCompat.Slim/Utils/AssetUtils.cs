@@ -46,9 +46,31 @@ namespace Jotunn.Utils
             }
 
             var texture = new Texture2D(2, 2);
-            return ImageConversion.LoadImage(texture, File.ReadAllBytes(path))
-                ? texture
-                : null;
+            var conversionType = Type.GetType(
+                "UnityEngine.ImageConversion, UnityEngine.ImageConversionModule");
+            var loadImage = conversionType?.GetMethod(
+                "LoadImage",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { typeof(Texture2D), typeof(byte[]) },
+                null);
+
+            if (loadImage == null)
+            {
+                UnityEngine.Object.Destroy(texture);
+                return null;
+            }
+
+            var loaded = (bool)loadImage.Invoke(
+                null,
+                new object[] { texture, File.ReadAllBytes(path) });
+            if (!loaded)
+            {
+                UnityEngine.Object.Destroy(texture);
+                return null;
+            }
+
+            return texture;
         }
 
         public static string LoadTextFromResources(string fileName)
