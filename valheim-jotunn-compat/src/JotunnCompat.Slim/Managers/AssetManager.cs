@@ -16,9 +16,45 @@ namespace Jotunn.Managers
 
         private readonly Dictionary<AssetID, Object> runtimeAssets = new Dictionary<AssetID, Object>();
         private readonly Dictionary<AssetID, ResolutionContext> resolve = new Dictionary<AssetID, ResolutionContext>();
+        private readonly GameObject resolvedAssetsContainer;
         private Dictionary<Type, Dictionary<string, AssetID>> byType;
 
-        private AssetManager() { }
+        public static event Action OnSoftReferenceableAssetsReady;
+
+        private AssetManager()
+        {
+            resolvedAssetsContainer = new GameObject("Resolved Assets");
+            resolvedAssetsContainer.transform.SetParent(Main.RootObject.transform);
+            resolvedAssetsContainer.SetActive(false);
+
+            var loaderType = AccessTools.TypeByName("SoftReferenceableAssets.AssetBundleLoader");
+            var initCompleted = AccessTools.Method(loaderType, "OnInitCompleted");
+            if (initCompleted != null)
+            {
+                Main.Harmony.Patch(
+                    initCompleted,
+                    postfix: new HarmonyMethod(
+                        typeof(AssetManager),
+                        nameof(AssetBundleLoaderReady)));
+            }
+        }
+
+        private static void AssetBundleLoaderReady(object __instance)
+        {
+            Instance.OnLoaderReady(__instance);
+        }
+
+        private void OnLoaderReady(object loader)
+        {
+            byType = null;
+
+            foreach (var pair in runtimeAssets.ToArray())
+            {
+                TryRegisterRuntimeAsset(pair.Key, pair.Value);
+            }
+
+            OnSoftReferenceableAssetsReady?.Invoke();
+        }
 
         public AssetID GenerateAssetID(string asset)
         {
@@ -172,7 +208,12 @@ namespace Jotunn.Managers
         public void ResolveMocksOnLoad(AssetID assetID, Transform parent, Action<Object> callback)
         {
             if (!resolve.TryGetValue(assetID, out var context))
-                resolve[assetID] = context = new ResolutionContext();
+            {
+                resolve[assetID] = context = new ResolutionContext
+                {
+                    Parent = resolvedAssetsContainer.transform
+                };
+            }
             if (parent != null) context.Parent = parent;
             context.Callback += callback;
 
