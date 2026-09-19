@@ -2,64 +2,86 @@
 
 This file tracks mods used to exercise the generic Jotunn compatibility layer.
 
-A target listed here is a **canary/regression target**, never a runtime dependency. Target-specific names and behavior belong in this document, tests, fixtures, or benchmarks. They must not appear in production runtime logic under `src/JotunnCompat.Runtime` or `src/JotunnCompat.Preloader`.
+A target listed here is a **canary/regression target**, never a runtime dependency. Target-specific names and behavior belong in this document, tests, fixtures, or benchmarks. They must not appear in production runtime logic under `src/JotunnCompat.Slim`.
 
 ## MoreWorldLocations_All
 
 Repository: `jneb802/MoreWorldLocations_All`
 
-Inspected target: current `master` at `f5d0bd659b8ee7d80fec623059adbed31dc283e1`
+Canary package: More World Locations AIO 5.1.1.
 
-The AIO plugin identifies itself as version 5.1.1 and declares a BepInEx dependency through `Jotunn.Main.ModGuid`. Its code checks for Jotunn 2.28.0 or newer; its current Thunderstore manifest declares Jotunn 2.29.2.
+MWL was compiled against an older Jotunn assembly identity, while the slim replacement exposes Jotunn 2.30.1-compatible assembly identity. The compatibility probe deliberately binds MWL's Jotunn references to the supplied slim `Jotunn.dll` independent of the compile-time Jotunn version.
 
 ### Jotunn surface exercised
 
-The current source uses a broad cross-section of Jotunn:
+The current MWL binary uses a broad cross-section of Jotunn:
 
 - `PrefabManager`: lifecycle event, get/add/remove/clone, `Cache.GetPrefab<T>`
 - `ZoneManager`: lifecycle event, location containers, custom locations
 - `DungeonManager`: lifecycle event, custom rooms and dungeon themes
-- `ItemManager`: custom items and item-registration lifecycle
-- `CustomPrefab`, `CustomItem`, `CustomLocation`
+- `ItemManager`: custom items, status effects, item-registration lifecycle
+- `CustomPrefab`, `CustomItem`, `CustomLocation`, `CustomRoom`, `CustomStatusEffect`
 - `LocationConfig` and `RoomConfig`
-- `FixReferences` and bundled `JVLmock_` resolution
+- `FixReferences` / JVLmock-style resolution
 - localization helpers
 - `NetworkManager` / `CustomRPC`
-- utility/resource helpers
+- GUI sprite lookup
+- resource helpers
 - Valheim SoftReferenceableAssets integration exposed through Jotunn
 
-This makes MWL useful as a first canary because it is not narrowly coupled to one helper.
+This makes MWL useful as a first canary because it exercises multiple managers and backend paths rather than one narrow helper.
 
-### Generic compatibility work currently relevant
+### Current slim implementation
 
-- early preloader installation before any dependent plugin `Awake`
-- PatchInit discovery preflight
-- one-pass automatic localization discovery
-- positive memoization of successful prefab-cache lookups
-- depth-aware duplicate suppression in mock-reference graphs
-- successful mock-resolution reuse within one top-level reference-fix traversal
-- graceful handling of Jotunn's known invalid-CodeMatcher AssetManager collision
+The package now uses our source-built `Jotunn.dll`; the official Jotunn runtime is not bundled.
 
-### Still delegated to upstream Jotunn
+The slim runtime currently provides generic implementations for the MWL-facing surface, including:
 
-The compatibility package intentionally delegates these contracts to the bundled upstream implementation while generic replacements are developed and tested:
+- prefab registration, cloning, cache lookup, and ZNetScene registration
+- custom location registration and ZoneSystem lifecycle timing
+- custom dungeon rooms and custom dungeon-theme handling
+- custom item/status-effect registration
+- localization storage/application
+- JVLmock-style reference fixing
+- custom RPC registration and Jotunn-compatible package framing
+- embedded-resource asset/text helpers
+- SoftReferenceableAssets lookup, runtime asset registration, and mock-resolution-on-load support
 
-- zone/location registration
-- dungeon-room registration and theme handling
-- item registration
-- SoftReferenceableAssets registration/lifetime behavior
-- custom RPC transport
-- the public entity/config object model
+### Exact-game validation
 
-Keeping those paths upstream preserves exact behavior while each subsystem is replaced independently.
+CI downloads a private draft-release `Managed.zip` made from the current Valheim `Valheim_Data/Managed` directory and verifies its pinned SHA-256 before use.
 
-### Validation status
+A Cecil contract checker validates the private game members and SoftReferenceableAssets internals used by our reflection/Harmony bridge before the slim runtime is compiled.
 
-- Source/API inventory: complete for the inspected target revision.
-- Generic-runtime invariant: enforced in CI.
-- Jotunn hook contract: enforced in CI against the pinned upstream DLL.
-- BepInEx 5 preloader-discovery contract: enforced in CI.
-- Runtime/preloader compilation: enforced in CI.
-- Live Valheim regression: requires a real Valheim+BepInEx client/server environment.
+Current exact-runtime contract status:
 
-A failure found with this target must be fixed at the underlying Jotunn contract level. Do not add a target-specific runtime branch.
+- pinned game binary input: verified
+- private/runtime contract checks: passing
+- slim runtime compilation against exact game binaries: passing
+- generic-runtime invariant: passing
+
+### MWL binary compatibility status
+
+CI probes every DLL shipped in the MWL AIO package.
+
+For the main MWL assembly:
+
+- referenced Jotunn types: **26**
+- referenced Jotunn members: **91**
+- all referenced symbols resolve against the source-built slim `Jotunn.dll`
+
+This is a static binary/API compatibility result. It does not prove full Unity runtime behavior.
+
+### Remaining validation
+
+The next required validation is live Valheim testing with:
+
+- official Jotunn absent
+- slim `Jotunn.dll` installed
+- MWL installed
+- startup free of loader/Harmony exceptions
+- prefab/location/dungeon registration functioning
+- locations actually appearing/generating
+- networking behavior checked where MWL uses custom RPCs
+
+A failure found with this target must be fixed at the underlying generic Jotunn contract level. Do not add a MWL-specific runtime branch.
