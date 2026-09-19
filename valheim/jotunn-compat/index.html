@@ -14,47 +14,51 @@
 <body><main>
 <a class="back" href="../">‹ Valheim</a>
 <h1>Jotunn Compatibility Layer</h1>
-<p class="sub">Drop-in Jotunn compatibility for existing Valheim mods, with generic internals optimized and hardened behind the same Jotunn contract.</p>
+<p class="sub">A source-built slim replacement for Jotunn that keeps the assembly identity and API existing Valheim mods expect.</p>
 
 <div class="card">
   <a class="download" href="JotunnCompat.zip">Download JotunnCompat.zip</a>
-  <p class="note">Recommended. The ZIP already contains the correct <code>BepInEx/plugins</code> and <code>BepInEx/patchers</code> folders.</p>
+  <p class="note">Recommended. The ZIP contains the complete plugin folder, including the slim <code>Jotunn.dll</code> and its <code>YamlDotNet.dll</code> dependency.</p>
 </div>
 
 <div class="card">
-  <p class="warning"><strong>Remove a separately installed Jotunn package first.</strong> If you tested the older compatibility prototype, also remove <code>JotunnCompat.FastPath.dll</code>.</p>
+  <p class="warning"><strong>Remove official Jotunn first.</strong> Also remove obsolete prototype files such as <code>JotunnCompat.Preloader.dll</code> or <code>JotunnCompat.FastPath.dll</code> if you previously tested an older build.</p>
 </div>
 
 <div class="card">
   <div class="title">Install</div>
   <ol class="steps">
     <li>Install BepInEx 5 for Valheim.</li>
-    <li>Remove any separately installed Jotunn package.</li>
+    <li>Remove any separately installed official Jotunn package.</li>
     <li>Extract <code>JotunnCompat.zip</code> directly into the <strong>Valheim game directory</strong>.</li>
-    <li>The ZIP places Jotunn under <code>BepInEx/plugins/JotunnCompat/</code> and the early compatibility layer under <code>BepInEx/patchers/</code>.</li>
+    <li>The ZIP installs under <code>BepInEx/plugins/JotunnCompat/</code>.</li>
     <li>Launch Valheim normally.</li>
   </ol>
 </div>
 
 <div class="card">
-  <div class="title">Compatibility strategy</div>
-  <p class="meta">The build bundles the <strong>unmodified official Jotunn 2.30.1 release DLL</strong>, pinned by SHA-256. A tiny BepInEx preloader arms before plugin discovery and installs generic Harmony hooks the instant the CLR loads the assembly named <code>Jotunn</code>—before any Jotunn-dependent mod can run <code>Awake</code>. Existing mods still bind to the exact upstream Jotunn assembly, GUID, API, and network behavior.</p>
+  <div class="title">What this build is</div>
+  <p class="meta">This package does <strong>not</strong> contain the official Jotunn runtime. <code>Jotunn.dll</code> is our own source-built compatibility implementation. It preserves the Jotunn assembly name, BepInEx GUID <code>com.jotunn.jotunn</code>, and the public surface required by supported existing mods while replacing the backend with a smaller generic implementation.</p>
 </div>
 
 <div class="card">
-  <div class="title">Current generic improvements</div>
-  <p class="meta"><strong>PatchInit:</strong> avoids pointless reflection on assemblies that cannot use the obsolete attribute.<br><br><strong>Localization:</strong> replaces five recursive plugin-tree scans with one.<br><br><strong>Prefab lookups:</strong> memoizes successful non-texture lookups without negative caching.<br><br><strong>JVLmock references:</strong> avoids redundant depth-limited graph walks and repeated successful resolutions.<br><br><strong>AssetManager:</strong> prevents Jotunn's known invalid-CodeMatcher collision from killing AssetManager when another mod has already transformed the same instruction.</p>
+  <div class="title">Current backend coverage</div>
+  <p class="meta"><strong>Prefabs:</strong> lookup, cloning, registration, cache behavior, ZNetScene integration.<br><br><strong>World locations:</strong> custom locations and ZoneSystem lifecycle registration.<br><br><strong>Dungeons:</strong> custom rooms and dungeon themes.<br><br><strong>Items:</strong> item and status-effect registration.<br><br><strong>Assets:</strong> SoftReferenceableAssets lookup, runtime registration, and resolve-on-load handling.<br><br><strong>Other:</strong> localization, custom RPCs, JVLmock-style reference fixing, GUI sprite lookup, and embedded-resource helpers.</p>
 </div>
 
 <div class="card">
-  <div class="title">Direct files</div>
+  <div class="title">Compatibility validation</div>
+  <p class="meta">CI builds against a SHA-256-pinned copy of the exact current Valheim <code>Valheim_Data/Managed</code> assemblies and validates the private game/SoftReferenceableAssets contracts used by the runtime. More World Locations AIO 5.1.1 is the first broad canary: its main assembly references <strong>26 Jotunn types and 91 Jotunn members</strong>, all of which resolve against this slim build. Live in-game behavior still needs runtime testing.</p>
+</div>
+
+<div class="card">
+  <div class="title">Direct file</div>
   <a class="secondary" href="Jotunn.dll">Jotunn.dll</a>
-  <a class="secondary" href="JotunnCompat.Preloader.dll">JotunnCompat.Preloader.dll</a>
-  <p class="note"><code>Jotunn.dll</code> belongs under BepInEx plugins; <code>JotunnCompat.Preloader.dll</code> belongs under BepInEx patchers. The ZIP is less error-prone.</p>
+  <p class="note">The DLL by itself is mainly for inspection/manual installs. The ZIP is recommended because it also includes the required <code>YamlDotNet.dll</code>.</p>
 </div>
 
 <div class="card">
-  <p class="meta"><strong>Runtime DLL count:</strong> 2<br><strong>License:</strong> MIT; upstream Jotunn copyright/license preserved<br><strong>Baseline:</strong> Jotunn 2.30.1<br><strong>Approach:</strong> exact compatibility first, then replace generic internals subsystem by subsystem</p>
+  <p class="meta"><strong>Package:</strong> JotunnCompat.zip<br><strong>Compatibility identity:</strong> Jotunn 2.30.1<br><strong>Jotunn runtime:</strong> source-built slim replacement<br><strong>Official Jotunn bundled:</strong> no<br><strong>License:</strong> MIT</p>
 </div>
 </main></body>
 </html>
