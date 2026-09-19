@@ -88,6 +88,7 @@ namespace HammerEverythingMod
         };
 
         // World/location props whose prefab root sits below the visible base.
+        // The three MountainKit brazier color variants share this placement geometry.
         // Only the Hammer placement ghost is adjusted; naturally spawned copies are untouched.
         private static readonly HashSet<string> GroundAlignedPrefabNames =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
