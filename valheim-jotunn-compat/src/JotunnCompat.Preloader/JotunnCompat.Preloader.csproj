@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>JotunnCompat.Preloader</AssemblyName>
+    <RootNamespace>JotunnCompat.Preloader</RootNamespace>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Deterministic>true</Deterministic>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="BepInEx">
+      <HintPath>..\..\lib\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="BepInEx.Preloader">
+      <HintPath>..\..\lib\BepInEx.Preloader.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>..\..\lib\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Mono.Cecil">
+      <HintPath>..\..\lib\Mono.Cecil.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>..\..\lib\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\JotunnCompat.FastPath\Startup.cs" Link="Runtime\Startup.cs" />
+    <Compile Include="..\JotunnCompat.FastPath\PrefabCacheFastPath.cs" Link="Runtime\PrefabCacheFastPath.cs" />
+    <Compile Include="..\JotunnCompat.FastPath\ReferenceFastPath.cs" Link="Runtime\ReferenceFastPath.cs" />
+  </ItemGroup>
+</Project>
