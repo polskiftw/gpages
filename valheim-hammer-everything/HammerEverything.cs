@@ -12,11 +12,11 @@ using System.Text.RegularExpressions;
 namespace HammerEverythingMod
 {
     [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
-    public sealed class HammerEverything : BaseUnityPlugin
+    public sealed partial class HammerEverything : BaseUnityPlugin
     {
         public const string PluginGuid = "claire.valheim.hammereverything";
         public const string PluginName = "Hammer Everything";
-        public const string PluginVersion = "1.4.14";
+        public const string PluginVersion = "1.5.0";
 
         private static readonly BindingFlags AnyInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -1085,8 +1085,7 @@ namespace HammerEverythingMod
             if (_categoryPatchesInstalled)
                 AssignCustomBuildCategory(piece);
 
-            if (string.Equals(prefabName, "dvergrtown_arch", StringComparison.OrdinalIgnoreCase))
-                EnsureDvergrTownArchSnapPoint(prefab);
+            ApplyMoreVanillaCompatibilityFixes(prefab, piece, prefabName);
 
             // Unique thumbnails are rendered from a fresh visual-only hierarchy.
             // No gameplay component from the Valheim prefab is instantiated, and
@@ -1267,6 +1266,7 @@ namespace HammerEverythingMod
                 MethodInfo getAvailablePiecesWithTag = FindInstanceMethod(_byUsagePieceListType, "GetAvailablePiecesWithTag");
                 MethodInfo pieceAwake = FindInstanceMethod(_pieceType, "Awake");
                 MethodInfo pieceSetCreator = FindPieceSetCreatorMethod();
+                MethodInfo setupPlacementGhost = FindInstanceMethod(_playerType, "SetupPlacementGhost");
                 MethodInfo updatePlacementGhost = FindInstanceMethod(_playerType, "UpdatePlacementGhost");
 
                 // Build-menu hooks are the core contract. Placement/removal hooks
@@ -1325,6 +1325,15 @@ namespace HammerEverythingMod
                             AnyStatic)));
                 }
 
+                if (setupPlacementGhost != null)
+                {
+                    _harmony.Patch(
+                        setupPlacementGhost,
+                        postfix: new HarmonyMethod(typeof(HammerEverything).GetMethod(
+                            nameof(PlayerSetupPlacementGhostPostfix),
+                            AnyStatic)));
+                }
+
                 if (updatePlacementGhost != null)
                 {
                     _harmony.Patch(
@@ -1363,8 +1372,14 @@ namespace HammerEverythingMod
             _instance?.FinalizeManagedPlacedPiece(__instance);
         }
 
+        private static void PlayerSetupPlacementGhostPostfix(object __instance)
+        {
+            _instance?.ApplyMoreVanillaPlacementGhostSetup(__instance);
+        }
+
         private static void PlayerUpdatePlacementGhostPostfix(object __instance)
         {
+            _instance?.ApplyMoreVanillaPlacementOffset(__instance);
             _instance?.AdjustGroundAlignedPlacementGhost(__instance);
         }
 
