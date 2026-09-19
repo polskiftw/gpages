@@ -135,7 +135,9 @@ jobs:
         shell: pwsh
         run: |
           dotnet build .\valheim-jotunn-compat\src\JotunnCompat.FastPath\JotunnCompat.FastPath.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet build .\valheim-jotunn-compat\src\JotunnCompat.Patcher\JotunnCompat.Patcher.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build Jotunn compatibility package
         shell: pwsh
