@@ -406,6 +406,7 @@ namespace Jotunn.Managers
         public static ItemManager Instance => instance ??= new ItemManager();
         public static event Action OnItemsRegistered;
         private readonly Dictionary<string, CustomItem> items = new Dictionary<string, CustomItem>();
+        private readonly List<CustomRecipe> recipes = new List<CustomRecipe>();
         private readonly List<CustomStatusEffect> effects = new List<CustomStatusEffect>();
 
         private ItemManager() { }
@@ -416,7 +417,44 @@ namespace Jotunn.Managers
             PrefabManager.Instance.AddPrefab(new CustomPrefab(item.ItemPrefab, item.FixReference));
             if (item.ItemPrefab.layer == 0) item.ItemPrefab.layer = LayerMask.NameToLayer("item");
             items.Add(item.ItemPrefab.name, item);
+            if (item.Recipe != null)
+            {
+                AddRecipe(item.Recipe);
+            }
             return true;
+        }
+
+        public CustomItem GetItem(string itemName)
+        {
+            return itemName != null &&
+                items.TryGetValue(itemName, out var item)
+                ? item
+                : null;
+        }
+
+        public bool AddRecipe(CustomRecipe recipe)
+        {
+            if (recipe == null || !recipe.IsValid())
+            {
+                return false;
+            }
+
+            if (recipes.Any(existing =>
+                existing.Recipe &&
+                recipe.Recipe &&
+                existing.Recipe.name == recipe.Recipe.name))
+            {
+                return false;
+            }
+
+            recipes.Add(recipe);
+            return true;
+        }
+
+        public CustomRecipe GetRecipe(string recipeName)
+        {
+            return recipes.FirstOrDefault(recipe =>
+                recipe?.Recipe && recipe.Recipe.name == recipeName);
         }
 
         public bool AddStatusEffect(CustomStatusEffect effect)
@@ -439,6 +477,26 @@ namespace Jotunn.Managers
                     GameInternals.ItemByHash(db).Add(hash, item.ItemPrefab);
                 }
             }
+            foreach (var recipe in recipes)
+            {
+                if (recipe?.Recipe == null)
+                {
+                    continue;
+                }
+
+                if ((recipe.FixReference || recipe.FixRequirementReferences))
+                {
+                    recipe.Recipe.FixReferences();
+                    recipe.FixReference = false;
+                    recipe.FixRequirementReferences = false;
+                }
+
+                if (!db.m_recipes.Contains(recipe.Recipe))
+                {
+                    db.m_recipes.Add(recipe.Recipe);
+                }
+            }
+
             foreach (var effect in effects)
                 if (effect.StatusEffect != null && !db.m_StatusEffects.Contains(effect.StatusEffect))
                     db.m_StatusEffects.Add(effect.StatusEffect);
@@ -454,6 +512,12 @@ namespace Jotunn.Managers
         private readonly CustomLocalization localization = new CustomLocalization();
         private LocalizationManager() { }
         public CustomLocalization GetLocalization() => localization;
+
+        public void AddToken(string token, string value, bool force = false)
+        {
+            localization.AddToken(token, value, force);
+        }
+
         internal void Apply() => localization.ApplyCurrent();
     }
 
@@ -506,7 +570,11 @@ namespace Jotunn.Managers
 
         [HarmonyPatch(typeof(ObjectDB), "Awake")]
         [HarmonyPrefix]
-        private static void ObjectDBAwakePrefix(ObjectDB __instance) => ItemManager.Instance.Register(__instance);
+        private static void ObjectDBAwakePrefix(ObjectDB __instance)
+        {
+            ItemManager.Instance.Register(__instance);
+            PieceManager.Instance.Register(__instance);
+        }
 
         [HarmonyPatch(typeof(ObjectDB), "Awake")]
         [HarmonyPostfix]
