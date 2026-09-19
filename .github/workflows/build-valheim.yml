@@ -7,6 +7,7 @@ on:
     paths:
       - 'valheim-ward-hit-sound/**'
       - 'valheim-hammer-everything/**'
+      - 'valheim-jotunn-compat/**'
       - '.github/workflows/build-valheim.yml'
   workflow_dispatch:
 
@@ -25,7 +26,8 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $projects = @(
             (Join-Path $env:GITHUB_WORKSPACE 'valheim-ward-hit-sound'),
-            (Join-Path $env:GITHUB_WORKSPACE 'valheim-hammer-everything')
+            (Join-Path $env:GITHUB_WORKSPACE 'valheim-hammer-everything'),
+            (Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat')
           )
           $stubDir = Join-Path $env:RUNNER_TEMP 'unity-stub'
 
@@ -129,34 +131,78 @@ jobs:
         shell: pwsh
         run: dotnet build .\valheim-hammer-everything\HammerEverything.csproj -c Release
 
-      - name: Verify DLLs
+      - name: Build Jotunn compatibility tooling
         shell: pwsh
         run: |
-          $dlls = @(
-            '.\valheim-ward-hit-sound\bin\Release\net472\WardHitSoundToggle.dll',
-            '.\valheim-hammer-everything\bin\Release\net472\HammerEverything.dll'
-          )
-          foreach ($dll in $dlls) {
-            if (-not (Test-Path $dll)) { throw "Build output missing: $dll" }
-            Get-FileHash $dll -Algorithm SHA256
-          }
+          dotnet build .\valheim-jotunn-compat\src\JotunnCompat.FastPath\JotunnCompat.FastPath.csproj -c Release
+          dotnet build .\valheim-jotunn-compat\src\JotunnCompat.Patcher\JotunnCompat.Patcher.csproj -c Release
 
-      - name: Publish DLLs to gpages
+      - name: Build Jotunn compatibility package
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $version = '2.30.1'
+          $url = "https://thunderstore.io/package/download/ValheimModding/Jotunn/$version/"
+          $zip = Join-Path $env:RUNNER_TEMP "jotunn-$version.zip"
+          $extract = Join-Path $env:RUNNER_TEMP "jotunn-$version"
+          $packageDir = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\bin\Release\package'
+          $packageZip = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\bin\Release\JotunnCompat.zip'
+
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $extract
+
+          $upstream = Get-ChildItem -Path $extract -Recurse -File -Filter 'Jotunn.dll' | Select-Object -First 1
+          if (-not $upstream) { throw "Could not find Jotunn.dll in upstream Jotunn $version package" }
+
+          $fastPath = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.FastPath\bin\Release\net472\JotunnCompat.FastPath.dll'
+          $patcher = Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\src\JotunnCompat.Patcher\bin\Release\net8.0\JotunnCompat.Patcher.dll'
+
+          New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
+
+          dotnet $patcher $upstream.FullName $fastPath (Join-Path $packageDir 'Jotunn.dll')
+          Copy-Item -Force $fastPath (Join-Path $packageDir 'JotunnCompat.FastPath.dll')
+          Copy-Item -Force '.\valheim-jotunn-compat\LICENSE' (Join-Path $packageDir 'LICENSE')
+          Copy-Item -Force '.\valheim-jotunn-compat\README.md' (Join-Path $packageDir 'README.md')
+
+          if (Test-Path $packageZip) { Remove-Item $packageZip -Force }
+          Compress-Archive -Path (Join-Path $packageDir '*') -DestinationPath $packageZip -CompressionLevel Optimal
+
+      - name: Verify build outputs
+        shell: pwsh
+        run: |
+          $files = @(
+            '.\valheim-ward-hit-sound\bin\Release\net472\WardHitSoundToggle.dll',
+            '.\valheim-hammer-everything\bin\Release\net472\HammerEverything.dll',
+            '.\valheim-jotunn-compat\bin\Release\package\Jotunn.dll',
+            '.\valheim-jotunn-compat\bin\Release\package\JotunnCompat.FastPath.dll',
+            '.\valheim-jotunn-compat\bin\Release\JotunnCompat.zip'
+          )
+          foreach ($file in $files) {
+            if (-not (Test-Path $file)) { throw "Build output missing: $file" }
+            Get-FileHash $file -Algorithm SHA256
+          }
+
+      - name: Publish Valheim artifacts to gpages
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path '.\valheim\jotunn-compat' | Out-Null
+
           Copy-Item -Force '.\valheim-ward-hit-sound\bin\Release\net472\WardHitSoundToggle.dll' '.\valheim\ward-hit-sound\WardHitSoundToggle.dll'
           Copy-Item -Force '.\valheim-hammer-everything\bin\Release\net472\HammerEverything.dll' '.\valheim\hammer-everything\HammerEverything.dll'
+          Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\package\Jotunn.dll' '.\valheim\jotunn-compat\Jotunn.dll'
+          Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\package\JotunnCompat.FastPath.dll' '.\valheim\jotunn-compat\JotunnCompat.FastPath.dll'
+          Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\JotunnCompat.zip' '.\valheim\jotunn-compat\JotunnCompat.zip'
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- "valheim/ward-hit-sound/WardHitSoundToggle.dll" "valheim/hammer-everything/HammerEverything.dll"
+          git add -- "valheim/ward-hit-sound/WardHitSoundToggle.dll" "valheim/hammer-everything/HammerEverything.dll" "valheim/jotunn-compat/Jotunn.dll" "valheim/jotunn-compat/JotunnCompat.FastPath.dll" "valheim/jotunn-compat/JotunnCompat.zip"
 
           git diff --cached --quiet
           if ($LASTEXITCODE -eq 0) {
-            Write-Host 'Published DLLs are already current.'
+            Write-Host 'Published Valheim artifacts are already current.'
             exit 0
           }
 
-          git commit -m "Publish Valheim mod DLLs"
+          git commit -m "Publish Valheim mod artifacts"
           git push
