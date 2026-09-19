@@ -43,12 +43,12 @@
 
 <div class="card">
   <div class="title">Current backend coverage</div>
-  <p class="meta"><strong>Prefabs:</strong> lookup, cloning, registration, cache behavior, ZNetScene integration.<br><br><strong>World locations:</strong> custom locations and ZoneSystem lifecycle registration.<br><br><strong>Dungeons:</strong> custom rooms and dungeon themes.<br><br><strong>Items:</strong> item and status-effect registration.<br><br><strong>Assets:</strong> SoftReferenceableAssets lookup, runtime registration, and resolve-on-load handling.<br><br><strong>Other:</strong> localization, custom RPCs, JVLmock-style reference fixing, GUI sprite lookup, and embedded-resource helpers.</p>
+  <p class="meta"><strong>Prefabs:</strong> lookup, cloning, registration, cache behavior, ZNetScene integration.<br><br><strong>World locations:</strong> custom locations and ZoneSystem lifecycle registration.<br><br><strong>Dungeons:</strong> custom rooms and dungeon themes.<br><br><strong>Items/building:</strong> items, recipes, pieces, piece tables, requirements, status effects, and custom categories.<br><br><strong>GUI:</strong> custom GUI lifecycle, Valheim-style controls, scroll views, input blocking, and a lightweight color picker.<br><br><strong>Assets:</strong> SoftReferenceableAssets lookup/runtime registration plus PNG/JPG runtime texture loading.<br><br><strong>Other:</strong> localization, custom RPCs, minimap lifecycle events, transform helpers, ZNet helpers, JVLmock-style reference fixing, and embedded-resource helpers.</p>
 </div>
 
 <div class="card">
   <div class="title">Compatibility validation</div>
-  <p class="meta">CI builds against a SHA-256-pinned copy of the exact current Valheim <code>Valheim_Data/Managed</code> assemblies and validates the private game/SoftReferenceableAssets contracts used by the runtime. More World Locations AIO 5.1.1 is the first broad canary: its main assembly references <strong>26 Jotunn types and 91 Jotunn members</strong>, all of which resolve against this slim build. Live in-game behavior still needs runtime testing.</p>
+  <p class="meta">CI builds against a SHA-256-pinned copy of the exact current Valheim <code>Valheim_Data/Managed</code> assemblies from a private draft asset and validates the private game/SoftReferenceableAssets contracts used by the runtime.<br><br><strong>More World Locations AIO 5.1.1:</strong> 26 Jotunn types / 91 members in the main DLL, all resolved.<br><br><strong>ValheimRAFT 4.3.5:</strong> <code>DynamicLocations.dll</code> 10/19, <code>ValheimRAFT.dll</code> 9/9, <code>ValheimVehicles.dll</code> 26/103, and <code>ZdoWatcher.dll</code> 8/13 (types/members), all resolved. <code>ServerSync.dll</code> and <code>Zolantris.Shared.dll</code> do not reference Jotunn.<br><br>This is static binary/API compatibility; live in-game behavior still needs runtime testing.</p>
 </div>
 
 <div class="card">
