@@ -69,15 +69,41 @@ namespace Jotunn.Managers
             {
                 var prefab = custom.Prefab;
                 if (!prefab) continue;
-                if (custom.FixReference) { prefab.FixReferences(true); custom.FixReference = false; }
-                int hash = prefab.name.GetStableHashCode();
-                if (!GameInternals.NamedPrefabs(scene).ContainsKey(hash))
+                if (custom.FixReference)
                 {
-                    if (prefab.GetComponent<ZNetView>() != null) scene.m_prefabs.Add(prefab);
-                    else scene.m_nonNetViewPrefabs.Add(prefab);
-                    GameInternals.NamedPrefabs(scene).Add(hash, prefab);
+                    prefab.FixReferences(true);
+                    custom.FixReference = false;
                 }
+
+                RegisterToZNetScene(prefab, scene);
             }
+        }
+
+        internal void RegisterToZNetScene(GameObject prefab, ZNetScene scene = null)
+        {
+            scene ??= ZNetScene.instance;
+            if (scene == null || !prefab || prefab.name.StartsWith("JVLmock_", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            int hash = prefab.name.GetStableHashCode();
+            var namedPrefabs = GameInternals.NamedPrefabs(scene);
+            if (namedPrefabs.ContainsKey(hash))
+            {
+                return;
+            }
+
+            if (prefab.GetComponent<ZNetView>() != null)
+            {
+                scene.m_prefabs.Add(prefab);
+            }
+            else
+            {
+                scene.m_nonNetViewPrefabs.Add(prefab);
+            }
+
+            namedPrefabs.Add(hash, prefab);
         }
 
         public static class Cache
@@ -157,9 +183,20 @@ namespace Jotunn.Managers
         internal void Setup(ZoneSystem zone)
         {
             OnVanillaLocationsAvailable?.Invoke();
+
             foreach (var custom in Locations.Values)
             {
-                if (custom.FixReference && custom.Prefab) { custom.Prefab.FixReferences(true); custom.FixReference = false; }
+                if (custom.FixReference && custom.Prefab && !custom.SoftReference)
+                {
+                    custom.Prefab.FixReferences(true);
+                    custom.FixReference = false;
+                }
+
+                if (!custom.SoftReference)
+                {
+                    PrepareLocation(custom.ZoneLocation);
+                }
+
                 int hash = custom.Name.GetStableHashCode();
                 if (!GameInternals.LocationHashes(zone).ContainsKey(hash))
                 {
@@ -167,6 +204,57 @@ namespace Jotunn.Managers
                     GameInternals.LocationHashes(zone)[hash] = custom.ZoneLocation;
                 }
             }
+        }
+
+        private static void PrepareLocation(ZoneSystem.ZoneLocation location)
+        {
+            location.m_prefab.Load();
+            var root = location.m_prefab.Asset;
+            if (!root)
+            {
+                return;
+            }
+
+            foreach (var znet in GameInternals.EnabledComponentsInChildren<ZNetView>(root))
+            {
+                RegisterUnknownPrefab(znet);
+            }
+
+            foreach (var randomSpawn in GameInternals.EnabledComponentsInChildren<RandomSpawn>(root))
+            {
+                GameInternals.PrepareRandomSpawn(randomSpawn);
+                foreach (var znet in GameInternals.RandomSpawnChildViews(randomSpawn))
+                {
+                    RegisterUnknownPrefab(znet);
+                }
+            }
+        }
+
+        private static void RegisterUnknownPrefab(ZNetView znet)
+        {
+            if (!znet)
+            {
+                return;
+            }
+
+            var prefabName = GameInternals.GetPrefabName(znet);
+            if (string.IsNullOrEmpty(prefabName) ||
+                prefabName.StartsWith("JVLmock_", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var scene = ZNetScene.instance;
+            int hash = prefabName.GetStableHashCode();
+            if (scene != null && GameInternals.NamedPrefabs(scene).ContainsKey(hash))
+            {
+                return;
+            }
+
+            var prefab = Object.Instantiate(znet.gameObject, PrefabManager.Instance.PrefabContainer.transform);
+            prefab.name = prefabName;
+            PrefabManager.Instance.AddPrefab(new CustomPrefab(prefab, false));
+            PrefabManager.Instance.RegisterToZNetScene(prefab, scene);
         }
     }
 
@@ -177,6 +265,7 @@ namespace Jotunn.Managers
         public static event Action OnVanillaRoomsAvailable;
         internal readonly Dictionary<string, CustomRoom> Rooms = new Dictionary<string, CustomRoom>();
         private readonly List<string> themeList = new List<string>();
+        private readonly Dictionary<int, string> roomHashes = new Dictionary<int, string>();
         internal GameObject DungeonRoomContainer { get; }
 
         private DungeonManager()
@@ -193,6 +282,11 @@ namespace Jotunn.Managers
             if (!CustomRoom.IsVanillaTheme(customRoom.ThemeName) && !themeList.Contains(customRoom.ThemeName))
                 throw new ArgumentException("ThemeName must be vanilla or registered", nameof(customRoom));
             if (Rooms.ContainsKey(customRoom.Name)) return false;
+            if (!customRoom.SoftReference && customRoom.Prefab)
+            {
+                customRoom.Prefab.transform.SetParent(DungeonRoomContainer.transform);
+                customRoom.Prefab.SetActive(true);
+            }
             Rooms.Add(customRoom.Name, customRoom);
             return true;
         }
@@ -212,10 +306,41 @@ namespace Jotunn.Managers
         internal void StartDungeonDB(DungeonDB db)
         {
             OnVanillaRoomsAvailable?.Invoke();
+
             foreach (var room in Rooms.Values)
-                if (CustomRoom.IsVanillaTheme(room.ThemeName) && !GameInternals.DungeonRooms(db).Contains(room.RoomData))
+            {
+                if (room.FixReference && room.Prefab && !room.SoftReference)
+                {
+                    room.Prefab.FixReferences(true);
+                    room.FixReference = false;
+                }
+
+                if (CustomRoom.IsVanillaTheme(room.ThemeName) &&
+                    !GameInternals.DungeonRooms(db).Contains(room.RoomData))
+                {
                     GameInternals.DungeonRooms(db).Add(room.RoomData);
+                }
+            }
+
             GameInternals.GenerateDungeonHashList(db);
+
+            roomHashes.Clear();
+            foreach (var room in Rooms.Values)
+            {
+                int hash = room.Name.GetStableHashCode();
+                if (!roomHashes.ContainsKey(hash))
+                {
+                    roomHashes.Add(hash, room.Name);
+                }
+            }
+        }
+
+        internal DungeonDB.RoomData GetRoomByHash(int hash)
+        {
+            return roomHashes.TryGetValue(hash, out var name) &&
+                   Rooms.TryGetValue(name, out var room)
+                ? room.RoomData
+                : null;
         }
 
         internal void AppendRooms(DungeonGenerator generator)
@@ -356,6 +481,20 @@ namespace Jotunn.Managers
         [HarmonyPatch(typeof(DungeonDB), "Start")]
         [HarmonyPostfix]
         private static void DungeonStart(DungeonDB __instance) => DungeonManager.Instance.StartDungeonDB(__instance);
+
+        [HarmonyPatch(typeof(DungeonDB), "GetRoom")]
+        [HarmonyPrefix]
+        private static bool DungeonGetRoom(int hash, ref DungeonDB.RoomData __result)
+        {
+            var custom = DungeonManager.Instance.GetRoomByHash(hash);
+            if (custom == null)
+            {
+                return true;
+            }
+
+            __result = custom;
+            return false;
+        }
 
         [HarmonyPatch(typeof(DungeonGenerator), "SetupAvailableRooms")]
         [HarmonyPostfix]
