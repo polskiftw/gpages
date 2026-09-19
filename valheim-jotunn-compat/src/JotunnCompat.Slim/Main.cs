@@ -33,7 +33,7 @@ namespace Jotunn
             _ = NetworkManager.Instance;
             _ = GUIManager.Instance;
 
-            Game.isModded = true;
+            Harmony.PatchAll(typeof(Managers.SlimPatches));\n            Harmony.PatchAll(typeof(Managers.AssetManager.Patches));\n            Game.isModded = true;
         }
 
         private void OnApplicationQuit()
