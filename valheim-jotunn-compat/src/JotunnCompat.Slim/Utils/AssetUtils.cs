@@ -18,6 +18,39 @@ namespace Jotunn.Utils
                 return AssetBundle.LoadFromStream(stream);
         }
 
+        public static Texture2D LoadTexture(
+            string texturePath,
+            bool relativePath = true)
+        {
+            if (string.IsNullOrEmpty(texturePath))
+            {
+                return null;
+            }
+
+            var path = relativePath
+                ? Path.Combine(BepInEx.Paths.PluginPath, texturePath)
+                : texturePath;
+
+            if (!File.Exists(path))
+            {
+                return null;
+            }
+
+            var extension = Path.GetExtension(path);
+            if (!string.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(extension, ".jpg", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(extension, ".jpeg", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "LoadTexture can only load png or jpg textures");
+            }
+
+            var texture = new Texture2D(2, 2);
+            return ImageConversion.LoadImage(texture, File.ReadAllBytes(path))
+                ? texture
+                : null;
+        }
+
         public static string LoadTextFromResources(string fileName)
         {
             return LoadTextFromResources(fileName, Assembly.GetCallingAssembly());
