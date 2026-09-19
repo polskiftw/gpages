@@ -38,7 +38,26 @@ namespace Jotunn
 
             Harmony.PatchAll(typeof(Managers.SlimPatches));
             Harmony.PatchAll(typeof(Managers.AssetManager.Patches));
+            PatchMinimapLifecycle();
             Game.isModded = true;
+        }
+
+        private static void PatchMinimapLifecycle()
+        {
+            var target = AccessTools.Method(typeof(Minimap), "LoadMapData") ??
+                AccessTools.Method(typeof(Minimap), "Start");
+            var postfix = AccessTools.Method(
+                typeof(Managers.SlimPatches),
+                nameof(Managers.SlimPatches.MinimapDataLoaded));
+
+            if (target == null || postfix == null)
+            {
+                Jotunn.Logger.LogWarning(
+                    "Could not find a Minimap lifecycle method for map-ready notifications");
+                return;
+            }
+
+            Harmony.Patch(target, postfix: new HarmonyMethod(postfix));
         }
 
         private IEnumerator AnnounceGUIAvailability()
