@@ -133,7 +133,20 @@ namespace Jotunn.Entities
 
     public class CustomLocalization
     {
+        private static readonly MethodInfo AddWordMethod = typeof(Localization).GetMethod(
+            "AddWord",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            null,
+            new[] { typeof(string), typeof(string) },
+            null);
+
         private readonly Dictionary<string, Dictionary<string, string>> map = new Dictionary<string, Dictionary<string, string>>();
+
+        private static void AddWord(string key, string value)
+        {
+            if (Localization.instance == null || AddWordMethod == null) return;
+            AddWordMethod.Invoke(Localization.instance, new object[] { key, value });
+        }
 
         public void AddYamlFile(string language, string fileContent)
         {
@@ -156,7 +169,7 @@ namespace Jotunn.Entities
             {
                 var key = kv.Key.TrimStart('$');
                 lang[key] = kv.Value;
-                if (Localization.instance != null) Localization.instance.AddWord(key, kv.Value);
+                AddWord(key, kv.Value);
             }
         }
 
@@ -165,7 +178,7 @@ namespace Jotunn.Entities
             if (Localization.instance == null) return;
             var language = Localization.instance.GetSelectedLanguage();
             if (!map.TryGetValue(language, out var words) && !map.TryGetValue("English", out words)) return;
-            foreach (var kv in words) Localization.instance.AddWord(kv.Key, kv.Value);
+            foreach (var kv in words) AddWord(kv.Key, kv.Value);
         }
     }
 
