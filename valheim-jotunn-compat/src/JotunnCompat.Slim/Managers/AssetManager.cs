@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using HarmonyLib;
 using SoftReferenceableAssets;
 using UnityEngine;
@@ -90,11 +91,11 @@ namespace Jotunn.Managers
                 context.Resolve(direct);
         }
 
-        internal void OnLoaded(ref AssetLoader loader, LoadResult result)
+        internal void OnLoaded(AssetID assetID, ref Object asset, LoadResult result)
         {
-            if (result != LoadResult.Succeeded || !resolve.TryGetValue(loader.m_assetID, out var context) || !loader.m_asset) return;
-            context.Resolve(loader.m_asset);
-            if (context.Asset) loader.m_asset = context.Asset;
+            if (result != LoadResult.Succeeded || !resolve.TryGetValue(assetID, out var context) || !asset) return;
+            context.Resolve(asset);
+            if (context.Asset) asset = context.Asset;
         }
 
         private sealed class ResolutionContext
@@ -113,11 +114,18 @@ namespace Jotunn.Managers
             }
         }
 
+        [HarmonyPatch]
         internal static class Patches
         {
-            [HarmonyPatch(typeof(AssetLoader), nameof(AssetLoader.InvokeCallbacks))]
+            private static MethodBase TargetMethod()
+            {
+                var assetLoader = AccessTools.TypeByName("SoftReferenceableAssets.AssetLoader");
+                return AccessTools.Method(assetLoader, "InvokeCallbacks");
+            }
+
             [HarmonyPrefix]
-            private static void Loaded(ref AssetLoader __instance, LoadResult result) => Instance.OnLoaded(ref __instance, result);
+            private static void Loaded(AssetID ___m_assetID, ref Object ___m_asset, LoadResult result)
+                => Instance.OnLoaded(___m_assetID, ref ___m_asset, result);
         }
     }
 }
