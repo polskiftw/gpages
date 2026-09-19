@@ -4,76 +4,79 @@ A compatibility-first, performance-oriented Jotunn distribution for Valheim.
 
 ## Goal
 
-Existing mods compiled against Jotunn should load without being ported. The compatibility package therefore preserves exactly what binary mods and BepInEx already expect:
+Existing mods compiled against Jotunn should load without being ported. The compatibility package preserves what those binaries already expect:
 
-- assembly file and assembly name: `Jotunn.dll`
+- assembly file/name: `Jotunn.dll`
 - BepInEx plugin GUID: `com.jotunn.jotunn`
 - Jotunn public namespaces, types, members, version, and network behavior
-- existing Jotunn features unless a subsystem has been deliberately replaced behind the same contract
+- existing behavior unless a subsystem is deliberately replaced behind that same contract
 
-This is intentionally different from inventing a new mod framework. Existing mods should continue to believe they are talking to Jotunn.
+This is not a new framework for mods to target. Mods continue targeting Jotunn.
 
-## Current implementation
+## Architecture
 
-The current release bundles the **unmodified official Jotunn 2.30.1 release DLL** and a tiny companion BepInEx plugin, `JotunnCompat.FastPath.dll`. CI downloads that DLL directly from Jotunn's GitHub release and verifies its pinned SHA-256 before packaging.
+The package contains only two runtime DLLs:
 
-The companion has a hard BepInEx dependency on Jotunn, so Jotunn's `Awake` runs first. The companion then installs Harmony prefixes before Unity calls Jotunn's `Start`. That lets us replace expensive Start-time internals without rewriting Jotunn metadata or changing any API that existing mods bind against.
+- `BepInEx/plugins/JotunnCompat/Jotunn.dll` — the **unmodified official Jotunn 2.30.1 release DLL**
+- `BepInEx/patchers/JotunnCompat.Preloader.dll` — the generic compatibility/optimization layer
 
-Because `Jotunn.dll` itself is untouched, binary/API identity is exact by construction.
+CI downloads Jotunn directly from its GitHub release and verifies a pinned SHA-256 before packaging.
 
-### PatchInit fast path
+The preloader arms before BepInEx starts plugin discovery. It watches for the CLR assembly named `Jotunn` and installs the generic Harmony layer immediately when that assembly loads, before BepInEx can construct or call `Awake` on Jotunn-dependent mods. This removes sibling-plugin load-order ambiguity while leaving `Jotunn.dll` itself byte-for-byte upstream.
 
-Jotunn's obsolete `PatchInit` compatibility code scans every type and every public static method in every Jotunn-dependent assembly at startup. The replacement first checks assembly metadata bytes for the obsolete attribute name and only reflects assemblies that can actually contain it.
+## Current generic improvements
 
-Modern mods that do not use `PatchInitAttribute` avoid the expensive type/method reflection walk entirely.
+### PatchInit discovery
 
-### Localization fast path
+Jotunn's obsolete `PatchInit` compatibility path reflects every type and every public static method in every Jotunn-dependent assembly. The replacement first checks assembly metadata for `PatchInitAttribute` and only reflects assemblies that can actually contain it.
 
-Jotunn's automatic translation discovery recursively scans the full BepInEx plugin tree separately for:
+### Automatic localization discovery
 
-- `community_translation.json`
-- `*.json`
-- `*.language`
-- `*.yaml`
-- `*.yml`
+Upstream recursively scans the full BepInEx plugin tree separately for five localization patterns. The replacement performs one recursive filesystem walk, classifies matches in memory, and avoids initializing the localization manager when no automatic translation files exist.
 
-The replacement performs one recursive filesystem walk, classifies matching files in memory, and feeds them into Jotunn's existing localization implementation. If no automatic translation files exist, it also avoids initializing the localization manager just for discovery.
+### Prefab lookup memoization
 
-### Prefab cache fast path
+`PrefabManager.Cache.GetPrefab(Type, string)` normally repeats the AssetManager/SoftReference lookup/load path even after a successful lookup. Successful non-texture lookups are memoized and invalidated with Jotunn's own cache. Missing assets are never negatively cached.
 
-Jotunn already caches the expensive `Resources.FindObjectsOfTypeAll` fallback, but every `PrefabManager.Cache.GetPrefab(Type, string)` call still checks `AssetManager`, creates a SoftReference, and calls `Load` before consulting that cache.
+### Mock-reference traversal
 
-The compatibility layer memoizes **successful lookups only**. Upstream Jotunn intentionally keeps those SoftReference assets loaded, so repeating the same lookup path is unnecessary. The memoizer is cleared whenever Jotunn clears its own cache, and texture-family lookups are deliberately excluded because Jotunn selectively invalidates textures later in startup.
+Jotunn's `JVLmock_` resolver reflects arbitrary object graphs with a depth limit of five. The compatibility layer remembers the shallowest processed depth per object for one top-level traversal and reuses successful mock resolutions inside that traversal. This avoids duplicate reflection/cycle churn while preserving the original depth budget.
 
-### Mock-reference traversal fast path
+### AssetManager collision hardening
 
-Jotunn's `JVLmock_` resolver recursively reflects arbitrary component/object graphs with a depth limit of five. Cyclic and multiply-referenced graphs can cause the same object to be walked repeatedly.
+Jotunn 2.30.1's asset-path transpiler assumes its target `Dictionary.Add` instruction still exists. If another mod has already transformed that instruction, Harmony's `CodeMatcher.SetInstruction` throws and can kill AssetManager initialization.
 
-The compatibility layer records the shallowest depth at which an object has already been processed during one top-level reference-fix operation. A duplicate visit is skipped only when the earlier visit had equal or greater remaining traversal reach. Successful mock resolutions are also reused inside that one traversal.
+The early compatibility layer catches **only that exact invalid-CodeMatcher failure** and falls back to the incoming instruction stream. Other exceptions are preserved.
 
-The cache is traversal-local, so arbitrary mod objects are not retained after reference fixing completes.
+## Compatibility strategy
 
-## Why start this way?
+A hand-written partial clone of common Jotunn APIs would not be a real drop-in replacement: already-compiled mods bind to exact types and signatures, including obscure ones.
 
-A hand-written shim that implements only common Jotunn calls is not a real drop-in replacement. Already-compiled mods contain metadata references to exact Jotunn types and signatures; missing one uncommon member can prevent a mod from loading at all.
+The project therefore keeps upstream Jotunn as the ABI floor while replacing internals incrementally. A subsystem is only replaced when its observable contract can be preserved. Canary mods reveal missing behavior, but production runtime code may never special-case a canary.
 
-Keeping the upstream assembly intact gives us a perfect compatibility floor while we replace internals incrementally. It also gives us a safe rollback path for each subsystem: if a faster implementation is not behavior-compatible, that override can be removed without changing what mods link against.
+See [COMPATIBILITY.md](COMPATIBILITY.md).
 
 ## Installation
 
-1. Remove any separately installed official Jotunn package. Do not load two copies.
-2. Put both `Jotunn.dll` and `JotunnCompat.FastPath.dll` from this package in the same BepInEx plugin folder.
-3. Launch Valheim normally.
+1. Install BepInEx 5 for Valheim.
+2. Remove any separately installed official Jotunn package.
+3. If upgrading from the old compatibility prototype, remove `JotunnCompat.FastPath.dll`.
+4. Extract `JotunnCompat.zip` directly into the **Valheim game directory**. The ZIP already contains the correct `BepInEx/plugins` and `BepInEx/patchers` paths.
+5. Launch Valheim normally.
 
-The recommended download is `JotunnCompat.zip`, which contains both DLLs.
+## Build guardrails
+
+CI:
+
+- rejects target-mod identifiers in production runtime/preloader source;
+- pins and hashes the canonical upstream Jotunn DLL;
+- verifies every private/public Jotunn hook our runtime expects;
+- verifies `JotunnCompat.Preloader.dll` has the exact static patcher shape BepInEx 5 discovers;
+- builds, hashes, packages, and publishes on a Windows runner.
 
 ## Roadmap
 
-The compatibility contract is permanent; the implementation underneath it can keep shrinking.
-
-Future work should profile real mod packs and replace one Jotunn subsystem at a time while maintaining a corpus of existing Jotunn-dependent mods as compatibility tests. See [COMPATIBILITY.md](COMPATIBILITY.md) for the canary matrix. Candidate areas include manager initialization, asset handling, GUI helpers, synchronization, prefab/item/piece registration, and location/zone management.
-
-The important rule is that optimization happens behind the existing Jotunn contract. Mods do not get forced onto a new API.
+Continue replacing generic Jotunn subsystems one at a time, driven by profiling and compatibility canaries: asset handling, zone/location registration, dungeon handling, items/pieces, synchronization/networking, and other managers where a simpler implementation can preserve the same contract.
 
 ## License
 
