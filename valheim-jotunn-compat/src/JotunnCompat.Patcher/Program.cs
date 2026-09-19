@@ -29,7 +29,7 @@ resolver.AddSearchDirectory(Path.GetDirectoryName(fastPath)!);
 using var module = ModuleDefinition.ReadModule(inputPath, new ReaderParameters
 {
     AssemblyResolver = resolver,
-    ReadingMode = ReadingMode.Immediate,
+    ReadingMode = ReadingMode.Deferred,
     ReadSymbols = false
 });
 
@@ -44,7 +44,7 @@ var originalApi = PublicApiSnapshot(module);
 using var fastModule = ModuleDefinition.ReadModule(fastPath, new ReaderParameters
 {
     AssemblyResolver = resolver,
-    ReadingMode = ReadingMode.Immediate,
+    ReadingMode = ReadingMode.Deferred,
     ReadSymbols = false
 });
 
@@ -64,7 +64,7 @@ module.Write(outputPath, new WriterParameters { WriteSymbols = false });
 
 using var verify = ModuleDefinition.ReadModule(outputPath, new ReaderParameters
 {
-    ReadingMode = ReadingMode.Immediate,
+    ReadingMode = ReadingMode.Deferred,
     ReadSymbols = false
 });
 
