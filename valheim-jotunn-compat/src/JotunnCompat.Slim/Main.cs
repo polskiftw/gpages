@@ -1,3 +1,4 @@
+using System.Collections;
 using BepInEx;
 using HarmonyLib;
 using Jotunn.Managers;
@@ -33,9 +34,19 @@ namespace Jotunn
             _ = NetworkManager.Instance;
             _ = GUIManager.Instance;
 
+            StartCoroutine(AnnounceGUIAvailability());
+
             Harmony.PatchAll(typeof(Managers.SlimPatches));
             Harmony.PatchAll(typeof(Managers.AssetManager.Patches));
             Game.isModded = true;
+        }
+
+        private IEnumerator AnnounceGUIAvailability()
+        {
+            // Jotunn loads before dependent plugins. Defer one frame so consumers
+            // have had a chance to subscribe to OnCustomGUIAvailable.
+            yield return null;
+            GUIManager.Instance.EnsureGUI();
         }
 
         private void OnApplicationQuit()
