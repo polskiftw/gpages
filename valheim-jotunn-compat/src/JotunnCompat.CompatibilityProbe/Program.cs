@@ -19,7 +19,7 @@ if (!File.Exists(modPath))
     throw new FileNotFoundException("Dependent mod DLL not found", modPath);
 }
 
-var resolver = new DefaultAssemblyResolver();
+using var resolver = new PinnedAssemblyResolver();
 resolver.AddSearchDirectory(Path.GetDirectoryName(jotunnPath)!);
 resolver.AddSearchDirectory(Path.GetDirectoryName(modPath)!);
 
@@ -31,6 +31,12 @@ using var jotunn = AssemblyDefinition.ReadAssembly(
         ReadingMode = ReadingMode.Deferred,
         ReadSymbols = false
     });
+
+// The compatibility question is deliberately version-independent: an existing mod
+// can reference an older Jotunn assembly version while the drop-in compatibility
+// package supplies a newer assembly named Jotunn. Pin every Cecil resolution of
+// that assembly name to the exact baseline DLL passed on the command line.
+resolver.Pin(jotunn);
 
 using var mod = AssemblyDefinition.ReadAssembly(
     modPath,
@@ -72,10 +78,7 @@ foreach (var type in jotunnTypes)
     {
         var resolved = type.Resolve();
         if (resolved == null ||
-            !string.Equals(
-                resolved.Module.Assembly.Name.Name,
-                "Jotunn",
-                StringComparison.Ordinal))
+            !ReferenceEquals(resolved.Module.Assembly, jotunn))
         {
             failures.Add("TYPE " + type.FullName);
         }
@@ -99,10 +102,7 @@ foreach (var member in jotunnMembers)
         };
 
         if (resolvedModule == null ||
-            !string.Equals(
-                resolvedModule.Assembly.Name.Name,
-                "Jotunn",
-                StringComparison.Ordinal))
+            !ReferenceEquals(resolvedModule.Assembly, jotunn))
         {
             failures.Add("MEMBER " + MemberKey(member));
         }
@@ -178,4 +178,31 @@ static string MemberKey(MemberReference member)
             field.Name + ":" + field.FieldType.FullName,
         _ => member.FullName
     };
+}
+
+sealed class PinnedAssemblyResolver : DefaultAssemblyResolver
+{
+    private readonly Dictionary<string, AssemblyDefinition> pinned =
+        new(StringComparer.Ordinal);
+
+    public void Pin(AssemblyDefinition assembly)
+    {
+        pinned[assembly.Name.Name] = assembly;
+    }
+
+    public override AssemblyDefinition Resolve(AssemblyNameReference name)
+    {
+        return pinned.TryGetValue(name.Name, out var assembly)
+            ? assembly
+            : base.Resolve(name);
+    }
+
+    public override AssemblyDefinition Resolve(
+        AssemblyNameReference name,
+        ReaderParameters parameters)
+    {
+        return pinned.TryGetValue(name.Name, out var assembly)
+            ? assembly
+            : base.Resolve(name, parameters);
+    }
 }
