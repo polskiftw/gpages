@@ -131,7 +131,9 @@ namespace Jotunn.Managers
 
         private static void Register(Jotunn.Entities.ConsoleCommand command)
         {
-            if (Terminal.commands.ContainsKey(command.Name))
+            var commandMap = AccessTools.Field(typeof(Terminal), "commands")?.GetValue(null)
+                as System.Collections.IDictionary;
+            if (commandMap != null && commandMap.Contains(command.Name))
             {
                 return;
             }
