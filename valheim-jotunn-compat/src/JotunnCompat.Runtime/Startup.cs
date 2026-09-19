@@ -8,14 +8,14 @@ using BepInEx;
 using BepInEx.Bootstrap;
 using BepInEx.Logging;
 
-namespace JotunnCompat.FastPath
+namespace JotunnCompat.Runtime
 {
     /// <summary>
-    /// Startup replacements injected into the official Jotunn binary.
+    /// Compatibility-preserving startup replacements installed by the early preloader.
     ///
-    /// This assembly deliberately does not reference Jotunn at compile time. That keeps the
-    /// fast paths independent from Valheim game assemblies and lets the compatibility build
-    /// preserve Jotunn's exact public API surface.
+    /// This runtime code deliberately does not reference Jotunn at compile time. It discovers
+    /// Jotunn types through reflection so the bundled upstream assembly keeps its exact
+    /// binary/API identity.
     /// </summary>
     internal static class Startup
     {
