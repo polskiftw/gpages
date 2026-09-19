@@ -1,4 +1,3 @@
-using System.Linq;
 using UnityEngine;
 
 namespace Jotunn.Managers
@@ -20,10 +19,10 @@ namespace Jotunn.Managers
                 return null;
             }
 
-            // Trophy/item icons are the common compatibility use case. Search already-loaded
-            // sprites by exact name without initializing Jotunn's full GUI framework.
-            return Resources.FindObjectsOfTypeAll<Sprite>()
-                .FirstOrDefault(sprite => sprite && sprite.name == spriteName);
+            // Upstream Jotunn ultimately falls back to PrefabManager.Cache for sprites.
+            // The slim build skips Jotunn's full GUI framework/atlases but keeps the
+            // generic asset lookup path, which also works before every sprite is loaded.
+            return PrefabManager.Cache.GetPrefab<Sprite>(spriteName);
         }
     }
 }
