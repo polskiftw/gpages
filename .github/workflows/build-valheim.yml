@@ -94,6 +94,9 @@ jobs:
           Copy-Item $cecil.FullName (Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\lib\Mono.Cecil.dll')
 
           choco install steamcmd -y --no-progress
+          # The Chocolatey package installs SteamCMD's bootstrap binary. Give it one
+          # invocation to self-update before asking it to process app commands.
+          & steamcmd +quit
           & steamcmd +force_install_dir $valheimInstall +login anonymous +app_info_update 1 +app_update 896660 validate +quit
           if ($LASTEXITCODE -ne 0) { throw "SteamCMD Valheim server install failed with exit code $LASTEXITCODE" }
 
