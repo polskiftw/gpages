@@ -26,6 +26,8 @@ jobs:
 
       - name: Prepare compile references
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
           $projects = @(
@@ -105,6 +107,48 @@ jobs:
           Copy-Item $preloader.FullName (Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\lib\BepInEx.Preloader.dll')
           Copy-Item $cecil.FullName (Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat\lib\Mono.Cecil.dll')
 
+          # Exact current Valheim managed binaries live in an unpublished draft release.
+          # They are never committed or copied into the public artifact.
+          $managedAssetId = 574482997
+          $managedExpectedSha256 = 'b81c940eb8d1d751b3a5b12d1e9dbc9309fa508014e2d22c1a5065212c1234ed'
+          $managedZip = Join-Path $env:RUNNER_TEMP 'valheim-managed.zip'
+          $managedExtract = Join-Path $env:RUNNER_TEMP 'valheim-managed'
+          $managedAssetUrl = "https://api.github.com/repos/polskiftw/gpages/releases/assets/$managedAssetId"
+          $headers = @{
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            Accept = 'application/octet-stream'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+
+          Invoke-WebRequest -Uri $managedAssetUrl -Headers $headers -OutFile $managedZip
+
+          $managedActualSha256 = (Get-FileHash $managedZip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($managedActualSha256 -ne $managedExpectedSha256) {
+            throw "Managed.zip SHA256 mismatch. Expected $managedExpectedSha256, got $managedActualSha256"
+          }
+
+          Expand-Archive -Path $managedZip -DestinationPath $managedExtract
+          $assemblyCSharp = Get-ChildItem -Path $managedExtract -Recurse -File -Filter 'Assembly-CSharp.dll' |
+            Select-Object -First 1
+          if (-not $assemblyCSharp) {
+            throw 'Managed.zip does not contain Assembly-CSharp.dll'
+          }
+
+          $managedDir = $assemblyCSharp.Directory.FullName
+          foreach ($required in @(
+            'Assembly-CSharp.dll',
+            'SoftReferenceableAssets.dll',
+            'UnityEngine.CoreModule.dll'
+          )) {
+            if (-not (Test-Path (Join-Path $managedDir $required))) {
+              throw "Managed.zip is missing required assembly $required"
+            }
+          }
+
+          "VALHEIM_MANAGED=$managedDir" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Pinned Valheim managed refs: $managedDir"
+          Write-Host "Managed.zip SHA256: $managedActualSha256"
 
       - name: Enforce generic Jotunn runtime
         shell: pwsh
@@ -196,11 +240,20 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet build .\valheim-jotunn-compat\src\JotunnCompat.CompatibilityProbe\JotunnCompat.CompatibilityProbe.csproj -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build .\valheim-jotunn-compat\src\JotunnCompat.ValheimContractCheck\JotunnCompat.ValheimContractCheck.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Validate exact Valheim runtime contract
+        shell: pwsh
+        run: |
+          $checker = '.\valheim-jotunn-compat\src\JotunnCompat.ValheimContractCheck\bin\Release\net8.0\JotunnCompat.ValheimContractCheck.dll'
+          dotnet $checker "$env:VALHEIM_MANAGED"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build slim Jotunn runtime
         shell: pwsh
         run: |
-          dotnet build .\valheim-jotunn-compat\src\JotunnCompat.Slim\JotunnCompat.Slim.csproj -c Release
+          dotnet build .\valheim-jotunn-compat\src\JotunnCompat.Slim\JotunnCompat.Slim.csproj -c Release /p:ValheimManaged="$env:VALHEIM_MANAGED"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build Jotunn compatibility package
