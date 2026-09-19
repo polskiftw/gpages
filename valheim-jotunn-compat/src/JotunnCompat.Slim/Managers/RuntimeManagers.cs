@@ -301,7 +301,11 @@ namespace Jotunn.Managers
 
         public CustomRPC AddRPC(string name, CoroutineHandler serverReceive, CoroutineHandler clientReceive)
         {
-            var owner = Assembly.GetCallingAssembly().GetName().Name ?? "mod";
+            var callingAssembly = Assembly.GetCallingAssembly();
+            var plugin = callingAssembly.GetCustomAttributes(typeof(BepInEx.BepInPlugin), false)
+                .OfType<BepInEx.BepInPlugin>()
+                .FirstOrDefault();
+            var owner = plugin?.GUID ?? callingAssembly.GetName().Name ?? "mod";
             var id = owner + "!" + name;
             var found = rpcs.FirstOrDefault(r => r.ID == id);
             if (found != null) return found;
