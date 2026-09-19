@@ -57,7 +57,7 @@ namespace Jotunn
 
         internal static void LogInit(string module)
         {
-            Logger.LogDebug("Initializing " + module);
+            Jotunn.Logger.LogDebug("Initializing " + module);
         }
     }
 }
