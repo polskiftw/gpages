@@ -34,7 +34,7 @@ namespace Jotunn.Managers
             return id;
         }
 
-        internal bool IsReady() => Runtime.s_assetLoader != null;
+        internal bool IsReady() => GameInternals.AssetLoaderReady;
 
         internal SoftReference<Object> GetSoftReference(Type type, string name)
         {
