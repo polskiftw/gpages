@@ -14,47 +14,47 @@
 <body><main>
 <a class="back" href="../">‹ Valheim</a>
 <h1>Jotunn Compatibility Layer</h1>
-<p class="sub">Drop-in Jotunn compatibility for existing Valheim mods, with expensive internals replaced incrementally instead of forcing mods onto a new framework.</p>
+<p class="sub">Drop-in Jotunn compatibility for existing Valheim mods, with generic internals optimized and hardened behind the same Jotunn contract.</p>
 
 <div class="card">
   <a class="download" href="JotunnCompat.zip">Download JotunnCompat.zip</a>
-  <p class="note">Recommended package. Contains the exact upstream <code>Jotunn.dll</code> plus <code>JotunnCompat.FastPath.dll</code>.</p>
+  <p class="note">Recommended. The ZIP already contains the correct <code>BepInEx/plugins</code> and <code>BepInEx/patchers</code> folders.</p>
 </div>
 
 <div class="card">
-  <p class="warning"><strong>Remove a separately installed Jotunn package first.</strong> This ZIP already contains Jotunn, so loading another copy would duplicate the same assembly/plugin.</p>
+  <p class="warning"><strong>Remove a separately installed Jotunn package first.</strong> If you tested the older compatibility prototype, also remove <code>JotunnCompat.FastPath.dll</code>.</p>
 </div>
 
 <div class="card">
   <div class="title">Install</div>
   <ol class="steps">
     <li>Install BepInEx 5 for Valheim.</li>
-    <li>Remove the separately installed official Jotunn package if present.</li>
-    <li>Extract <code>JotunnCompat.zip</code> into a folder under <code>Valheim\BepInEx\plugins\</code>.</li>
-    <li>Keep <code>Jotunn.dll</code> and <code>JotunnCompat.FastPath.dll</code> together.</li>
+    <li>Remove any separately installed Jotunn package.</li>
+    <li>Extract <code>JotunnCompat.zip</code> directly into the <strong>Valheim game directory</strong>.</li>
+    <li>The ZIP places Jotunn under <code>BepInEx/plugins/JotunnCompat/</code> and the early compatibility layer under <code>BepInEx/patchers/</code>.</li>
     <li>Launch Valheim normally.</li>
   </ol>
 </div>
 
 <div class="card">
   <div class="title">Compatibility strategy</div>
-  <p class="meta">The current build bundles the <strong>unmodified official Jotunn 2.30.1 DLL</strong>. The fast-path plugin loads after Jotunn's <code>Awake</code> and installs Harmony overrides before Jotunn's <code>Start</code>. Existing mods therefore get the exact Jotunn assembly, GUID, version, namespaces, types, methods, and network behavior they were compiled against.</p>
+  <p class="meta">The build bundles the <strong>unmodified official Jotunn 2.30.1 release DLL</strong>, pinned by SHA-256. A tiny BepInEx preloader arms before plugin discovery and installs generic Harmony hooks the instant the CLR loads the assembly named <code>Jotunn</code>—before any Jotunn-dependent mod can run <code>Awake</code>. Existing mods still bind to the exact upstream Jotunn assembly, GUID, API, and network behavior.</p>
 </div>
 
 <div class="card">
-  <div class="title">Current fast paths</div>
-  <p class="meta"><strong>Obsolete PatchInit:</strong> skips the full reflection walk for dependent assemblies that cannot contain <code>PatchInitAttribute</code>.<br><br><strong>Automatic localization:</strong> replaces five recursive BepInEx plugin-tree scans with one scan, and avoids initializing the localization manager when there are no automatic translation files.</p>
+  <div class="title">Current generic improvements</div>
+  <p class="meta"><strong>PatchInit:</strong> avoids pointless reflection on assemblies that cannot use the obsolete attribute.<br><br><strong>Localization:</strong> replaces five recursive plugin-tree scans with one.<br><br><strong>Prefab lookups:</strong> memoizes successful non-texture lookups without negative caching.<br><br><strong>JVLmock references:</strong> avoids redundant depth-limited graph walks and repeated successful resolutions.<br><br><strong>AssetManager:</strong> prevents Jotunn's known invalid-CodeMatcher collision from killing AssetManager when another mod has already transformed the same instruction.</p>
 </div>
 
 <div class="card">
   <div class="title">Direct files</div>
   <a class="secondary" href="Jotunn.dll">Jotunn.dll</a>
-  <a class="secondary" href="JotunnCompat.FastPath.dll">JotunnCompat.FastPath.dll</a>
-  <p class="note">Use both files. The ZIP is less error-prone.</p>
+  <a class="secondary" href="JotunnCompat.Preloader.dll">JotunnCompat.Preloader.dll</a>
+  <p class="note"><code>Jotunn.dll</code> belongs under BepInEx plugins; <code>JotunnCompat.Preloader.dll</code> belongs under BepInEx patchers. The ZIP is less error-prone.</p>
 </div>
 
 <div class="card">
-  <p class="meta"><strong>License:</strong> MIT; upstream Jotunn copyright/license preserved<br><strong>Target:</strong> existing Jotunn-dependent mods without recompilation<br><strong>Baseline:</strong> Jotunn 2.30.1<br><strong>Approach:</strong> exact compatibility first, then replace internals subsystem by subsystem</p>
+  <p class="meta"><strong>Runtime DLL count:</strong> 2<br><strong>License:</strong> MIT; upstream Jotunn copyright/license preserved<br><strong>Baseline:</strong> Jotunn 2.30.1<br><strong>Approach:</strong> exact compatibility first, then replace generic internals subsystem by subsystem</p>
 </div>
 </main></body>
 </html>
