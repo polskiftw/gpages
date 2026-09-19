@@ -6,7 +6,7 @@ using HarmonyLib;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace JotunnCompat.FastPath
+namespace JotunnCompat.Runtime
 {
     /// <summary>
     /// Generic acceleration for Jotunn's mock-reference resolver.
