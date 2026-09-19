@@ -34,6 +34,7 @@ namespace Jotunn.Entities
     {
         public GameObject ItemPrefab { get; }
         public ItemDrop ItemDrop { get; }
+        public CustomRecipe Recipe { get; }
         public bool FixReference { get; set; }
 
         public CustomItem(GameObject itemPrefab, bool fixReference)
@@ -43,13 +44,151 @@ namespace Jotunn.Entities
             FixReference = fixReference;
         }
 
-        public CustomItem(string name, string basePrefabName, ItemConfig itemConfig)
-            : this(PrefabManager.Instance.CreateClonedPrefab(name, basePrefabName), false) { }
+        public CustomItem(
+            GameObject itemPrefab,
+            bool fixReference,
+            ItemConfig itemConfig)
+            : this(itemPrefab, fixReference)
+        {
+            if (ItemPrefab && itemConfig != null)
+            {
+                itemConfig.Apply(ItemPrefab);
+                var recipe = itemConfig.GetRecipe(ItemPrefab);
+                if (recipe)
+                {
+                    Recipe = new CustomRecipe(recipe, true, true);
+                }
+            }
+        }
 
-        public CustomItem(AssetBundle bundle, string assetName, bool fixReference, ItemConfig itemConfig)
-            : this(bundle != null ? bundle.LoadAsset<GameObject>(assetName) : null, fixReference) { }
+        public CustomItem(string name, string basePrefabName, ItemConfig itemConfig)
+            : this(
+                PrefabManager.Instance.CreateClonedPrefab(name, basePrefabName),
+                false,
+                itemConfig)
+        {
+        }
+
+        public CustomItem(
+            AssetBundle bundle,
+            string assetName,
+            bool fixReference,
+            ItemConfig itemConfig)
+            : this(
+                bundle != null ? bundle.LoadAsset<GameObject>(assetName) : null,
+                fixReference,
+                itemConfig)
+        {
+        }
 
         internal bool IsValid() => ItemPrefab && ItemDrop;
+        public override string ToString() =>
+            ItemPrefab ? ItemPrefab.name : "<invalid item>";
+    }
+
+    public class CustomPiece
+    {
+        public GameObject PiecePrefab { get; }
+        public Piece Piece { get; }
+        public string PieceTable { get; set; }
+        public string Category { get; set; }
+        public string[] Usage { get; set; } = Array.Empty<string>();
+        public bool FixReference { get; set; }
+        internal bool FixConfig { get; set; }
+
+        public CustomPiece(
+            GameObject piecePrefab,
+            bool fixReference,
+            PieceConfig pieceConfig)
+        {
+            PiecePrefab = piecePrefab;
+            Piece = piecePrefab ? piecePrefab.GetComponent<Piece>() : null;
+            FixReference = fixReference;
+
+            if (pieceConfig != null && piecePrefab)
+            {
+                PieceTable = pieceConfig.PieceTable;
+                Category = pieceConfig.Category;
+                Usage = pieceConfig.Usage ?? Array.Empty<string>();
+                FixConfig = true;
+                pieceConfig.Apply(piecePrefab);
+            }
+        }
+
+        public CustomPiece(
+            GameObject piecePrefab,
+            string pieceTable,
+            bool fixReference)
+        {
+            PiecePrefab = piecePrefab;
+            Piece = piecePrefab ? piecePrefab.GetComponent<Piece>() : null;
+            PieceTable = pieceTable;
+            FixReference = fixReference;
+        }
+
+        public bool IsValid() =>
+            PiecePrefab && Piece && !string.IsNullOrEmpty(PieceTable);
+
+        public override string ToString() =>
+            PiecePrefab ? PiecePrefab.name : "<invalid piece>";
+    }
+
+    public class CustomPieceTable
+    {
+        public GameObject PieceTablePrefab { get; }
+        public PieceTable PieceTable { get; }
+        public string[] Categories { get; set; } = Array.Empty<string>();
+        public bool GuessUsage { get; set; } = true;
+
+        public CustomPieceTable(string name, PieceTableConfig config)
+        {
+            PieceTablePrefab = new GameObject(name);
+            PieceTable = PieceTablePrefab.AddComponent<PieceTable>();
+            if (config != null)
+            {
+                config.Apply(PieceTablePrefab);
+                Categories = config.GetCategories();
+                GuessUsage = config.GuessUsage;
+            }
+        }
+
+        public CustomPieceTable(GameObject prefab)
+        {
+            PieceTablePrefab = prefab;
+            PieceTable = prefab ? prefab.GetComponent<PieceTable>() : null;
+        }
+
+        public bool IsValid() => PieceTablePrefab && PieceTable;
+        public override string ToString() =>
+            PieceTablePrefab ? PieceTablePrefab.name : "<invalid piece table>";
+    }
+
+    public class CustomRecipe
+    {
+        public Recipe Recipe { get; }
+        public bool FixReference { get; set; }
+        public bool FixRequirementReferences { get; set; }
+
+        public CustomRecipe(
+            Recipe recipe,
+            bool fixReference,
+            bool fixRequirementReferences)
+        {
+            Recipe = recipe;
+            FixReference = fixReference;
+            FixRequirementReferences = fixRequirementReferences;
+        }
+
+        public CustomRecipe(RecipeConfig recipeConfig)
+        {
+            Recipe = recipeConfig?.GetRecipe();
+            FixReference = true;
+            FixRequirementReferences = true;
+        }
+
+        public bool IsValid() => Recipe && Recipe.m_item;
+        public override string ToString() =>
+            Recipe ? Recipe.name : "<invalid recipe>";
     }
 
     public class CustomStatusEffect
