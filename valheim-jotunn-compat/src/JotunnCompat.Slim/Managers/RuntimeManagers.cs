@@ -217,7 +217,7 @@ namespace Jotunn.Managers
             }
         }
 
-        private static void PrepareLocation(ZoneSystem.ZoneLocation location)
+        internal void PrepareLocation(ZoneSystem.ZoneLocation location)
         {
             location.m_prefab.Load();
             var root = location.m_prefab.Asset;
