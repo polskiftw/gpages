@@ -67,6 +67,20 @@ try
     RequireMethod(modules, "Localization", "AddWord", "System.String", "System.String");
     RequireUniqueMethod(modules, "Localization", "SetupLanguage");
 
+    // Current-game private/version-sensitive bridges used by generic Jotunn APIs.
+    RequireField(modules, "ZNet", "m_adminList", isStatic: false);
+    RequireUniqueMethod(modules, "ZNet", "ListContainsId");
+    RequireField(modules, "GameCamera", "m_mouseCapture", isStatic: false);
+    RequireUniqueMethod(modules, "GameCamera", "UpdateMouseCapture");
+    RequireAnyMethod(modules, "Minimap", "LoadMapData", "Start");
+
+    var imageConversion = RequireType(modules, "UnityEngine.ImageConversion");
+    RequireMethodOnType(
+        imageConversion,
+        "LoadImage",
+        "UnityEngine.Texture2D",
+        "System.Byte[]");
+
     // SoftReferenceableAssets internals used by the slim runtime asset bridge.
     RequireField(
         modules,
@@ -117,7 +131,7 @@ try
 
     Console.WriteLine("Valheim runtime contract check passed.");
     Console.WriteLine($"  Managed assemblies scanned: {modules.Count}");
-    Console.WriteLine("  Reflection/Harmony targets checked: 36");
+    Console.WriteLine("  Reflection/Harmony targets checked: 42");
     return 0;
 }
 finally
@@ -258,6 +272,28 @@ static MethodDefinition RequireMethodOnType(
     throw new MissingMethodException(
         type.FullName,
         methodName + "(" + string.Join(", ", parameterTypes) + ")");
+}
+
+static MethodDefinition RequireAnyMethod(
+    IEnumerable<ModuleDefinition> modules,
+    string typeFullName,
+    params string[] methodNames)
+{
+    var type = RequireType(modules, typeFullName);
+    foreach (var name in methodNames)
+    {
+        var method = type.Methods.FirstOrDefault(
+            m => string.Equals(m.Name, name, StringComparison.Ordinal));
+        if (method != null)
+        {
+            Console.WriteLine($"  METHOD {method.FullName}");
+            return method;
+        }
+    }
+
+    throw new MissingMethodException(
+        typeFullName,
+        string.Join(" or ", methodNames));
 }
 
 static MethodDefinition RequireUniqueMethod(
