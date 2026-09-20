@@ -1117,6 +1117,7 @@ def status_command(args: argparse.Namespace) -> int:
     synonyms = db.execute("SELECT COUNT(*) FROM tag_synonyms").fetchone()[0]
     print(f"Network attempts recorded: {attempts}")
     print(f"Synonym mappings stored:   {synonyms}")
+    db.close()
     return 0
 
 
@@ -1127,6 +1128,7 @@ def verify_command(args: argparse.Namespace) -> int:
     db = open_db(db_path)
     report = verify_db(db)
     print_verify_report(report)
+    db.close()
     return 0 if report["complete"] else 2
 
 
@@ -1193,6 +1195,8 @@ def export_command(args: argparse.Namespace) -> int:
         ORDER BY s.synonym COLLATE NOCASE, t.name COLLATE NOCASE
         """
     ).fetchall()
+    db.close()
+
     _write_tsv(
         out / "synonym-map.tsv",
         ["synonym", "tag_id", "official_tag"],
