@@ -1428,6 +1428,7 @@ def stabilize_growing_source(
 ) -> tuple[dict[str, object], int, int]:
     """Reconcile live growth without rescanning already-OK interior pages."""
     final_page = int(get_meta(db, "final_page") or "0")
+    tail_checked_for_counter_mismatch = False
 
     for _ in range(max(1, rounds)):
         previous_final_page = final_page
@@ -1438,6 +1439,31 @@ def stabilize_growing_source(
             expected_rows_per_page=rows_per_page,
         )
         report = verify_db(db)
+        tag_count = int(report["tag_count"])
+
+        if (
+            report["complete"]
+            and total != tag_count
+            and final_page == previous_final_page
+            and not tail_checked_for_counter_mismatch
+        ):
+            direction = "ahead of" if tag_count > total else "behind"
+            print(
+                f"Observed corpus is {abs(tag_count - total):,} tag(s) {direction} "
+                "the site's displayed counter; refreshing the live final page once "
+                "to confirm the tail.",
+                flush=True,
+            )
+            _refresh_final_page_for_growth(
+                db,
+                http,
+                generation=generation,
+                final_page=final_page,
+                rows_per_page=rows_per_page,
+                max_attempts=max_attempts,
+            )
+            tail_checked_for_counter_mismatch = True
+            continue
 
         if report["complete"]:
             return report, final_page, rows_per_page
@@ -1450,7 +1476,6 @@ def stabilize_growing_source(
             )
             return report, final_page, rows_per_page
 
-        tag_count = int(report["tag_count"])
         if final_page == previous_final_page and total > tag_count:
             print(
                 f"Live total is {total - tag_count:,} tag(s) ahead of the saved corpus.",
@@ -1823,6 +1848,8 @@ def verify_db(db: sqlite3.Connection) -> dict[str, object]:
             page for page in range(1, final_page + 1) if page not in present
         ]
 
+    reported_delta = None if total is None else tag_count - total
+
     complete = all(
         (
             total is not None,
@@ -1830,8 +1857,9 @@ def verify_db(db: sqlite3.Connection) -> dict[str, object]:
             final_page is not None and ok_pages == final_page,
             failed_pages == 0,
             parse_error_pages == 0,
-            total is not None and tag_count == total,
-            total is not None and page_tag_sum == total,
+            tag_count == page_tag_sum,
+            unique_names == tag_count,
+            total is not None and tag_count >= total,
             synonym_mismatches == 0,
             edge_mismatches == 0,
             len(missing_pages) == 0,
@@ -1842,6 +1870,7 @@ def verify_db(db: sqlite3.Connection) -> dict[str, object]:
         "complete": complete,
         "generation": generation,
         "reported_total": total,
+        "reported_delta": reported_delta,
         "final_page": final_page,
         "ok_pages": ok_pages,
         "failed_pages": failed_pages,
@@ -1862,6 +1891,11 @@ def print_verify_report(report: dict[str, object]) -> None:
     print("------------------------")
     print(f"Crawl generation:         {report['generation']}")
     print(f"Reported tags:            {report['reported_total']}")
+    print(f"Observed unique tags:     {report['tag_count']}")
+    delta = report.get("reported_delta")
+    if isinstance(delta, int) and delta != 0:
+        sign = "+" if delta > 0 else ""
+        print(f"Reported/observed delta:  {sign}{delta}")
     print(f"Final page:               {report['final_page']}")
     print(f"Pages OK:                 {report['ok_pages']}")
     print(f"Failed pages:             {report['failed_pages']}")
