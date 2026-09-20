@@ -1,0 +1,28 @@
+name: Test Tag Gremlin
+
+on:
+  push:
+    paths:
+      - "tag-gremlin/**"
+      - ".github/workflows/test-tag-gremlin.yml"
+  pull_request:
+    paths:
+      - "tag-gremlin/**"
+      - ".github/workflows/test-tag-gremlin.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Syntax check
+        run: python -m py_compile tag-gremlin/tag_gremlin.py
+      - name: Unit tests
+        run: python -m unittest discover -s tag-gremlin/tests -v
