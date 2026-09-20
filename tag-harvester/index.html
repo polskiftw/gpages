@@ -24,7 +24,7 @@ curl -fLO https://raw.githubusercontent.com/polskiftw/gpages/main/tag-gremlin/ta
 <div class="row"><button class="btn copy" data-copy="downloadCmd">Copy download command</button></div>
 
 <h3>2. Make sure Firefox is logged in</h3>
-<p class="note">Open Firefox normally and log into the target site first. When you start Tag Gremlin, it now automatically closes Firefox cleanly, reads the matching cookies from <code>cookies.sqlite</code>, then reopens the same Firefox profile for you. Cookie values are not printed or saved into the Tag Gremlin database. Cookie values are not printed or saved into the Tag Gremlin database.</p>
+<p class="note">Open Firefox normally and log into the target site first. When you start Tag Gremlin, it now automatically closes Firefox cleanly, reads the matching cookies from <code>cookies.sqlite</code>, then reopens the same Firefox profile for you. Cookie values are not printed or saved into the Tag Gremlin database.</p>
 
 <h3>3. Start the harvest</h3>
 <p class="note">Replace <code>YOUR-SITE</code> with the real hostname. Point it at the site's normal <code>tags.php</code> page.</p>
@@ -37,7 +37,7 @@ python3 tag_gremlin.py \
   -8</div>
 <div class="row"><button class="btn copy" data-copy="harvestCmd">Copy harvest command</button></div>
 
-<p class="note small"><span class="good">Safe to interrupt:</span> completed pages are committed to SQLite as it goes. Run the same harvest command again to resume.</p>
+<p class="note small"><span class="good">Safe to interrupt:</span> completed pages are committed to SQLite as it goes. Run the same harvest command again to resume. After a <strong>COMPLETE: YES</strong> crawl, running the same command weeks later starts a fresh refresh generation automatically.</p>
 <p class="note small"><span class="warn">Do not delete</span> <code>~/tag-gremlin.sqlite3</code> unless you intentionally want to start over from scratch.</p>
 </div>
 
@@ -53,7 +53,7 @@ python3 tag_gremlin.py --db ~/tag-gremlin.sqlite3 status</div>
 <div class="code" id="verifyCmd">cd ~/tag-gremlin
 python3 tag_gremlin.py --db ~/tag-gremlin.sqlite3 verify</div>
 <div class="row"><button class="btn copy" data-copy="verifyCmd">Copy verify command</button></div>
-<p class="note">The harvest only reports <strong>COMPLETE: YES</strong> when every expected page is accounted for, the tag totals reconcile, TagIDs/names are unique, and every harvested synonym count matches the site's reported count.</p>
+<p class="note">The harvest only reports <strong>COMPLETE: YES</strong> when every expected page is accounted for, the unique TagID count and page-row totals reconcile with the site, and every harvested synonym count matches the site's reported count. TagID is the stable identity.</p>
 
 <h3>Export files</h3>
 <div class="code" id="exportCmd">cd ~/tag-gremlin
@@ -77,8 +77,9 @@ python3 tag_gremlin.py \
 <ul>
 <li>Harvests the directly pageable <code>tags.php?page=N</code> index instead of brute-forcing autocomplete.</li>
 <li>Stores the full tag corpus locally in SQLite.</li>
+<li>Keys tags by TagID rather than page number, so tags can move between pages on later refreshes without creating duplicates. A completed refresh UPSERTs known TagIDs and removes old TagIDs no longer seen only after verification succeeds.</li>
 <li>Captures TagID, official name, uses, positive/negative votes, reported synonym count, and the hidden synonym data already embedded in each page.</li>
-<li>Starts conservatively at low network concurrency and backs off on slow responses, retries, HTTP 429, or server errors.</li>
+<li>Uses the fixed worker count you choose (for example <code>-8</code>). Workers share one non-overlapping page queue; only the request that hits a timeout/429/transient error backs off while the others keep moving.</li>
 <li>Stops rather than silently accepting parser drift or synonym-count mismatches.</li>
 </ul>
 <p class="note">The complete design notes live in <a href="https://github.com/polskiftw/gpages/blob/main/tag-gremlin/DGD.md">tag-gremlin/DGD.md</a>. The source is <a href="https://github.com/polskiftw/gpages/blob/main/tag-gremlin/tag_gremlin.py">tag_gremlin.py</a>.</p>
