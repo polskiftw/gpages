@@ -56,7 +56,8 @@ The crawler is resumable and uses a fixed continuous worker pool.
 - other workers keep moving and the global worker count does not automatically ratchet downward;
 - honor `Retry-After` on HTTP 429 when present;
 - retry transient failures with bounded exponential backoff plus jitter;
-- within an incomplete crawl, pages already committed with status `ok` are skipped.
+- within an incomplete crawl, pages already committed with status `ok` are skipped;
+- after a long crawl, page 1 is rechecked so a source-total increase during the run can be reconciled without rescanning already-completed pages; if the growth created new page numbers, those pages remain pending for the next resume.
 
 Local CPU and RAM may be used freely for parsing, validation, indexing, and exports.
 
@@ -107,16 +108,12 @@ The `tag_id INTEGER PRIMARY KEY` constraint makes duplicate stored TagID rows im
 
 Lossless mapping from official TagID to each synonym string observed in that tag's hidden detail row.
 
-Each row stores:
+Each row stores only:
 
-- source official TagID;
-- raw synonym text exactly as normalized by the parser;
-- optional `resolved_tag_id`;
-- resolution status: `unresolved`, `exact`, `missing`, or `ambiguous`.
+- the owning official TagID;
+- the synonym/alias string exactly as normalized by the parser.
 
-After a generation is fully harvested, Tag Gremlin resolves a synonym string to a TagID only when that string exactly matches exactly one current-generation official tag name. Zero matches stay `missing`; multiple exact-name matches stay `ambiguous`. Resolution is case-sensitive and never fuzzy.
-
-The raw string is always retained even when an ID resolves. Do not assume synonym relationships are symmetric or transitive.
+On this site, these synonym values are alternate spellings, typos, or aliases for the owning official tag. They intentionally do not have their own TagIDs. A row such as `1234 -> "tagg6"` means that alias points back to official TagID 1234; it does not imply another official tag entity.
 
 ## Refresh generations
 
@@ -128,23 +125,13 @@ A completed database can be refreshed in place by running the normal harvest com
 - Each observed tag is UPSERTed by TagID and marked with the new generation.
 - Each observed source TagID's raw synonym rows are replaced with the newly observed set.
 - After the new generation passes strict completeness verification, tags not seen in that generation are removed. This handles source-side deletions without tying any tag to a page.
-- Synonym target IDs are then recalculated against the completed current-generation tag table, so renames, additions, deletions, and changed relationships cannot leave stale resolved IDs.
 - If a refresh is interrupted, old rows are not purged. The same generation simply resumes later.
 
 This design tolerates new tags pushing existing tags onto different pages and cannot create a second stored row for an already-known TagID.
 
 ## Synonym semantics
 
-The site calls the values synonyms, but Tag Gremlin stores the observed mapping rather than imposing a graph model during harvest.
-
-Derived views/exports may later calculate:
-
-- synonym -> official tag reverse mappings;
-- aliases shared by multiple official tags;
-- official names that also appear as synonyms;
-- connected components when justified by the data.
-
-Those are derived products, not harvest truth.
+The site's "synonyms" are aliases/alternate spellings/typos that point to the owning official tag. Tag Gremlin therefore stores the direct alias -> official TagID relationship and does not try to resolve aliases into separate tag entities.
 
 ## Exports
 
@@ -152,8 +139,8 @@ The CLI exports:
 
 - `tags.txt` - official tag names, one per line;
 - `tags.tsv` - TagID, name, uses, votes, reported synonym count;
-- `synonyms.tsv` - source TagID/name, raw synonym text, resolved target TagID/name when exact, and resolution status;
-- `synonym-map.tsv` - the same relationship with synonym text first for convenient reverse lookup.
+- `synonyms.tsv` - official TagID/name and alias text;
+- `synonym-map.tsv` - alias text first, then the official TagID/name it points to.
 
 Exports are deterministic and sorted.
 
@@ -183,7 +170,7 @@ python3 tag_gremlin.py verify
 python3 tag_gremlin.py export
 ```
 
-The default database is `./tag-gremlin.sqlite3`. Incomplete generations resume automatically; running harvest again after a COMPLETE generation starts a full in-place refresh generation. Schema-v1 databases are migrated in place to the page-independent TagID model.
+The default database is `./tag-gremlin.sqlite3`. Incomplete generations resume automatically; running harvest again after a COMPLETE generation starts a full in-place refresh generation. Older databases are migrated in place to the current page-independent TagID + alias model.
 
 ## Testing
 
@@ -199,8 +186,8 @@ GitHub Actions tests run on `windows-latest` and cover:
 - SQLite completeness verification;
 - page-independent TagID UPSERT behavior;
 - completed-refresh stale-tag cleanup;
-- exact/missing/ambiguous synonym-ID resolution;
-- synonym-ID recalculation after refresh;
-- schema-v1/v2 to schema-v3 migration.
+- raw alias -> official TagID preservation;
+- live end-of-crawl total reconciliation when the source grows during a long run;
+- schema-v1/v2/v3 to schema-v4 migration.
 
 No live target-site requests are made in CI.
