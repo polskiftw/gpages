@@ -1579,9 +1579,16 @@ def harvest(args: argparse.Namespace) -> int:
             "Bulk crawl was not started."
         )
 
-    prior_report = verify_db(db)
     generation = current_generation(db)
-    if prior_report["complete"]:
+    completed_raw = get_meta(db, "completed_generation")
+    try:
+        completed_generation = (
+            int(completed_raw) if completed_raw is not None else 0
+        )
+    except ValueError:
+        completed_generation = 0
+
+    if completed_generation == generation:
         generation += 1
         db.execute("DELETE FROM pages")
         set_meta(db, "crawl_generation", generation)
