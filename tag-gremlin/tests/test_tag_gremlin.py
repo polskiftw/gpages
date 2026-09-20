@@ -1,3 +1,4 @@
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -128,6 +129,7 @@ class DatabaseTests(unittest.TestCase):
                 db,
                 page=1,
                 parsed=parsed,
+                generation=1,
                 attempts=1,
                 http_status=200,
                 latency_ms=25,
@@ -157,6 +159,221 @@ class DatabaseTests(unittest.TestCase):
             synonyms = (root / "out" / "synonyms.tsv").read_text(encoding="utf-8")
             self.assertIn("178\talpha\talpha one", synonyms)
             self.assertIn("97\tgamma\tgamma alias", synonyms)
+
+
+    def test_tag_id_upsert_is_page_independent(self):
+        first = tg.ParsedPage(
+            reported_total=1,
+            final_page=1,
+            tags=[
+                tg.TagRecord(
+                    tag_id=123,
+                    name="old-name",
+                    uses=10,
+                    upvotes=1,
+                    downvotes=0,
+                    reported_synonym_count=1,
+                    synonyms=["old alias"],
+                    synonym_raw_text="old alias",
+                    synonym_parse_ok=True,
+                )
+            ],
+            synonym_mismatches=0,
+        )
+        moved = tg.ParsedPage(
+            reported_total=1,
+            final_page=1,
+            tags=[
+                tg.TagRecord(
+                    tag_id=123,
+                    name="new-name",
+                    uses=99,
+                    upvotes=4,
+                    downvotes=1,
+                    reported_synonym_count=1,
+                    synonyms=["new alias"],
+                    synonym_raw_text="new alias",
+                    synonym_parse_ok=True,
+                )
+            ],
+            synonym_mismatches=0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db = tg.open_db(Path(tmp) / "move.sqlite3")
+            tg.write_page(
+                db,
+                page=10,
+                parsed=first,
+                generation=1,
+                attempts=1,
+                http_status=200,
+                latency_ms=10,
+                body_sha256="old",
+            )
+            tg.write_page(
+                db,
+                page=47,
+                parsed=moved,
+                generation=2,
+                attempts=1,
+                http_status=200,
+                latency_ms=10,
+                body_sha256="new",
+            )
+
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM tags").fetchone()[0], 1)
+            self.assertEqual(
+                db.execute(
+                    """
+                    SELECT name,uses,last_seen_generation
+                    FROM tags WHERE tag_id=123
+                    """
+                ).fetchone(),
+                ("new-name", 99, 2),
+            )
+            self.assertEqual(
+                db.execute(
+                    "SELECT synonym FROM tag_synonyms WHERE tag_id=123"
+                ).fetchall(),
+                [("new alias",)],
+            )
+            columns = {
+                row[1] for row in db.execute("PRAGMA table_info(tags)").fetchall()
+            }
+            self.assertNotIn("source_page", columns)
+            db.close()
+
+    def test_complete_refresh_removes_only_unseen_old_tags(self):
+        gen1 = tg.ParsedPage(
+            reported_total=2,
+            final_page=1,
+            tags=[
+                tg.TagRecord(1, "one", 1, 0, 0, 0, [], "", True),
+                tg.TagRecord(2, "two", 1, 0, 0, 0, [], "", True),
+            ],
+            synonym_mismatches=0,
+        )
+        gen2 = tg.ParsedPage(
+            reported_total=1,
+            final_page=1,
+            tags=[
+                tg.TagRecord(1, "one-renamed", 2, 0, 0, 0, [], "", True),
+            ],
+            synonym_mismatches=0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db = tg.open_db(Path(tmp) / "refresh.sqlite3")
+            tg.set_meta(db, "reported_total", 2)
+            tg.set_meta(db, "final_page", 1)
+            tg.set_meta(db, "crawl_generation", 1)
+            db.commit()
+            tg.write_page(
+                db,
+                page=1,
+                parsed=gen1,
+                generation=1,
+                attempts=1,
+                http_status=200,
+                latency_ms=10,
+                body_sha256="g1",
+            )
+            self.assertTrue(tg.verify_db(db)["complete"])
+            tg.finalize_generation(db, 1)
+
+            db.execute("DELETE FROM pages")
+            tg.set_meta(db, "reported_total", 1)
+            tg.set_meta(db, "final_page", 1)
+            tg.set_meta(db, "crawl_generation", 2)
+            db.commit()
+            tg.write_page(
+                db,
+                page=1,
+                parsed=gen2,
+                generation=2,
+                attempts=1,
+                http_status=200,
+                latency_ms=10,
+                body_sha256="g2",
+            )
+
+            report = tg.verify_db(db)
+            self.assertTrue(report["complete"])
+            self.assertEqual(report["tag_count"], 1)
+            self.assertEqual(report["stale_tag_rows"], 1)
+            self.assertEqual(tg.finalize_generation(db, 2), 1)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM tags").fetchone()[0], 1)
+            self.assertEqual(
+                db.execute("SELECT name FROM tags WHERE tag_id=1").fetchone()[0],
+                "one-renamed",
+            )
+            db.close()
+
+    def test_v1_database_migrates_without_losing_tags(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "legacy.sqlite3"
+            db = sqlite3.connect(path)
+            db.executescript(
+                """
+                CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                INSERT INTO meta(key,value) VALUES('schema_version','1');
+                CREATE TABLE pages (
+                    page INTEGER PRIMARY KEY,
+                    status TEXT NOT NULL,
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    http_status INTEGER,
+                    latency_ms INTEGER,
+                    tag_count INTEGER,
+                    synonym_count INTEGER,
+                    body_sha256 TEXT,
+                    fetched_at TEXT,
+                    error TEXT
+                );
+                CREATE TABLE tags (
+                    tag_id INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL UNIQUE,
+                    uses INTEGER NOT NULL,
+                    upvotes INTEGER NOT NULL,
+                    downvotes INTEGER NOT NULL,
+                    reported_synonym_count INTEGER NOT NULL,
+                    source_page INTEGER NOT NULL,
+                    synonym_raw_text TEXT NOT NULL,
+                    synonym_parse_ok INTEGER NOT NULL
+                );
+                CREATE TABLE tag_synonyms (
+                    tag_id INTEGER NOT NULL REFERENCES tags(tag_id) ON DELETE CASCADE,
+                    synonym TEXT NOT NULL,
+                    PRIMARY KEY (tag_id, synonym)
+                );
+                INSERT INTO tags VALUES(7,'legacy',12,3,1,1,99,'alias',1);
+                INSERT INTO tag_synonyms VALUES(7,'alias');
+                """
+            )
+            db.commit()
+            db.close()
+
+            migrated = tg.open_db(path)
+            columns = {
+                row[1]
+                for row in migrated.execute("PRAGMA table_info(tags)").fetchall()
+            }
+            self.assertNotIn("source_page", columns)
+            self.assertIn("last_seen_generation", columns)
+            self.assertEqual(
+                migrated.execute(
+                    "SELECT name,last_seen_generation FROM tags WHERE tag_id=7"
+                ).fetchone(),
+                ("legacy", 1),
+            )
+            self.assertEqual(
+                migrated.execute(
+                    "SELECT synonym FROM tag_synonyms WHERE tag_id=7"
+                ).fetchone()[0],
+                "alias",
+            )
+            self.assertEqual(tg.get_meta(migrated, "schema_version"), "2")
+            migrated.close()
 
 
 if __name__ == "__main__":
