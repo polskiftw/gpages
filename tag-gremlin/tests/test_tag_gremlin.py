@@ -372,7 +372,225 @@ class DatabaseTests(unittest.TestCase):
                 ).fetchone()[0],
                 "alias",
             )
-            self.assertEqual(tg.get_meta(migrated, "schema_version"), "2")
+            synonym_columns = {
+                row[1]
+                for row in migrated.execute(
+                    "PRAGMA table_info(tag_synonyms)"
+                ).fetchall()
+            }
+            self.assertIn("resolved_tag_id", synonym_columns)
+            self.assertIn("resolution_status", synonym_columns)
+            self.assertEqual(tg.get_meta(migrated, "schema_version"), "3")
+            migrated.close()
+
+
+    def test_synonym_ids_resolve_exact_missing_and_ambiguous(self):
+        parsed = tg.ParsedPage(
+            reported_total=4,
+            final_page=1,
+            tags=[
+                tg.TagRecord(
+                    1,
+                    "source",
+                    10,
+                    0,
+                    0,
+                    3,
+                    ["target", "missing-alias", "duplicate-name"],
+                    "target, missing-alias, duplicate-name",
+                    True,
+                ),
+                tg.TagRecord(2, "target", 9, 0, 0, 0, [], "", True),
+                tg.TagRecord(3, "duplicate-name", 8, 0, 0, 0, [], "", True),
+                tg.TagRecord(4, "duplicate-name", 7, 0, 0, 0, [], "", True),
+            ],
+            synonym_mismatches=0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db = tg.open_db(Path(tmp) / "resolve.sqlite3")
+            tg.set_meta(db, "reported_total", 4)
+            tg.set_meta(db, "final_page", 1)
+            tg.set_meta(db, "crawl_generation", 1)
+            db.commit()
+
+            tg.write_page(
+                db,
+                page=1,
+                parsed=parsed,
+                generation=1,
+                attempts=1,
+                http_status=200,
+                latency_ms=10,
+                body_sha256="resolve",
+            )
+
+            self.assertTrue(tg.verify_db(db)["complete"])
+            tg.finalize_generation(db, 1)
+
+            rows = {
+                synonym: (resolved_id, status)
+                for synonym, resolved_id, status in db.execute(
+                    """
+                    SELECT synonym,resolved_tag_id,resolution_status
+                    FROM tag_synonyms
+                    WHERE tag_id=1
+                    """
+                ).fetchall()
+            }
+            self.assertEqual(rows["target"], (2, "exact"))
+            self.assertEqual(rows["missing-alias"], (None, "missing"))
+            self.assertEqual(rows["duplicate-name"], (None, "ambiguous"))
+
+            report = tg.verify_db(db)
+            self.assertEqual(report["resolution_exact"], 1)
+            self.assertEqual(report["resolution_missing"], 1)
+            self.assertEqual(report["resolution_ambiguous"], 1)
+            self.assertEqual(report["resolution_unresolved"], 0)
+            db.close()
+
+    def test_synonym_resolution_recalculates_on_refresh(self):
+        gen1 = tg.ParsedPage(
+            reported_total=2,
+            final_page=1,
+            tags=[
+                tg.TagRecord(1, "source", 1, 0, 0, 1, ["target"], "target", True),
+                tg.TagRecord(2, "target", 1, 0, 0, 0, [], "", True),
+            ],
+            synonym_mismatches=0,
+        )
+        gen2 = tg.ParsedPage(
+            reported_total=3,
+            final_page=1,
+            tags=[
+                tg.TagRecord(1, "source", 2, 0, 0, 1, ["target"], "target", True),
+                tg.TagRecord(2, "renamed-target", 2, 0, 0, 0, [], "", True),
+                tg.TagRecord(3, "target", 1, 0, 0, 0, [], "", True),
+            ],
+            synonym_mismatches=0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db = tg.open_db(Path(tmp) / "rereso.sqlite3")
+            tg.set_meta(db, "reported_total", 2)
+            tg.set_meta(db, "final_page", 1)
+            tg.set_meta(db, "crawl_generation", 1)
+            db.commit()
+            tg.write_page(
+                db,
+                page=1,
+                parsed=gen1,
+                generation=1,
+                attempts=1,
+                http_status=200,
+                latency_ms=10,
+                body_sha256="g1",
+            )
+            tg.finalize_generation(db, 1)
+            self.assertEqual(
+                db.execute(
+                    """
+                    SELECT resolved_tag_id
+                    FROM tag_synonyms
+                    WHERE tag_id=1 AND synonym='target'
+                    """
+                ).fetchone()[0],
+                2,
+            )
+
+            db.execute("DELETE FROM pages")
+            tg.set_meta(db, "reported_total", 3)
+            tg.set_meta(db, "final_page", 1)
+            tg.set_meta(db, "crawl_generation", 2)
+            db.commit()
+            tg.write_page(
+                db,
+                page=1,
+                parsed=gen2,
+                generation=2,
+                attempts=1,
+                http_status=200,
+                latency_ms=10,
+                body_sha256="g2",
+            )
+            tg.finalize_generation(db, 2)
+
+            self.assertEqual(
+                db.execute(
+                    """
+                    SELECT resolved_tag_id,resolution_status
+                    FROM tag_synonyms
+                    WHERE tag_id=1 AND synonym='target'
+                    """
+                ).fetchone(),
+                (3, "exact"),
+            )
+            db.close()
+
+    def test_v2_database_migrates_synonym_resolution_columns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "v2.sqlite3"
+            db = sqlite3.connect(path)
+            db.executescript(
+                """
+                CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                INSERT INTO meta(key,value) VALUES('schema_version','2');
+                INSERT INTO meta(key,value) VALUES('crawl_generation','1');
+                CREATE TABLE pages (
+                    page INTEGER PRIMARY KEY,
+                    status TEXT NOT NULL,
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    http_status INTEGER,
+                    latency_ms INTEGER,
+                    tag_count INTEGER,
+                    synonym_count INTEGER,
+                    body_sha256 TEXT,
+                    fetched_at TEXT,
+                    error TEXT
+                );
+                CREATE TABLE tags (
+                    tag_id INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    uses INTEGER NOT NULL,
+                    upvotes INTEGER NOT NULL,
+                    downvotes INTEGER NOT NULL,
+                    reported_synonym_count INTEGER NOT NULL,
+                    synonym_raw_text TEXT NOT NULL,
+                    synonym_parse_ok INTEGER NOT NULL,
+                    last_seen_generation INTEGER NOT NULL
+                );
+                CREATE TABLE tag_synonyms (
+                    tag_id INTEGER NOT NULL REFERENCES tags(tag_id) ON DELETE CASCADE,
+                    synonym TEXT NOT NULL,
+                    PRIMARY KEY (tag_id, synonym)
+                );
+                INSERT INTO tags VALUES(1,'one',1,0,0,1,'two',1,1);
+                INSERT INTO tags VALUES(2,'two',1,0,0,0,'',1,1);
+                INSERT INTO tag_synonyms VALUES(1,'two');
+                """
+            )
+            db.commit()
+            db.close()
+
+            migrated = tg.open_db(path)
+            columns = {
+                row[1]
+                for row in migrated.execute(
+                    "PRAGMA table_info(tag_synonyms)"
+                ).fetchall()
+            }
+            self.assertIn("resolved_tag_id", columns)
+            self.assertIn("resolution_status", columns)
+            self.assertEqual(
+                migrated.execute(
+                    """
+                    SELECT synonym,resolved_tag_id,resolution_status
+                    FROM tag_synonyms
+                    """
+                ).fetchone(),
+                ("two", None, "unresolved"),
+            )
+            self.assertEqual(tg.get_meta(migrated, "schema_version"), "3")
             migrated.close()
 
 

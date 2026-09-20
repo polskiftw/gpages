@@ -107,7 +107,16 @@ The `tag_id INTEGER PRIMARY KEY` constraint makes duplicate stored TagID rows im
 
 Lossless mapping from official TagID to each synonym string observed in that tag's hidden detail row.
 
-The raw relationship is preserved. Do not assume synonym relationships are symmetric or transitive.
+Each row stores:
+
+- source official TagID;
+- raw synonym text exactly as normalized by the parser;
+- optional `resolved_tag_id`;
+- resolution status: `unresolved`, `exact`, `missing`, or `ambiguous`.
+
+After a generation is fully harvested, Tag Gremlin resolves a synonym string to a TagID only when that string exactly matches exactly one current-generation official tag name. Zero matches stay `missing`; multiple exact-name matches stay `ambiguous`. Resolution is case-sensitive and never fuzzy.
+
+The raw string is always retained even when an ID resolves. Do not assume synonym relationships are symmetric or transitive.
 
 ## Refresh generations
 
@@ -117,7 +126,9 @@ A completed database can be refreshed in place by running the normal harvest com
 - If the current generation is COMPLETE, the next harvest automatically starts a new generation and re-fetches every current page.
 - Existing tag rows remain in place while the refresh runs.
 - Each observed tag is UPSERTed by TagID and marked with the new generation.
+- Each observed source TagID's raw synonym rows are replaced with the newly observed set.
 - After the new generation passes strict completeness verification, tags not seen in that generation are removed. This handles source-side deletions without tying any tag to a page.
+- Synonym target IDs are then recalculated against the completed current-generation tag table, so renames, additions, deletions, and changed relationships cannot leave stale resolved IDs.
 - If a refresh is interrupted, old rows are not purged. The same generation simply resumes later.
 
 This design tolerates new tags pushing existing tags onto different pages and cannot create a second stored row for an already-known TagID.
@@ -141,8 +152,8 @@ The CLI exports:
 
 - `tags.txt` - official tag names, one per line;
 - `tags.tsv` - TagID, name, uses, votes, reported synonym count;
-- `synonyms.tsv` - TagID, official tag, synonym;
-- `synonym-map.tsv` - synonym first, then TagID and official tag for convenient reverse lookup.
+- `synonyms.tsv` - source TagID/name, raw synonym text, resolved target TagID/name when exact, and resolution status;
+- `synonym-map.tsv` - the same relationship with synonym text first for convenient reverse lookup.
 
 Exports are deterministic and sorted.
 
@@ -188,6 +199,8 @@ GitHub Actions tests run on `windows-latest` and cover:
 - SQLite completeness verification;
 - page-independent TagID UPSERT behavior;
 - completed-refresh stale-tag cleanup;
-- schema-v1 to schema-v2 migration.
+- exact/missing/ambiguous synonym-ID resolution;
+- synonym-ID recalculation after refresh;
+- schema-v1/v2 to schema-v3 migration.
 
 No live target-site requests are made in CI.

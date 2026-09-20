@@ -66,8 +66,8 @@ python3 tag_gremlin.py \
 <ul>
 <li><code>~/tag-gremlin-export/tags.txt</code> — one official tag per line; this is the simple corpus for the regex/search tool.</li>
 <li><code>tags.tsv</code> — TagID, name, uses, votes, synonym count.</li>
-<li><code>synonyms.tsv</code> — official tag → synonym mappings.</li>
-<li><code>synonym-map.tsv</code> — synonym → official tag reverse map.</li>
+<li><code>synonyms.tsv</code> — source official tag → raw synonym, plus resolved target TagID/name and resolution status.</li>
+<li><code>synonym-map.tsv</code> — the same relationship with the synonym string first.</li>
 </ul>
 </div>
 
@@ -78,6 +78,7 @@ python3 tag_gremlin.py \
 <li>Harvests the directly pageable <code>tags.php?page=N</code> index instead of brute-forcing autocomplete.</li>
 <li>Stores the full tag corpus locally in SQLite.</li>
 <li>Keys tags by TagID rather than page number, so tags can move between pages on later refreshes without creating duplicates. A completed refresh UPSERTs known TagIDs and removes old TagIDs no longer seen only after verification succeeds.</li>
+<li>Keeps every raw synonym string and, after a complete crawl, resolves it to a target TagID only when it exactly matches one unique current official tag name. Missing or ambiguous names stay explicitly unresolved rather than being guessed.</li>
 <li>Captures TagID, official name, uses, positive/negative votes, reported synonym count, and the hidden synonym data already embedded in each page.</li>
 <li>Uses the fixed worker count you choose (for example <code>-8</code>). Workers share one non-overlapping page queue; only the request that hits a timeout/429/transient error backs off while the others keep moving.</li>
 <li>Stops rather than silently accepting parser drift or synonym-count mismatches.</li>
