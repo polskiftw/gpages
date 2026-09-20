@@ -24,7 +24,7 @@ curl -fLO https://raw.githubusercontent.com/polskiftw/gpages/main/tag-gremlin/ta
 <div class="row"><button class="btn copy" data-copy="downloadCmd">Copy download command</button></div>
 
 <h3>2. Make sure Firefox is logged in</h3>
-<p class="note">Open Firefox normally and log into the target site. Firefox can stay open. Tag Gremlin reads the matching cookies from Firefox's local <code>cookies.sqlite</code> database read-only; cookie values are not printed or saved into the Tag Gremlin database.</p>
+<p class="note">Open Firefox normally and log into the target site. On some Firefox/Linux setups, Firefox keeps <code>cookies.sqlite</code> locked while it is running. If Tag Gremlin reports that the cookie DB stayed locked, close Firefox completely, start Tag Gremlin again, and reopen Firefox as soon as Tag Gremlin prints <strong>Loaded ... matching cookie(s)</strong>. Cookie values are not printed or saved into the Tag Gremlin database.</p>
 
 <h3>3. Start the harvest</h3>
 <p class="note">Replace <code>YOUR-SITE</code> with the real hostname. Point it at the site's normal <code>tags.php</code> page.</p>
