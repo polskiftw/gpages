@@ -39,7 +39,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Iterable
 
-SCHEMA_VERSION = "3"
+SCHEMA_VERSION = "4"
 DEFAULT_DB = "tag-gremlin.sqlite3"
 DEFAULT_WORKERS = 4
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
@@ -467,7 +467,7 @@ def parse_tags_page(html: str) -> ParsedPage:
     )
 
 
-def _create_schema_v3(db: sqlite3.Connection) -> None:
+def _create_schema_v4(db: sqlite3.Connection) -> None:
     db.executescript(
         """
         CREATE TABLE IF NOT EXISTS meta (
@@ -508,16 +508,11 @@ def _create_schema_v3(db: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS tag_synonyms (
             tag_id INTEGER NOT NULL REFERENCES tags(tag_id) ON DELETE CASCADE,
             synonym TEXT NOT NULL,
-            resolved_tag_id INTEGER REFERENCES tags(tag_id) ON DELETE SET NULL,
-            resolution_status TEXT NOT NULL DEFAULT 'unresolved'
-                CHECK (resolution_status IN ('unresolved','exact','missing','ambiguous')),
             PRIMARY KEY (tag_id, synonym)
         );
 
         CREATE INDEX IF NOT EXISTS synonyms_name_nocase
             ON tag_synonyms(synonym COLLATE NOCASE);
-        CREATE INDEX IF NOT EXISTS synonyms_resolved_tag_id
-            ON tag_synonyms(resolved_tag_id);
         """
     )
 
@@ -622,40 +617,54 @@ def _migrate_v1_to_v2(db: sqlite3.Connection) -> None:
         db.execute("PRAGMA foreign_keys=ON")
 
 
-def _migrate_v2_to_v3(db: sqlite3.Connection) -> None:
-    """Add optional exact synonym->TagID resolution without losing raw text."""
-    columns = {
-        row[1] for row in db.execute("PRAGMA table_info(tag_synonyms)").fetchall()
-    }
-    if "resolved_tag_id" not in columns:
+def _migrate_v3_to_v4(db: sqlite3.Connection) -> None:
+    """Drop misleading synonym target-ID fields while preserving raw alias mappings."""
+    db.execute("PRAGMA foreign_keys=OFF")
+    try:
+        db.execute("BEGIN")
+        db.execute("DROP TABLE IF EXISTS tag_synonyms_v4")
         db.execute(
             """
-            ALTER TABLE tag_synonyms
-            ADD COLUMN resolved_tag_id INTEGER
-                REFERENCES tags(tag_id) ON DELETE SET NULL
+            CREATE TABLE tag_synonyms_v4 (
+                tag_id INTEGER NOT NULL REFERENCES tags(tag_id) ON DELETE CASCADE,
+                synonym TEXT NOT NULL,
+                PRIMARY KEY (tag_id, synonym)
+            )
             """
         )
-    if "resolution_status" not in columns:
         db.execute(
             """
-            ALTER TABLE tag_synonyms
-            ADD COLUMN resolution_status TEXT NOT NULL DEFAULT 'unresolved'
-                CHECK (resolution_status IN ('unresolved','exact','missing','ambiguous'))
+            INSERT INTO tag_synonyms_v4(tag_id,synonym)
+            SELECT tag_id,synonym FROM tag_synonyms
             """
         )
-    db.execute(
-        """
-        CREATE INDEX IF NOT EXISTS synonyms_resolved_tag_id
-        ON tag_synonyms(resolved_tag_id)
-        """
-    )
-    db.execute(
-        """
-        INSERT INTO meta(key,value) VALUES('schema_version','3')
-        ON CONFLICT(key) DO UPDATE SET value='3'
-        """
-    )
-    db.commit()
+        db.execute("DROP TABLE tag_synonyms")
+        db.execute("ALTER TABLE tag_synonyms_v4 RENAME TO tag_synonyms")
+        db.execute(
+            "CREATE INDEX synonyms_name_nocase ON tag_synonyms(synonym COLLATE NOCASE)"
+        )
+
+        for key in (
+            "synonym_resolution_generation",
+            "synonym_resolution_exact",
+            "synonym_resolution_missing",
+            "synonym_resolution_ambiguous",
+            "synonym_resolution_at",
+        ):
+            db.execute("DELETE FROM meta WHERE key=?", (key,))
+
+        db.execute(
+            """
+            INSERT INTO meta(key,value) VALUES('schema_version','4')
+            ON CONFLICT(key) DO UPDATE SET value='4'
+            """
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.execute("PRAGMA foreign_keys=ON")
 
 
 def open_db(path: Path) -> sqlite3.Connection:
@@ -695,10 +704,10 @@ def open_db(path: Path) -> sqlite3.Connection:
                 row[1]
                 for row in db.execute("PRAGMA table_info(tag_synonyms)").fetchall()
             }
-            if "resolved_tag_id" not in synonym_columns:
-                _migrate_v2_to_v3(db)
+            if "resolved_tag_id" in synonym_columns or "resolution_status" in synonym_columns:
+                _migrate_v3_to_v4(db)
 
-        _create_schema_v3(db)
+        _create_schema_v4(db)
         db.execute(
             """
             INSERT INTO meta(key,value) VALUES('schema_version',?)
@@ -752,106 +761,8 @@ def current_generation(db: sqlite3.Connection) -> int:
     return max(1, value)
 
 
-def resolve_synonym_targets(
-    db: sqlite3.Connection, generation: int
-) -> dict[str, int]:
-    """Resolve raw synonym strings to current-generation TagIDs when exact and unique."""
-    name_rows = db.execute(
-        """
-        SELECT name,COUNT(*),MIN(tag_id)
-        FROM tags
-        WHERE last_seen_generation=?
-        GROUP BY name
-        """,
-        (generation,),
-    ).fetchall()
-
-    names: dict[str, tuple[int, int]] = {
-        str(name): (int(count), int(tag_id))
-        for name, count, tag_id in name_rows
-    }
-
-    synonym_rows = db.execute(
-        """
-        SELECT s.tag_id,s.synonym
-        FROM tag_synonyms s
-        JOIN tags source ON source.tag_id=s.tag_id
-        WHERE source.last_seen_generation=?
-        """,
-        (generation,),
-    ).fetchall()
-
-    exact = 0
-    missing = 0
-    ambiguous = 0
-    updates: list[tuple[int | None, str, int, str]] = []
-
-    for source_tag_id, synonym in synonym_rows:
-        match = names.get(str(synonym))
-        if match is None:
-            resolved_tag_id = None
-            status = "missing"
-            missing += 1
-        elif match[0] == 1:
-            resolved_tag_id = match[1]
-            status = "exact"
-            exact += 1
-        else:
-            resolved_tag_id = None
-            status = "ambiguous"
-            ambiguous += 1
-
-        updates.append(
-            (resolved_tag_id, status, int(source_tag_id), str(synonym))
-        )
-
-    if updates:
-        db.executemany(
-            """
-            UPDATE tag_synonyms
-            SET resolved_tag_id=?, resolution_status=?
-            WHERE tag_id=? AND synonym=?
-            """,
-            updates,
-        )
-
-    set_meta(db, "synonym_resolution_generation", generation)
-    set_meta(db, "synonym_resolution_exact", exact)
-    set_meta(db, "synonym_resolution_missing", missing)
-    set_meta(db, "synonym_resolution_ambiguous", ambiguous)
-    set_meta(db, "synonym_resolution_at", now_iso())
-    db.commit()
-
-    return {
-        "exact": exact,
-        "missing": missing,
-        "ambiguous": ambiguous,
-        "total": exact + missing + ambiguous,
-    }
-
-
-def ensure_synonym_resolution(
-    db: sqlite3.Connection, report: dict[str, object]
-) -> dict[str, object]:
-    """Resolve a structurally complete generation if it has not been resolved yet."""
-    if not report.get("complete"):
-        return report
-
-    generation = int(report["generation"])
-    resolved_raw = get_meta(db, "synonym_resolution_generation")
-    try:
-        resolved_generation = int(resolved_raw) if resolved_raw is not None else 0
-    except ValueError:
-        resolved_generation = 0
-
-    if resolved_generation != generation:
-        resolve_synonym_targets(db, generation)
-        return verify_db(db)
-    return report
-
-
 def finalize_generation(db: sqlite3.Connection, generation: int) -> int:
-    """Drop unseen old tags, resolve synonym IDs, and mark the generation complete."""
+    """Drop tags not seen in a verified refresh and mark that generation complete."""
     report = verify_db(db)
     if not report["complete"]:
         return 0
@@ -864,10 +775,6 @@ def finalize_generation(db: sqlite3.Connection, generation: int) -> int:
         "DELETE FROM tags WHERE last_seen_generation<>?",
         (generation,),
     )
-    db.commit()
-
-    resolve_synonym_targets(db, generation)
-
     set_meta(db, "completed_generation", generation)
     set_meta(db, "last_complete_at", now_iso())
     set_meta(db, "updated_at", now_iso())
@@ -928,11 +835,7 @@ def write_page(
             )
             db.execute("DELETE FROM tag_synonyms WHERE tag_id=?", (tag.tag_id,))
             db.executemany(
-                """
-                INSERT INTO tag_synonyms(
-                    tag_id,synonym,resolved_tag_id,resolution_status
-                ) VALUES(?,?,NULL,'unresolved')
-                """,
+                "INSERT INTO tag_synonyms(tag_id,synonym) VALUES(?,?)",
                 ((tag.tag_id, synonym) for synonym in tag.synonyms),
             )
 
@@ -1420,6 +1323,56 @@ def inspect_first_page(parsed: ParsedPage) -> tuple[int, int, int]:
     return parsed.reported_total, final_page, rows_per_page
 
 
+def recheck_live_source_shape(
+    db: sqlite3.Connection,
+    http: HarvesterHTTP,
+    *,
+    max_attempts: int,
+    expected_rows_per_page: int,
+) -> tuple[int, int, int]:
+    """Refresh the live total/page count after a long crawl without rescanning pages."""
+    print("Rechecking live tag total after crawl...", flush=True)
+    fetched = http.fetch_page(1, max_attempts)
+    parsed = parse_tags_page(fetched.html)
+    total, final_page, rows_per_page = inspect_first_page(parsed)
+
+    inferred_page_capacity = (
+        math.ceil(total / final_page) if final_page and total else rows_per_page
+    )
+    if (
+        parsed.synonym_mismatches > 0
+        or rows_per_page != expected_rows_per_page
+        or rows_per_page != inferred_page_capacity
+    ):
+        raise RuntimeError(
+            "Final source recheck failed the page-1 parser canary; "
+            "leaving the crawl incomplete rather than guessing."
+        )
+
+    old_total = get_meta(db, "reported_total")
+    old_final = get_meta(db, "final_page")
+    set_meta(db, "reported_total", total)
+    set_meta(db, "final_page", final_page)
+    set_meta(db, "rows_per_page", rows_per_page)
+    set_meta(db, "source_rechecked_at", now_iso())
+    set_meta(db, "updated_at", now_iso())
+    db.commit()
+
+    old_total_int = int(old_total) if old_total and old_total.isdigit() else None
+    old_final_int = int(old_final) if old_final and old_final.isdigit() else None
+    if old_total_int != total or old_final_int != final_page:
+        before = "unknown" if old_total_int is None else f"{old_total_int:,}"
+        print(
+            f"Live source changed during crawl: {before} -> {total:,} tags; "
+            f"final page is now {final_page:,}.",
+            flush=True,
+        )
+    else:
+        print("Live source total is unchanged.", flush=True)
+
+    return total, final_page, rows_per_page
+
+
 def print_progress(db: sqlite3.Connection, final_page: int) -> None:
     row = db.execute(
         """
@@ -1683,6 +1636,21 @@ def harvest(args: argparse.Namespace) -> int:
             "Stopping because synonym parsing no longer matches the site. "
             "Saved OK pages remain resumable."
         )
+    else:
+        previous_final_page = final_page
+        total, final_page, rows_per_page = recheck_live_source_shape(
+            db,
+            http,
+            max_attempts=args.max_attempts,
+            expected_rows_per_page=rows_per_page,
+        )
+        if final_page > previous_final_page:
+            print(
+                f"The site grew into {final_page - previous_final_page:,} new page(s) "
+                "while this crawl was running. Rerun the same command; only those "
+                "newly missing pages will be fetched.",
+                flush=True,
+            )
 
     report = verify_db(db)
     if report["complete"]:
@@ -1747,23 +1715,6 @@ def verify_db(db: sqlite3.Connection) -> dict[str, object]:
         (generation,),
     ).fetchone()[0]
 
-    resolution_rows = dict(
-        db.execute(
-            """
-            SELECT s.resolution_status,COUNT(*)
-            FROM tag_synonyms s
-            JOIN tags t ON t.tag_id=s.tag_id
-            WHERE t.last_seen_generation=?
-            GROUP BY s.resolution_status
-            """,
-            (generation,),
-        ).fetchall()
-    )
-    resolution_exact = int(resolution_rows.get("exact", 0))
-    resolution_missing = int(resolution_rows.get("missing", 0))
-    resolution_ambiguous = int(resolution_rows.get("ambiguous", 0))
-    resolution_unresolved = int(resolution_rows.get("unresolved", 0))
-
     missing_pages: list[int] = []
     if final_page:
         present = {
@@ -1806,10 +1757,6 @@ def verify_db(db: sqlite3.Connection) -> dict[str, object]:
         "page_tag_sum": page_tag_sum,
         "synonym_mismatches": synonym_mismatches,
         "edge_mismatches": edge_mismatches,
-        "resolution_exact": resolution_exact,
-        "resolution_missing": resolution_missing,
-        "resolution_ambiguous": resolution_ambiguous,
-        "resolution_unresolved": resolution_unresolved,
         "missing_pages": missing_pages,
     }
 
@@ -1829,10 +1776,6 @@ def print_verify_report(report: dict[str, object]) -> None:
     print(f"Sum of page tag counts:   {report['page_tag_sum']}")
     print(f"Synonym parse mismatches: {report['synonym_mismatches']}")
     print(f"Synonym edge mismatches:  {report['edge_mismatches']}")
-    print(f"Synonym IDs exact:        {report['resolution_exact']}")
-    print(f"Synonym IDs missing:      {report['resolution_missing']}")
-    print(f"Synonym IDs ambiguous:    {report['resolution_ambiguous']}")
-    print(f"Synonym IDs unresolved:   {report['resolution_unresolved']}")
     missing = report["missing_pages"]
     if isinstance(missing, list) and missing:
         preview = ", ".join(str(x) for x in missing[:20])
@@ -1846,7 +1789,7 @@ def status_command(args: argparse.Namespace) -> int:
     if not db_path.exists():
         raise RuntimeError(f"Database does not exist: {db_path}")
     db = open_db(db_path)
-    report = ensure_synonym_resolution(db, verify_db(db))
+    report = verify_db(db)
     print_verify_report(report)
 
     attempts = db.execute(
@@ -1873,7 +1816,7 @@ def verify_command(args: argparse.Namespace) -> int:
     if not db_path.exists():
         raise RuntimeError(f"Database does not exist: {db_path}")
     db = open_db(db_path)
-    report = ensure_synonym_resolution(db, verify_db(db))
+    report = verify_db(db)
     print_verify_report(report)
     db.close()
     return 0 if report["complete"] else 2
@@ -1891,7 +1834,7 @@ def export_command(args: argparse.Namespace) -> int:
     if not db_path.exists():
         raise RuntimeError(f"Database does not exist: {db_path}")
     db = open_db(db_path)
-    report = ensure_synonym_resolution(db, verify_db(db))
+    report = verify_db(db)
     if not report["complete"] and not args.allow_incomplete:
         print_verify_report(report)
         raise RuntimeError(
@@ -1925,16 +1868,9 @@ def export_command(args: argparse.Namespace) -> int:
 
     synonym_rows = db.execute(
         """
-        SELECT
-            source.tag_id,
-            source.name,
-            s.synonym,
-            s.resolved_tag_id,
-            target.name,
-            s.resolution_status
+        SELECT source.tag_id,source.name,s.synonym
         FROM tag_synonyms s
         JOIN tags source ON source.tag_id=s.tag_id
-        LEFT JOIN tags target ON target.tag_id=s.resolved_tag_id
         WHERE source.last_seen_generation=?
         ORDER BY source.name COLLATE NOCASE, s.synonym COLLATE NOCASE
         """,
@@ -1942,29 +1878,15 @@ def export_command(args: argparse.Namespace) -> int:
     ).fetchall()
     _write_tsv(
         out / "synonyms.tsv",
-        [
-            "tag_id",
-            "official_tag",
-            "synonym",
-            "resolved_tag_id",
-            "resolved_tag",
-            "resolution_status",
-        ],
+        ["tag_id", "official_tag", "synonym"],
         synonym_rows,
     )
 
     reverse_rows = db.execute(
         """
-        SELECT
-            s.synonym,
-            source.tag_id,
-            source.name,
-            s.resolved_tag_id,
-            target.name,
-            s.resolution_status
+        SELECT s.synonym,source.tag_id,source.name
         FROM tag_synonyms s
         JOIN tags source ON source.tag_id=s.tag_id
-        LEFT JOIN tags target ON target.tag_id=s.resolved_tag_id
         WHERE source.last_seen_generation=?
         ORDER BY s.synonym COLLATE NOCASE, source.name COLLATE NOCASE
         """,
@@ -1974,14 +1896,7 @@ def export_command(args: argparse.Namespace) -> int:
 
     _write_tsv(
         out / "synonym-map.tsv",
-        [
-            "synonym",
-            "tag_id",
-            "official_tag",
-            "resolved_tag_id",
-            "resolved_tag",
-            "resolution_status",
-        ],
+        ["synonym", "tag_id", "official_tag"],
         reverse_rows,
     )
 
