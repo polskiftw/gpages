@@ -662,9 +662,7 @@ class HarvesterHTTP:
     def __init__(self, base_url: str, jar: http.cookiejar.CookieJar, timeout: float):
         self.base_url = base_url
         self.timeout = timeout
-        self._opener = urllib.request.build_opener(
-            urllib.request.HTTPCookieProcessor(jar)
-        )
+        self._jar = jar
         self._lock = threading.Lock()
 
     def page_url(self, page: int) -> str:
@@ -713,7 +711,14 @@ class HarvesterHTTP:
             )
             started = time.monotonic()
             try:
-                with self._opener.open(request, timeout=self.timeout) as response:
+                # CookieJar mutation/selection is serialized, but the network request is not.
+                # This keeps concurrent fetches safe without exporting cookie values.
+                with self._lock:
+                    self._jar.add_cookie_header(request)
+                opener = urllib.request.build_opener()
+                with opener.open(request, timeout=self.timeout) as response:
+                    with self._lock:
+                        self._jar.extract_cookies(response, request)
                     status = int(getattr(response, "status", 200))
                     last_status = status
                     body = response.read(MAX_RESPONSE_BYTES + 1)
@@ -870,8 +875,10 @@ def harvest(args: argparse.Namespace) -> int:
         f"page 1 contains {rows_per_page} tag rows."
     )
     if first_parsed.synonym_mismatches:
-        print(
-            f"WARNING: page 1 has {first_parsed.synonym_mismatches} synonym parse mismatch(es)."
+        raise RuntimeError(
+            "Page 1 has "
+            f"{first_parsed.synonym_mismatches} synonym parse mismatch(es). "
+            "Bulk crawl aborted so a parser mismatch cannot contaminate thousands of pages."
         )
 
     ok_pages = {
@@ -893,7 +900,9 @@ def harvest(args: argparse.Namespace) -> int:
         f"adaptive concurrency {current_workers}..{args.max_workers}."
     )
 
-    while pending:
+    fatal_parse_error = False
+
+    while pending and not fatal_parse_error:
         batch_size = max(current_workers, current_workers * 4)
         batch = pending[:batch_size]
         pending = pending[batch_size:]
@@ -920,10 +929,11 @@ def harvest(args: argparse.Namespace) -> int:
                         )
 
                     if page < final_page and len(parsed.tags) != rows_per_page:
-                        parsed.synonym_mismatches += 1
-                        print(
+                        raise FetchFailure(
                             f"page {page}: expected {rows_per_page} tag rows, "
-                            f"parsed {len(parsed.tags)}; marking parse_error"
+                            f"parsed {len(parsed.tags)}",
+                            attempts=result.attempts,
+                            status=result.status,
                         )
 
                     write_page(
@@ -939,9 +949,10 @@ def harvest(args: argparse.Namespace) -> int:
                     stressed = stressed or result.had_retry
                     if parsed.synonym_mismatches:
                         stressed = True
+                        fatal_parse_error = True
                         print(
                             f"page {page}: {parsed.synonym_mismatches} "
-                            "synonym/layout mismatch(es)"
+                            "synonym mismatch(es); bulk crawl will stop after this batch"
                         )
                 except FetchFailure as exc:
                     stressed = True
@@ -978,6 +989,13 @@ def harvest(args: argparse.Namespace) -> int:
                     print(f"page {page}: {exc}", file=sys.stderr)
 
         print_progress(db, final_page)
+
+        if fatal_parse_error:
+            print(
+                "Stopping because synonym parsing no longer matches the site. "
+                "Saved OK pages remain resumable."
+            )
+            break
 
         median_ms = statistics.median(latencies) if latencies else None
         if stressed or (median_ms is not None and median_ms > args.slow_ms):
