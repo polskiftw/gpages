@@ -679,7 +679,7 @@ class DatabaseTests(unittest.TestCase):
             self.assertEqual(report["reported_delta"], -1)
             db.close()
 
-    def test_stabilizer_confirms_tail_when_counter_lags(self):
+    def test_stabilizer_keeps_consistent_snapshot_when_counter_lags(self):
         def page_html(total, final_page, rows):
             body = [
                 "<!doctype html><html><body>",
@@ -774,7 +774,72 @@ class DatabaseTests(unittest.TestCase):
             self.assertTrue(report["complete"])
             self.assertEqual(report["reported_delta"], 1)
             self.assertEqual((final_page, rows_per_page), (2, 3))
-            self.assertEqual(http.tail_fetches, 1)
+            self.assertEqual(http.tail_fetches, 0)
+            db.close()
+
+
+    def test_repairs_old_tail_confirmation_page_count_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = tg.open_db(Path(tmp) / "repair-tail.sqlite3")
+            tg.set_meta(db, "reported_total", 5)
+            tg.set_meta(db, "final_page", 2)
+            tg.set_meta(db, "rows_per_page", 3)
+            tg.set_meta(db, "crawl_generation", 1)
+
+            db.executemany(
+                """
+                INSERT INTO pages(
+                    page,status,attempts,http_status,latency_ms,tag_count,
+                    synonym_count,body_sha256,fetched_at,error
+                ) VALUES(?, 'ok', 1, 200, 1, ?, 0, '', '', NULL)
+                """,
+                [(1, 3), (2, 4)],
+            )
+            db.executemany(
+                """
+                INSERT INTO tags(
+                    tag_id,name,uses,upvotes,downvotes,reported_synonym_count,
+                    synonym_raw_text,synonym_parse_ok,last_seen_generation
+                ) VALUES(?,?,1,0,0,0,'',1,1)
+                """,
+                [
+                    (1, "one"),
+                    (2, "two"),
+                    (3, "three"),
+                    (4, "four"),
+                    (5, "five"),
+                    (6, "six"),
+                ],
+            )
+            db.commit()
+
+            before = tg.verify_db(db)
+            self.assertFalse(before["complete"])
+            self.assertEqual(before["tag_count"], 6)
+            self.assertEqual(before["page_tag_sum"], 7)
+
+            self.assertTrue(
+                tg.repair_tail_confirmation_bookkeeping(
+                    db,
+                    final_page=2,
+                    rows_per_page=3,
+                )
+            )
+
+            after = tg.verify_db(db)
+            self.assertTrue(after["complete"])
+            self.assertEqual(after["tag_count"], 6)
+            self.assertEqual(after["page_tag_sum"], 6)
+            self.assertEqual(
+                db.execute(
+                    "SELECT tag_count FROM pages WHERE page=2"
+                ).fetchone()[0],
+                3,
+            )
+            self.assertEqual(
+                db.execute("SELECT COUNT(*) FROM tags").fetchone()[0],
+                6,
+            )
             db.close()
 
 
