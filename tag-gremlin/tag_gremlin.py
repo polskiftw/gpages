@@ -39,7 +39,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Iterable
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 DEFAULT_DB = "tag-gremlin.sqlite3"
 DEFAULT_WORKERS = 4
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
@@ -467,16 +467,8 @@ def parse_tags_page(html: str) -> ParsedPage:
     )
 
 
-def open_db(path: Path) -> sqlite3.Connection:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    db: sqlite3.Connection | None = None
-    try:
-        db = sqlite3.connect(path, timeout=30.0)
-        db.execute("PRAGMA busy_timeout=30000")
-        db.execute("PRAGMA foreign_keys=ON")
-        db.execute("PRAGMA journal_mode=WAL")
-        db.execute("PRAGMA synchronous=NORMAL")
-        db.executescript(
+def _create_schema_v2(db: sqlite3.Connection) -> None:
+    db.executescript(
         """
         CREATE TABLE IF NOT EXISTS meta (
             key TEXT PRIMARY KEY,
@@ -498,20 +490,20 @@ def open_db(path: Path) -> sqlite3.Connection:
 
         CREATE TABLE IF NOT EXISTS tags (
             tag_id INTEGER PRIMARY KEY,
-            name TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
             uses INTEGER NOT NULL,
             upvotes INTEGER NOT NULL,
             downvotes INTEGER NOT NULL,
             reported_synonym_count INTEGER NOT NULL,
-            source_page INTEGER NOT NULL,
             synonym_raw_text TEXT NOT NULL,
-            synonym_parse_ok INTEGER NOT NULL CHECK (synonym_parse_ok IN (0,1))
+            synonym_parse_ok INTEGER NOT NULL CHECK (synonym_parse_ok IN (0,1)),
+            last_seen_generation INTEGER NOT NULL
         );
 
         CREATE INDEX IF NOT EXISTS tags_name_nocase
             ON tags(name COLLATE NOCASE);
-        CREATE INDEX IF NOT EXISTS tags_source_page
-            ON tags(source_page);
+        CREATE INDEX IF NOT EXISTS tags_last_seen_generation
+            ON tags(last_seen_generation);
 
         CREATE TABLE IF NOT EXISTS tag_synonyms (
             tag_id INTEGER NOT NULL REFERENCES tags(tag_id) ON DELETE CASCADE,
@@ -522,15 +514,159 @@ def open_db(path: Path) -> sqlite3.Connection:
         CREATE INDEX IF NOT EXISTS synonyms_name_nocase
             ON tag_synonyms(synonym COLLATE NOCASE);
         """
+    )
+
+
+def _migrate_v1_to_v2(db: sqlite3.Connection) -> None:
+    """Remove page ownership from tags while preserving an existing v1 harvest."""
+    db.execute("PRAGMA foreign_keys=OFF")
+    try:
+        db.execute("BEGIN")
+        db.execute("DROP TABLE IF EXISTS tags_v2")
+        db.execute("DROP TABLE IF EXISTS tag_synonyms_v2_backup")
+
+        db.execute(
+            """
+            CREATE TABLE tags_v2 (
+                tag_id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                uses INTEGER NOT NULL,
+                upvotes INTEGER NOT NULL,
+                downvotes INTEGER NOT NULL,
+                reported_synonym_count INTEGER NOT NULL,
+                synonym_raw_text TEXT NOT NULL,
+                synonym_parse_ok INTEGER NOT NULL CHECK (synonym_parse_ok IN (0,1)),
+                last_seen_generation INTEGER NOT NULL
+            )
+            """
         )
-        set_meta(db, "schema_version", SCHEMA_VERSION)
+        db.execute(
+            """
+            INSERT INTO tags_v2(
+                tag_id,name,uses,upvotes,downvotes,reported_synonym_count,
+                synonym_raw_text,synonym_parse_ok,last_seen_generation
+            )
+            SELECT
+                tag_id,name,uses,upvotes,downvotes,reported_synonym_count,
+                synonym_raw_text,synonym_parse_ok,1
+            FROM tags
+            """
+        )
+
+        db.execute(
+            """
+            CREATE TABLE tag_synonyms_v2_backup (
+                tag_id INTEGER NOT NULL,
+                synonym TEXT NOT NULL,
+                PRIMARY KEY (tag_id, synonym)
+            )
+            """
+        )
+        db.execute(
+            """
+            INSERT INTO tag_synonyms_v2_backup(tag_id,synonym)
+            SELECT tag_id,synonym FROM tag_synonyms
+            """
+        )
+
+        db.execute("DROP TABLE tag_synonyms")
+        db.execute("DROP TABLE tags")
+        db.execute("ALTER TABLE tags_v2 RENAME TO tags")
+
+        db.execute(
+            """
+            CREATE TABLE tag_synonyms (
+                tag_id INTEGER NOT NULL REFERENCES tags(tag_id) ON DELETE CASCADE,
+                synonym TEXT NOT NULL,
+                PRIMARY KEY (tag_id, synonym)
+            )
+            """
+        )
+        db.execute(
+            """
+            INSERT INTO tag_synonyms(tag_id,synonym)
+            SELECT tag_id,synonym FROM tag_synonyms_v2_backup
+            """
+        )
+        db.execute("DROP TABLE tag_synonyms_v2_backup")
+
+        db.execute("CREATE INDEX tags_name_nocase ON tags(name COLLATE NOCASE)")
+        db.execute(
+            "CREATE INDEX tags_last_seen_generation ON tags(last_seen_generation)"
+        )
+        db.execute(
+            "CREATE INDEX synonyms_name_nocase ON tag_synonyms(synonym COLLATE NOCASE)"
+        )
+        db.execute(
+            """
+            INSERT INTO meta(key,value) VALUES('crawl_generation','1')
+            ON CONFLICT(key) DO NOTHING
+            """
+        )
+        db.execute(
+            """
+            INSERT INTO meta(key,value) VALUES('schema_version','2')
+            ON CONFLICT(key) DO UPDATE SET value='2'
+            """
+        )
         db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.execute("PRAGMA foreign_keys=ON")
+
+
+def open_db(path: Path) -> sqlite3.Connection:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    db: sqlite3.Connection | None = None
+    try:
+        db = sqlite3.connect(path, timeout=30.0)
+        db.execute("PRAGMA busy_timeout=30000")
+        db.execute("PRAGMA journal_mode=WAL")
+        db.execute("PRAGMA synchronous=NORMAL")
+        db.execute("PRAGMA foreign_keys=OFF")
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS meta (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+            """
+        )
+        db.commit()
+
+        tags_exists = db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='tags'"
+        ).fetchone()
+        if tags_exists:
+            columns = {
+                row[1] for row in db.execute("PRAGMA table_info(tags)").fetchall()
+            }
+            if "source_page" in columns and "last_seen_generation" not in columns:
+                _migrate_v1_to_v2(db)
+
+        _create_schema_v2(db)
+        db.execute(
+            """
+            INSERT INTO meta(key,value) VALUES('schema_version',?)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value
+            """,
+            (SCHEMA_VERSION,),
+        )
+        db.execute(
+            """
+            INSERT INTO meta(key,value) VALUES('crawl_generation','1')
+            ON CONFLICT(key) DO NOTHING
+            """
+        )
+        db.commit()
+        db.execute("PRAGMA foreign_keys=ON")
         return db
     except sqlite3.OperationalError as exc:
         if db is not None:
             db.close()
         raise RuntimeError(f"Could not open Tag Gremlin database {path}: {exc}") from exc
-
 
 def get_meta(db: sqlite3.Connection, key: str) -> str | None:
     row = db.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
@@ -555,11 +691,42 @@ def prior_attempts(db: sqlite3.Connection, page: int) -> int:
     return int(row[0]) if row else 0
 
 
+def current_generation(db: sqlite3.Connection) -> int:
+    raw = get_meta(db, "crawl_generation")
+    try:
+        value = int(raw) if raw is not None else 1
+    except ValueError:
+        value = 1
+    return max(1, value)
+
+
+def finalize_generation(db: sqlite3.Connection, generation: int) -> int:
+    """Drop tags not seen in a verified refresh and mark that generation complete."""
+    report = verify_db(db)
+    if not report["complete"]:
+        return 0
+
+    stale = db.execute(
+        "SELECT COUNT(*) FROM tags WHERE last_seen_generation<>?",
+        (generation,),
+    ).fetchone()[0]
+    db.execute(
+        "DELETE FROM tags WHERE last_seen_generation<>?",
+        (generation,),
+    )
+    set_meta(db, "completed_generation", generation)
+    set_meta(db, "last_complete_at", now_iso())
+    set_meta(db, "updated_at", now_iso())
+    db.commit()
+    return int(stale or 0)
+
+
 def write_page(
     db: sqlite3.Connection,
     *,
     page: int,
     parsed: ParsedPage,
+    generation: int,
     attempts: int,
     http_status: int,
     latency_ms: int,
@@ -575,26 +742,23 @@ def write_page(
 
     try:
         db.execute("BEGIN")
-        old_ids = [
-            row[0]
-            for row in db.execute(
-                "SELECT tag_id FROM tags WHERE source_page=?", (page,)
-            ).fetchall()
-        ]
-        if old_ids:
-            db.executemany(
-                "DELETE FROM tag_synonyms WHERE tag_id=?",
-                ((tag_id,) for tag_id in old_ids),
-            )
-            db.execute("DELETE FROM tags WHERE source_page=?", (page,))
 
         for tag in parsed.tags:
             db.execute(
                 """
                 INSERT INTO tags(
                     tag_id,name,uses,upvotes,downvotes,reported_synonym_count,
-                    source_page,synonym_raw_text,synonym_parse_ok
+                    synonym_raw_text,synonym_parse_ok,last_seen_generation
                 ) VALUES(?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(tag_id) DO UPDATE SET
+                    name=excluded.name,
+                    uses=excluded.uses,
+                    upvotes=excluded.upvotes,
+                    downvotes=excluded.downvotes,
+                    reported_synonym_count=excluded.reported_synonym_count,
+                    synonym_raw_text=excluded.synonym_raw_text,
+                    synonym_parse_ok=excluded.synonym_parse_ok,
+                    last_seen_generation=excluded.last_seen_generation
                 """,
                 (
                     tag.tag_id,
@@ -603,11 +767,12 @@ def write_page(
                     tag.upvotes,
                     tag.downvotes,
                     tag.reported_synonym_count,
-                    page,
                     tag.synonym_raw_text,
                     int(tag.synonym_parse_ok),
+                    generation,
                 ),
             )
+            db.execute("DELETE FROM tag_synonyms WHERE tag_id=?", (tag.tag_id,))
             db.executemany(
                 "INSERT INTO tag_synonyms(tag_id,synonym) VALUES(?,?)",
                 ((tag.tag_id, synonym) for synonym in tag.synonyms),
@@ -648,7 +813,6 @@ def write_page(
     except Exception:
         db.rollback()
         raise
-
 
 def record_page_failure(
     db: sqlite3.Connection,
@@ -1109,7 +1273,11 @@ def print_progress(db: sqlite3.Connection, final_page: int) -> None:
         """
     ).fetchone()
     ok, failed, parse_error = (int(x or 0) for x in row)
-    tags = db.execute("SELECT COUNT(*) FROM tags").fetchone()[0]
+    generation = current_generation(db)
+    tags = db.execute(
+        "SELECT COUNT(*) FROM tags WHERE last_seen_generation=?",
+        (generation,),
+    ).fetchone()[0]
     print(
         f"pages {ok:,}/{final_page:,} ok"
         f" | failed {failed:,}"
@@ -1177,6 +1345,22 @@ def harvest(args: argparse.Namespace) -> int:
             "Bulk crawl was not started."
         )
 
+    prior_report = verify_db(db)
+    generation = current_generation(db)
+    if prior_report["complete"]:
+        generation += 1
+        db.execute("DELETE FROM pages")
+        set_meta(db, "crawl_generation", generation)
+        set_meta(db, "refresh_started_at", now_iso())
+        print(
+            f"Previous snapshot is complete; starting refresh generation {generation}.",
+            flush=True,
+        )
+    else:
+        set_meta(db, "crawl_generation", generation)
+        if not get_meta(db, "refresh_started_at"):
+            set_meta(db, "refresh_started_at", now_iso())
+
     set_meta(db, "source_url", source_url)
     set_meta(db, "reported_total", total)
     set_meta(db, "final_page", final_page)
@@ -1191,6 +1375,7 @@ def harvest(args: argparse.Namespace) -> int:
             db,
             page=1,
             parsed=first_parsed,
+            generation=generation,
             attempts=first_fetch.attempts,
             http_status=first_fetch.status,
             latency_ms=first_fetch.latency_ms,
@@ -1210,6 +1395,11 @@ def harvest(args: argparse.Namespace) -> int:
     if not pending:
         print("All pages are already harvested.")
         report = verify_db(db)
+        if report["complete"]:
+            stale = finalize_generation(db, generation)
+            if stale:
+                print(f"Refresh cleanup removed {stale:,} tag(s) no longer present.")
+            report = verify_db(db)
         print_verify_report(report)
         return 0 if report["complete"] else 2
 
@@ -1271,6 +1461,7 @@ def harvest(args: argparse.Namespace) -> int:
                         db,
                         page=page,
                         parsed=parsed,
+                        generation=generation,
                         attempts=result.attempts,
                         http_status=result.status,
                         latency_ms=result.latency_ms,
@@ -1336,6 +1527,11 @@ def harvest(args: argparse.Namespace) -> int:
         )
 
     report = verify_db(db)
+    if report["complete"]:
+        stale = finalize_generation(db, generation)
+        if stale:
+            print(f"Refresh cleanup removed {stale:,} tag(s) no longer present.")
+        report = verify_db(db)
     print_verify_report(report)
     return 0 if report["complete"] else 2
 
@@ -1345,6 +1541,7 @@ def verify_db(db: sqlite3.Connection) -> dict[str, object]:
     final_raw = get_meta(db, "final_page")
     total = int(total_raw) if total_raw and total_raw.isdigit() else None
     final_page = int(final_raw) if final_raw and final_raw.isdigit() else None
+    generation = current_generation(db)
 
     ok_pages = db.execute(
         "SELECT COUNT(*) FROM pages WHERE status='ok'"
@@ -1355,13 +1552,28 @@ def verify_db(db: sqlite3.Connection) -> dict[str, object]:
     parse_error_pages = db.execute(
         "SELECT COUNT(*) FROM pages WHERE status='parse_error'"
     ).fetchone()[0]
-    tag_count = db.execute("SELECT COUNT(*) FROM tags").fetchone()[0]
-    unique_names = db.execute("SELECT COUNT(DISTINCT name) FROM tags").fetchone()[0]
+    tag_count = db.execute(
+        "SELECT COUNT(*) FROM tags WHERE last_seen_generation=?",
+        (generation,),
+    ).fetchone()[0]
+    unique_names = db.execute(
+        "SELECT COUNT(DISTINCT name) FROM tags WHERE last_seen_generation=?",
+        (generation,),
+    ).fetchone()[0]
+    stored_tag_rows = db.execute("SELECT COUNT(*) FROM tags").fetchone()[0]
+    stale_tag_rows = db.execute(
+        "SELECT COUNT(*) FROM tags WHERE last_seen_generation<>?",
+        (generation,),
+    ).fetchone()[0]
     page_tag_sum = db.execute(
         "SELECT COALESCE(SUM(tag_count),0) FROM pages WHERE status IN ('ok','parse_error')"
     ).fetchone()[0]
     synonym_mismatches = db.execute(
-        "SELECT COUNT(*) FROM tags WHERE synonym_parse_ok=0"
+        """
+        SELECT COUNT(*) FROM tags
+        WHERE last_seen_generation=? AND synonym_parse_ok=0
+        """,
+        (generation,),
     ).fetchone()[0]
     edge_mismatches = db.execute(
         """
@@ -1369,10 +1581,12 @@ def verify_db(db: sqlite3.Connection) -> dict[str, object]:
             SELECT t.tag_id
             FROM tags t
             LEFT JOIN tag_synonyms s ON s.tag_id=t.tag_id
+            WHERE t.last_seen_generation=?
             GROUP BY t.tag_id, t.reported_synonym_count
             HAVING COUNT(s.synonym) != t.reported_synonym_count
         )
-        """
+        """,
+        (generation,),
     ).fetchone()[0]
 
     missing_pages: list[int] = []
@@ -1395,7 +1609,6 @@ def verify_db(db: sqlite3.Connection) -> dict[str, object]:
             failed_pages == 0,
             parse_error_pages == 0,
             total is not None and tag_count == total,
-            total is not None and unique_names == total,
             total is not None and page_tag_sum == total,
             synonym_mismatches == 0,
             edge_mismatches == 0,
@@ -1405,6 +1618,7 @@ def verify_db(db: sqlite3.Connection) -> dict[str, object]:
 
     return {
         "complete": complete,
+        "generation": generation,
         "reported_total": total,
         "final_page": final_page,
         "ok_pages": ok_pages,
@@ -1412,24 +1626,27 @@ def verify_db(db: sqlite3.Connection) -> dict[str, object]:
         "parse_error_pages": parse_error_pages,
         "tag_count": tag_count,
         "unique_names": unique_names,
+        "stored_tag_rows": stored_tag_rows,
+        "stale_tag_rows": stale_tag_rows,
         "page_tag_sum": page_tag_sum,
         "synonym_mismatches": synonym_mismatches,
         "edge_mismatches": edge_mismatches,
         "missing_pages": missing_pages,
     }
 
-
 def print_verify_report(report: dict[str, object]) -> None:
     print("")
     print("Tag Gremlin verification")
     print("------------------------")
+    print(f"Crawl generation:         {report['generation']}")
     print(f"Reported tags:            {report['reported_total']}")
     print(f"Final page:               {report['final_page']}")
     print(f"Pages OK:                 {report['ok_pages']}")
     print(f"Failed pages:             {report['failed_pages']}")
     print(f"Parse-error pages:        {report['parse_error_pages']}")
-    print(f"Stored unique TagIDs:     {report['tag_count']}")
-    print(f"Stored unique names:      {report['unique_names']}")
+    print(f"Current-generation IDs:   {report['tag_count']}")
+    print(f"Current unique names:     {report['unique_names']}")
+    print(f"Stale prior-gen rows:     {report['stale_tag_rows']}")
     print(f"Sum of page tag counts:   {report['page_tag_sum']}")
     print(f"Synonym parse mismatches: {report['synonym_mismatches']}")
     print(f"Synonym edge mismatches:  {report['edge_mismatches']}")
@@ -1452,9 +1669,18 @@ def status_command(args: argparse.Namespace) -> int:
     attempts = db.execute(
         "SELECT COALESCE(SUM(attempts),0) FROM pages"
     ).fetchone()[0]
-    synonyms = db.execute("SELECT COUNT(*) FROM tag_synonyms").fetchone()[0]
+    generation = current_generation(db)
+    synonyms = db.execute(
+        """
+        SELECT COUNT(*)
+        FROM tag_synonyms s
+        JOIN tags t ON t.tag_id=s.tag_id
+        WHERE t.last_seen_generation=?
+        """,
+        (generation,),
+    ).fetchone()[0]
     print(f"Network attempts recorded: {attempts}")
-    print(f"Synonym mappings stored:   {synonyms}")
+    print(f"Current synonym mappings:  {synonyms}")
     db.close()
     return 0
 
@@ -1492,13 +1718,16 @@ def export_command(args: argparse.Namespace) -> int:
 
     out = Path(args.out_dir).expanduser().resolve()
     out.mkdir(parents=True, exist_ok=True)
+    generation = current_generation(db)
 
     tag_rows = db.execute(
         """
         SELECT tag_id,name,uses,upvotes,downvotes,reported_synonym_count
         FROM tags
+        WHERE last_seen_generation=?
         ORDER BY name COLLATE NOCASE, tag_id
-        """
+        """,
+        (generation,),
     ).fetchall()
 
     with (out / "tags.txt").open("w", encoding="utf-8", newline="\n") as handle:
@@ -1516,8 +1745,10 @@ def export_command(args: argparse.Namespace) -> int:
         SELECT t.tag_id,t.name,s.synonym
         FROM tag_synonyms s
         JOIN tags t ON t.tag_id=s.tag_id
+        WHERE t.last_seen_generation=?
         ORDER BY t.name COLLATE NOCASE, s.synonym COLLATE NOCASE
-        """
+        """,
+        (generation,),
     ).fetchall()
     _write_tsv(
         out / "synonyms.tsv",
@@ -1530,8 +1761,10 @@ def export_command(args: argparse.Namespace) -> int:
         SELECT s.synonym,t.tag_id,t.name
         FROM tag_synonyms s
         JOIN tags t ON t.tag_id=s.tag_id
+        WHERE t.last_seen_generation=?
         ORDER BY s.synonym COLLATE NOCASE, t.name COLLATE NOCASE
-        """
+        """,
+        (generation,),
     ).fetchall()
     db.close()
 
