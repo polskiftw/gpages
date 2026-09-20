@@ -202,6 +202,8 @@ No live target-site requests are made in CI.
 
 The site's page-1 "N tags" counter can lag behind the actual pageable rows. Completeness therefore uses the harvested corpus itself as the strict cardinality check: every expected page must be OK, the sum of page row counts must equal the number of unique stored TagIDs, unique names must match unique TagIDs, and synonym counts must reconcile.
 
-If the displayed total is lower than the observed corpus, Tag Gremlin refreshes the live final page once before accepting the mismatch. The report shows both values and the signed delta. A displayed total that is higher than the observed corpus still blocks completeness because that indicates missing data or a source change that has not yet been caught up.
+If the displayed total is lower than an already self-consistent observed corpus, Tag Gremlin keeps that harvested snapshot unchanged. Re-fetching a single live page after the fact can mix two source moments and create a false cross-page overlap, so stale-counter confirmation is non-mutating. The report shows both values and the signed delta. A displayed total that is higher than the observed corpus still blocks completeness because that indicates missing data or a source change that has not yet been caught up.
+
+Older builds briefly refreshed the live final page to confirm a stale counter. If that changed only the final page's saved row count and introduced an overlap against the frozen corpus, current Tag Gremlin can repair that final-page bookkeeping in place without changing any harvested tags or aliases.
 
 A generation only becomes eligible to start a later full refresh after harvest finalization records it as the completed generation. Merely becoming structurally complete during a verification pass does not cause the next harvest invocation to throw away its page-resume state.
