@@ -454,8 +454,8 @@ class DatabaseTests(unittest.TestCase):
     def test_live_total_recheck_updates_metadata_without_rescan(self):
         html = (
             FIXTURE
-            .replace("332228 tags", "5 tags")
-            .replace("page=3323", "page=2")
+            .replace("332228 tags", "5000 tags")
+            .replace("page=3323", "page=1667")
         )
 
         class FakeHTTP:
@@ -474,8 +474,8 @@ class DatabaseTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             db = tg.open_db(Path(tmp) / "live.sqlite3")
-            tg.set_meta(db, "reported_total", 4)
-            tg.set_meta(db, "final_page", 2)
+            tg.set_meta(db, "reported_total", 4999)
+            tg.set_meta(db, "final_page", 1667)
             db.commit()
 
             total, final_page, rows_per_page = tg.recheck_live_source_shape(
@@ -485,9 +485,9 @@ class DatabaseTests(unittest.TestCase):
                 expected_rows_per_page=3,
             )
 
-            self.assertEqual((total, final_page, rows_per_page), (5, 2, 3))
-            self.assertEqual(tg.get_meta(db, "reported_total"), "5")
-            self.assertEqual(tg.get_meta(db, "final_page"), "2")
+            self.assertEqual((total, final_page, rows_per_page), (5000, 1667, 3))
+            self.assertEqual(tg.get_meta(db, "reported_total"), "5000")
+            self.assertEqual(tg.get_meta(db, "final_page"), "1667")
             db.close()
 
 
