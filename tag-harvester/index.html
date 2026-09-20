@@ -4,22 +4,135 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f2f2f7">
-<title>Tag Gremlin v9</title>
+<title>Tag Gremlin</title>
 <style>
-:root{color-scheme:light dark;--bg:#f2f2f7;--card:#fff;--text:#111;--muted:#6e6e73;--border:rgba(60,60,67,.18);--accent:#007aff;--good:#34c759}@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#f5f5f7;--muted:#98989d;--border:rgba(84,84,88,.65);--accent:#0a84ff;--good:#30d158}}*{box-sizing:border-box}body{margin:0;padding:max(28px,env(safe-area-inset-top)) 16px max(28px,env(safe-area-inset-bottom));background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif}main{width:min(100%,720px);margin:0 auto}h1{font-size:32px;margin:4px 0 6px}.sub,.note{color:var(--muted);line-height:1.48}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;margin:14px 0}h2{font-size:18px;margin:0 0 10px}ol,ul{padding-left:22px;line-height:1.55}.btn{width:100%;min-height:50px;border:0;border-radius:12px;background:var(--accent);color:#fff;font-weight:750;font-size:16px}.btn:disabled{opacity:.45}.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;word-break:break-all;background:rgba(127,127,127,.12);border-radius:12px;padding:12px;margin:10px 0;max-height:110px;overflow:auto}.ok{font-size:13px;color:var(--muted);min-height:20px;margin-top:8px}.good{color:var(--good);font-weight:700}.pill{display:inline-block;padding:3px 8px;border-radius:999px;background:rgba(127,127,127,.14);font-size:12px;font-weight:700;margin-right:5px}
+:root{color-scheme:light dark;--bg:#f2f2f7;--card:#fff;--text:#111;--muted:#6e6e73;--border:rgba(60,60,67,.18);--accent:#007aff;--good:#34c759;--warn:#ff9f0a}@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#f5f5f7;--muted:#98989d;--border:rgba(84,84,88,.65);--accent:#0a84ff;--good:#30d158;--warn:#ffd60a}}*{box-sizing:border-box}body{margin:0;padding:max(28px,env(safe-area-inset-top)) 16px max(28px,env(safe-area-inset-bottom));background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif}main{width:min(100%,820px);margin:0 auto}h1{font-size:32px;margin:4px 0 6px}h2{font-size:20px;margin:0 0 10px}h3{font-size:16px;margin:18px 0 8px}.sub,.note{color:var(--muted);line-height:1.5}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;margin:14px 0}ol,ul{padding-left:22px;line-height:1.58}.btn{min-height:44px;border:0;border-radius:10px;background:var(--accent);color:#fff;font-weight:750;font-size:14px;padding:0 14px;cursor:pointer}.btn:disabled{opacity:.45}.code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;background:rgba(127,127,127,.12);border-radius:12px;padding:12px;margin:8px 0;overflow:auto}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.ok{font-size:13px;color:var(--muted);min-height:20px;margin-top:8px}.good{color:var(--good);font-weight:700}.warn{color:var(--warn);font-weight:700}.pill{display:inline-block;padding:3px 8px;border-radius:999px;background:rgba(127,127,127,.14);font-size:12px;font-weight:700;margin-right:5px}.sep{height:1px;background:var(--border);margin:28px 0}code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.small{font-size:13px}
 </style>
 </head>
 <body><main>
-<h1>Tag Gremlin v9</h1>
-<p class="sub">The restored frozen v9 control scheduler, packaged again as an iPhone Safari bookmarklet. It resumes the existing v8/v8.1 crawl database.</p>
-<div class="card"><h2>Install / upgrade</h2><ol><li>If v8 or v8.1 is running, tap <strong>Pause + Save</strong> first.</li><li>Wait for <strong>v9 bookmarklet ready</strong> below.</li><li>Tap <strong>Copy v9 bookmarklet</strong>.</li><li>Create a fresh Safari bookmark named <strong>Tag Gremlin v9</strong> and replace its URL with the copied code.</li><li>Reload the logged-in target search page and run the new bookmark.</li><li>Tap <strong>Start / Resume</strong>. If it needs to relearn the autocomplete endpoint, tap the Tags field once and run it again.</li></ol><button class="btn" id="copy" disabled>Preparing v9 bookmarklet…</button><div class="ok" id="ok"></div><div class="code" id="code"></div></div>
-<div class="card"><h2>Your scan resumes</h2><p class="note"><span class="good">No restart.</span> v9 intentionally uses the same <code>tag-gremlin-v8:&lt;host&gt;</code> IndexedDB as v8/v8.1. Existing tags, CLOSED proofs, saturated queries, request counters, learned endpoint data, frontier-pressure state, and debt state are loaded and the frontier is rebuilt from that saved work.</p></div>
-<div class="card"><h2>v9 corrections</h2><p class="note"><span class="pill">0–9 roots kept</span><span class="pill">period kept</span><span class="pill">hyphen removed</span></p><ul><li>Tags beginning with a digit remain fully supported.</li><li>The valid crawl alphabet is now <strong>a–z, 0–9, and period</strong>.</li><li>Old v8/v8.1 tag or proof records containing a hyphen are ignored when v9 rebuilds the active crawl, so they cannot spawn useless descendants.</li></ul></div>
-<div class="card"><h2>What “v9” means here</h2><p class="note">This uses the preserved v9 control policy from the later research harness: the same language/popularity scoring, sibling evidence, harvest-vs-prune scheduling, frontier-pressure controller, and debt-mode thresholds that were frozen as the v9 baseline. The only intentional behavior change is the corrected no-hyphen alphabet.</p></div>
-<div class="card"><h2>Completeness rules unchanged</h2><p class="note">A real autocomplete response below 40 is the only server response allowed to prove a substring CLOSED. A candidate that is itself a known tag and already occurs in at least 40 known tags may still be inferred saturated with zero request. CLOSED substrings continue to prune every covered candidate globally.</p></div>
+<h1>Tag Gremlin</h1>
+<p class="sub">Desktop harvester for the complete tag index and synonym map. The old bookmarklet version is preserved below, but the desktop CLI is the recommended version now.</p>
+
+<div class="card">
+<h2>Desktop setup — no repo clone needed</h2>
+<p class="note">You can put Tag Gremlin anywhere on your Gentoo box. This creates <code>~/tag-gremlin</code>, downloads the single Python file from gpages, and runs it there.</p>
+
+<h3>1. Download Tag Gremlin</h3>
+<div class="code" id="downloadCmd">mkdir -p ~/tag-gremlin
+cd ~/tag-gremlin
+curl -fLO https://raw.githubusercontent.com/polskiftw/gpages/main/tag-gremlin/tag_gremlin.py</div>
+<div class="row"><button class="btn copy" data-copy="downloadCmd">Copy download command</button></div>
+
+<h3>2. Make sure Firefox is logged in</h3>
+<p class="note">Open Firefox normally and log into the target site. Firefox can stay open. Tag Gremlin reads the matching cookies from Firefox's local <code>cookies.sqlite</code> database read-only; cookie values are not printed or saved into the Tag Gremlin database.</p>
+
+<h3>3. Start the harvest</h3>
+<p class="note">Replace <code>YOUR-SITE</code> with the real hostname. Point it at the site's normal <code>tags.php</code> page.</p>
+<div class="code" id="harvestCmd">cd ~/tag-gremlin
+
+python3 tag_gremlin.py \
+  --db ~/tag-gremlin.sqlite3 \
+  harvest \
+  --url 'https://YOUR-SITE/tags.php'</div>
+<div class="row"><button class="btn copy" data-copy="harvestCmd">Copy harvest command</button></div>
+
+<p class="note small"><span class="good">Safe to interrupt:</span> completed pages are committed to SQLite as it goes. Run the same harvest command again to resume.</p>
+<p class="note small"><span class="warn">Do not delete</span> <code>~/tag-gremlin.sqlite3</code> unless you intentionally want to start over from scratch.</p>
+</div>
+
+<div class="card">
+<h2>Check progress / verify / export</h2>
+
+<h3>Status</h3>
+<div class="code" id="statusCmd">cd ~/tag-gremlin
+python3 tag_gremlin.py --db ~/tag-gremlin.sqlite3 status</div>
+<div class="row"><button class="btn copy" data-copy="statusCmd">Copy status command</button></div>
+
+<h3>Strict verification</h3>
+<div class="code" id="verifyCmd">cd ~/tag-gremlin
+python3 tag_gremlin.py --db ~/tag-gremlin.sqlite3 verify</div>
+<div class="row"><button class="btn copy" data-copy="verifyCmd">Copy verify command</button></div>
+<p class="note">The harvest only reports <strong>COMPLETE: YES</strong> when every expected page is accounted for, the tag totals reconcile, TagIDs/names are unique, and every harvested synonym count matches the site's reported count.</p>
+
+<h3>Export files</h3>
+<div class="code" id="exportCmd">cd ~/tag-gremlin
+python3 tag_gremlin.py \
+  --db ~/tag-gremlin.sqlite3 \
+  export \
+  --out-dir ~/tag-gremlin-export</div>
+<div class="row"><button class="btn copy" data-copy="exportCmd">Copy export command</button></div>
+
+<ul>
+<li><code>~/tag-gremlin-export/tags.txt</code> — one official tag per line; this is the simple corpus for the regex/search tool.</li>
+<li><code>tags.tsv</code> — TagID, name, uses, votes, synonym count.</li>
+<li><code>synonyms.tsv</code> — official tag → synonym mappings.</li>
+<li><code>synonym-map.tsv</code> — synonym → official tag reverse map.</li>
+</ul>
+</div>
+
+<div class="card">
+<h2>What the desktop version does</h2>
+<p class="note"><span class="pill">resumable SQLite</span><span class="pill">Firefox auth</span><span class="pill">synonym map</span><span class="pill">strict verification</span></p>
+<ul>
+<li>Harvests the directly pageable <code>tags.php?page=N</code> index instead of brute-forcing autocomplete.</li>
+<li>Stores the full tag corpus locally in SQLite.</li>
+<li>Captures TagID, official name, uses, positive/negative votes, reported synonym count, and the hidden synonym data already embedded in each page.</li>
+<li>Starts conservatively at low network concurrency and backs off on slow responses, retries, HTTP 429, or server errors.</li>
+<li>Stops rather than silently accepting parser drift or synonym-count mismatches.</li>
+</ul>
+<p class="note">The complete design notes live in <a href="https://github.com/polskiftw/gpages/blob/main/tag-gremlin/DGD.md">tag-gremlin/DGD.md</a>. The source is <a href="https://github.com/polskiftw/gpages/blob/main/tag-gremlin/tag_gremlin.py">tag_gremlin.py</a>.</p>
+</div>
+
+<div class="sep"></div>
+
+<h2>Legacy bookmarklet — Tag Gremlin v9</h2>
+<p class="sub">Preserved for old phone/browser crawls. This is no longer the recommended way to build a fresh corpus on desktop.</p>
+
+<div class="card"><h2>Install / upgrade legacy v9</h2><ol><li>If v8 or v8.1 is running, tap <strong>Pause + Save</strong> first.</li><li>Wait for <strong>v9 bookmarklet ready</strong> below.</li><li>Tap <strong>Copy v9 bookmarklet</strong>.</li><li>Create a fresh Safari bookmark named <strong>Tag Gremlin v9</strong> and replace its URL with the copied code.</li><li>Reload the logged-in target search page and run the new bookmark.</li><li>Tap <strong>Start / Resume</strong>. If it needs to relearn the autocomplete endpoint, tap the Tags field once and run it again.</li></ol><button class="btn" id="copyBm" disabled>Preparing v9 bookmarklet…</button><div class="ok" id="ok"></div><div class="code" id="bmCode"></div></div>
+
+<div class="card"><h2>Legacy v9 notes</h2><p class="note"><span class="good">No restart.</span> v9 intentionally uses the same <code>tag-gremlin-v8:&lt;host&gt;</code> IndexedDB as v8/v8.1. Existing tags, CLOSED proofs, saturated queries, request counters, learned endpoint data, frontier-pressure state, and debt state are loaded and the frontier is rebuilt from that saved work.</p><p class="note"><span class="pill">0–9 roots kept</span><span class="pill">period kept</span><span class="pill">hyphen removed</span></p><p class="note">A real autocomplete response below 40 is the only server response allowed to prove a substring CLOSED. A candidate that is itself a known tag and already occurs in at least 40 known tags may still be inferred saturated with zero request.</p></div>
+
 </main>
 <script>
+for(const button of document.querySelectorAll('.copy')){
+  button.addEventListener('click',async()=>{
+    const el=document.getElementById(button.dataset.copy);
+    try{
+      await navigator.clipboard.writeText(el.textContent.trim());
+      const old=button.textContent;
+      button.textContent='Copied';
+      setTimeout(()=>button.textContent=old,1200);
+    }catch{
+      button.textContent='Copy failed — select the command above';
+    }
+  });
+}
+
 let bm='';
-(async()=>{const b=document.getElementById('copy'),ok=document.getElementById('ok'),code=document.getElementById('code');try{let r=await fetch('./v9.js?v=9',{cache:'no-store'});if(!r.ok)throw new Error('v9.js HTTP '+r.status);let js=await r.text();if(!js.includes('__tagGremlinV9'))throw new Error('v9.js did not look like Tag Gremlin v9');bm='javascript:'+js;code.textContent=bm;b.disabled=false;b.textContent='Copy v9 bookmarklet';ok.textContent='v9 bookmarklet ready • resumes v8/v8.1 storage';b.onclick=async()=>{try{await navigator.clipboard.writeText(bm);ok.textContent='Copied. Make a fresh v9 bookmark, reload the target page, then Start / Resume.'}catch{ok.textContent='Long-press the code below and copy it manually.'}}}catch(e){b.textContent='Could not prepare bookmarklet';ok.textContent='Preparation failed: '+e.message}})();
+(async()=>{
+  const b=document.getElementById('copyBm'),ok=document.getElementById('ok'),code=document.getElementById('bmCode');
+  try{
+    let r=await fetch('./v9.js?v=9',{cache:'no-store'});
+    if(!r.ok)throw new Error('v9.js HTTP '+r.status);
+    let js=await r.text();
+    if(!js.includes('__tagGremlinV9'))throw new Error('v9.js did not look like Tag Gremlin v9');
+    bm='javascript:'+js;
+    code.textContent=bm;
+    b.disabled=false;
+    b.textContent='Copy v9 bookmarklet';
+    ok.textContent='v9 bookmarklet ready • resumes v8/v8.1 storage';
+    b.onclick=async()=>{
+      try{
+        await navigator.clipboard.writeText(bm);
+        ok.textContent='Copied. Make a fresh v9 bookmark, reload the target page, then Start / Resume.';
+      }catch{
+        ok.textContent='Select the code below and copy it manually.';
+      }
+    };
+  }catch(e){
+    b.textContent='Could not prepare bookmarklet';
+    ok.textContent='Preparation failed: '+e.message;
+  }
+})();
 </script>
 </body></html>
