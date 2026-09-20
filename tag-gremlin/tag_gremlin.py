@@ -21,6 +21,7 @@ import os
 import random
 import re
 import shutil
+import signal
 import sqlite3
 import subprocess
 import statistics
@@ -583,20 +584,67 @@ def _domain_matches(hostname: str, cookie_host: str) -> bool:
     return host == domain or host.endswith("." + domain)
 
 
-def _firefox_running() -> bool:
+def _firefox_pids() -> list[int]:
     proc = Path("/proc")
     if not proc.exists():
-        return False
+        return []
+
+    try:
+        uid = os.getuid()
+    except AttributeError:
+        uid = None
+
+    pids: list[int] = []
     for entry in proc.iterdir():
         if not entry.name.isdigit():
             continue
         try:
+            if uid is not None and entry.stat().st_uid != uid:
+                continue
             comm = (entry / "comm").read_text(encoding="utf-8").strip().casefold()
         except (OSError, UnicodeError):
             continue
         if comm in {"firefox", "firefox-bin"}:
-            return True
-    return False
+            pids.append(int(entry.name))
+    return sorted(pids)
+
+
+def _firefox_running() -> bool:
+    return bool(_firefox_pids())
+
+
+def _close_firefox(timeout: float = 15.0) -> None:
+    pids = _firefox_pids()
+    if not pids:
+        print("Firefox is already closed.", flush=True)
+        return
+
+    print(
+        f"Closing Firefox cleanly ({len(pids)} process(es)) so cookies.sqlite can be read...",
+        flush=True,
+    )
+
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        except PermissionError as exc:
+            raise RuntimeError(f"Could not close Firefox process {pid}: {exc}") from exc
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not _firefox_running():
+            print("Firefox closed.", flush=True)
+            return
+        time.sleep(0.10)
+
+    remaining = _firefox_pids()
+    raise RuntimeError(
+        "Firefox did not close cleanly within "
+        f"{timeout:.0f}s (remaining PID(s): {', '.join(map(str, remaining))}). "
+        "Tag Gremlin will not force-kill it; close Firefox manually and rerun."
+    )
 
 
 def _reopen_firefox(profile: Path) -> None:
@@ -935,6 +983,8 @@ def harvest(args: argparse.Namespace) -> int:
     print("Finding Firefox profile...", flush=True)
     profile = discover_firefox_profile(args.firefox_profile)
     print(f"Firefox profile: {profile}", flush=True)
+    if args.close_firefox:
+        _close_firefox()
     print("Reading matching Firefox cookies...", flush=True)
     jar, cookie_count = load_firefox_cookiejar(profile, source_url)
     print(
@@ -1350,12 +1400,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Firefox profile directory or cookies.sqlite path; default is auto-detect",
     )
     p_harvest.add_argument(
+        "--no-close-firefox",
+        dest="close_firefox",
+        action="store_false",
+        help="Do not close Firefox automatically before reading cookies.sqlite",
+    )
+    p_harvest.add_argument(
         "--no-reopen-firefox",
         dest="reopen_firefox",
         action="store_false",
         help="Do not reopen Firefox automatically after its cookies have been loaded",
     )
-    p_harvest.set_defaults(reopen_firefox=True)
+    p_harvest.set_defaults(close_firefox=True, reopen_firefox=True)
     p_harvest.add_argument(
         "--initial-workers",
         type=int,
