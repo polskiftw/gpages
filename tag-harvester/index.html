@@ -53,7 +53,7 @@ python3 tag_gremlin.py --db ~/tag-gremlin.sqlite3 status</div>
 <div class="code" id="verifyCmd">cd ~/tag-gremlin
 python3 tag_gremlin.py --db ~/tag-gremlin.sqlite3 verify</div>
 <div class="row"><button class="btn copy" data-copy="verifyCmd">Copy verify command</button></div>
-<p class="note">The harvest only reports <strong>COMPLETE: YES</strong> when every expected page is accounted for, the unique TagID count and page-row totals reconcile with the site, and every harvested synonym count matches the site's reported count. TagID is the stable identity.</p>
+<p class="note">The harvest only reports <strong>COMPLETE: YES</strong> when every expected page is accounted for, unique TagIDs match the sum of harvested page rows, unique names match unique TagIDs, and every harvested synonym count reconciles. The site's displayed total is retained and shown, but it may lag the live pageable index; if observed rows are higher, Tag Gremlin confirms the live tail before accepting the corpus.</p>
 
 <h3>Export files</h3>
 <div class="code" id="exportCmd">cd ~/tag-gremlin

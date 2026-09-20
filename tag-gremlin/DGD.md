@@ -23,15 +23,18 @@ A harvest is COMPLETE only when all of the following are true:
 2. the final page number was discovered;
 3. every page from 1 through the final page has status `ok`;
 4. there are no failed or unresolved pages;
-5. the sum of parsed tag rows equals the reported total;
-6. the number of unique tag IDs equals the reported total;
-7. every tag's parsed synonym count equals its reported synonym count.
+5. the number of unique TagIDs equals the sum of parsed tag rows;
+6. the number of unique official names equals the unique TagID count;
+7. the observed corpus is not smaller than the site's displayed total;
+8. every tag's parsed synonym count equals its reported synonym count.
+
+The site's displayed total is retained as source metadata but is advisory rather than an absolute completeness invariant. The site can lag behind the live pageable index by a few rows. When the observed corpus is larger than the displayed counter, Tag Gremlin rechecks the live final page before accepting the observed unique/page-row count as complete.
 
 TagID is the identity invariant. Official names are data, not identity; a rename updates the row for that TagID rather than creating a new row.
 
 Anything else is incomplete. The CLI must say so explicitly.
 
-Do not silently discard malformed rows, duplicate TagIDs encountered across fetched pages, synonym mismatches, HTTP errors, or authentication failures. The SQLite primary key makes duplicate stored TagID rows impossible; overlapping TagIDs discovered during a crawl still make completeness verification fail because the unique TagID count cannot match the sum of page rows.
+Do not silently discard malformed rows, duplicate TagIDs encountered across fetched pages, synonym mismatches, HTTP errors, or authentication failures. The SQLite primary key makes duplicate stored TagID rows impossible; overlapping TagIDs discovered during a crawl still make completeness verification fail because the unique TagID count cannot match the sum of page rows. A displayed-total mismatch is reported explicitly rather than silently rewritten.
 
 ## Authentication and privacy
 
@@ -193,3 +196,12 @@ GitHub Actions tests run on `windows-latest` and cover:
 - schema-v1/v2/v3 to schema-v4 migration.
 
 No live target-site requests are made in CI.
+
+
+## Displayed total versus observed corpus
+
+The site's page-1 "N tags" counter can lag behind the actual pageable rows. Completeness therefore uses the harvested corpus itself as the strict cardinality check: every expected page must be OK, the sum of page row counts must equal the number of unique stored TagIDs, unique names must match unique TagIDs, and synonym counts must reconcile.
+
+If the displayed total is lower than the observed corpus, Tag Gremlin refreshes the live final page once before accepting the mismatch. The report shows both values and the signed delta. A displayed total that is higher than the observed corpus still blocks completeness because that indicates missing data or a source change that has not yet been caught up.
+
+A generation only becomes eligible to start a later full refresh after harvest finalization records it as the completed generation. Merely becoming structurally complete during a verification pass does not cause the next harvest invocation to throw away its page-resume state.

@@ -71,7 +71,7 @@ Strict verification:
 python3 tag_gremlin.py --db ~/tag-gremlin.sqlite3 verify
 ```
 
-A harvest is not reported COMPLETE unless every expected page is present, the unique TagID count and page-row totals match the site's reported total, and every synonym count reconciles. Official names are data rather than identity; TagID is the stable key.
+A harvest is not reported COMPLETE unless every expected page is present, unique TagIDs equal the sum of harvested page rows, unique names equal unique TagIDs, the observed corpus is not smaller than the site's displayed counter, and every synonym count reconciles. The displayed counter is shown for comparison but may lag the live pageable index.
 
 ## Export
 
@@ -132,3 +132,10 @@ The database stores `1234 -> "tagg5"`. The reverse export makes the same relatio
 ## Growing source during a crawl
 
 Because the live tag list keeps growing, Tag Gremlin rechecks page 1 after a long crawl. If the source total changed but still fits on the same final page, only that final page is refreshed to catch the newly appended tags; already-fetched interior pages are not rescanned. If growth created one or more new page numbers, those pages remain pending and the same command resumes only those missing pages.
+
+
+## If the site's displayed total is stale
+
+Tag Gremlin keeps the page-1 displayed total, but it does not blindly trust it over a fully consistent corpus. If all expected pages are OK and the database contains more unique TagIDs than the displayed counter, Tag Gremlin refreshes the live final page once to confirm the tail. If the unique-ID count still exactly matches the sum of page rows, the crawl can complete and the verification report shows the positive displayed/observed delta.
+
+A displayed total that is higher than the observed corpus still prevents completion.
