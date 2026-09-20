@@ -312,7 +312,11 @@ def parse_tags_page(html: str) -> ParsedPage:
 
 def open_db(path: Path) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(path)
+    try:
+        db = sqlite3.connect(path, timeout=30.0)
+        db.execute("PRAGMA busy_timeout=30000")
+    except sqlite3.OperationalError as exc:
+        raise RuntimeError(f"Could not open Tag Gremlin database {path}: {exc}") from exc
     db.execute("PRAGMA foreign_keys=ON")
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA synchronous=NORMAL")
@@ -574,15 +578,40 @@ def _domain_matches(hostname: str, cookie_host: str) -> bool:
     return host == domain or host.endswith("." + domain)
 
 
+def _snapshot_firefox_cookies(cookie_db: Path) -> sqlite3.Connection:
+    """Return an in-memory, transactionally consistent snapshot of cookies.sqlite."""
+    uri = "file:" + urllib.parse.quote(str(cookie_db.resolve())) + "?mode=ro"
+    source: sqlite3.Connection | None = None
+    snapshot: sqlite3.Connection | None = None
+    try:
+        source = sqlite3.connect(uri, uri=True, timeout=30.0)
+        source.execute("PRAGMA query_only=ON")
+        source.execute("PRAGMA busy_timeout=30000")
+        snapshot = sqlite3.connect(":memory:")
+        # SQLite's online backup API handles WAL correctly and waits/retries
+        # around short-lived writer locks without copying cookie data to disk.
+        source.backup(snapshot, pages=256, sleep=0.10)
+        return snapshot
+    except sqlite3.OperationalError as exc:
+        if snapshot is not None:
+            snapshot.close()
+        raise RuntimeError(
+            "Could not snapshot Firefox cookies.sqlite while Firefox was using it. "
+            "Wait a few seconds and retry; cookie values were not exported. "
+            f"SQLite said: {exc}"
+        ) from exc
+    finally:
+        if source is not None:
+            source.close()
+
+
 def load_firefox_cookiejar(profile: Path, target_url: str) -> tuple[http.cookiejar.CookieJar, int]:
     hostname = urllib.parse.urlsplit(target_url).hostname
     if not hostname:
         raise RuntimeError("Target URL has no hostname")
 
     cookie_db = profile / "cookies.sqlite"
-    uri = "file:" + urllib.parse.quote(str(cookie_db.resolve())) + "?mode=ro"
-    db = sqlite3.connect(uri, uri=True)
-    db.execute("PRAGMA query_only=ON")
+    db = _snapshot_firefox_cookies(cookie_db)
 
     columns = {row[1] for row in db.execute("PRAGMA table_info(moz_cookies)")}
     required = {"host", "path", "isSecure", "expiry", "name", "value"}
