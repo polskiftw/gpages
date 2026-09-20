@@ -20,7 +20,9 @@ import math
 import os
 import random
 import re
+import shutil
 import sqlite3
+import subprocess
 import statistics
 import sys
 import threading
@@ -581,6 +583,49 @@ def _domain_matches(hostname: str, cookie_host: str) -> bool:
     return host == domain or host.endswith("." + domain)
 
 
+def _firefox_running() -> bool:
+    proc = Path("/proc")
+    if not proc.exists():
+        return False
+    for entry in proc.iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            comm = (entry / "comm").read_text(encoding="utf-8").strip().casefold()
+        except (OSError, UnicodeError):
+            continue
+        if comm in {"firefox", "firefox-bin"}:
+            return True
+    return False
+
+
+def _reopen_firefox(profile: Path) -> None:
+    if _firefox_running():
+        return
+
+    exe = shutil.which("firefox")
+    if not exe:
+        print(
+            "Firefox is closed, but the 'firefox' executable was not found in PATH; "
+            "open Firefox manually.",
+            flush=True,
+        )
+        return
+
+    try:
+        subprocess.Popen(
+            [exe, "--profile", str(profile)],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+            close_fds=True,
+        )
+        print("Firefox reopened automatically.", flush=True)
+    except OSError as exc:
+        print(f"Could not reopen Firefox automatically: {exc}", flush=True)
+
+
 def _read_firefox_cookie_rows(
     cookie_db: Path, *, max_attempts: int = 8
 ) -> tuple[set[str], list[tuple[object, ...]]]:
@@ -897,6 +942,8 @@ def harvest(args: argparse.Namespace) -> int:
         "(values not shown).",
         flush=True,
     )
+    if args.reopen_firefox:
+        _reopen_firefox(profile)
 
     http = HarvesterHTTP(source_url, jar, timeout=args.timeout)
 
@@ -1302,6 +1349,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--firefox-profile",
         help="Firefox profile directory or cookies.sqlite path; default is auto-detect",
     )
+    p_harvest.add_argument(
+        "--no-reopen-firefox",
+        dest="reopen_firefox",
+        action="store_false",
+        help="Do not reopen Firefox automatically after its cookies have been loaded",
+    )
+    p_harvest.set_defaults(reopen_firefox=True)
     p_harvest.add_argument(
         "--initial-workers",
         type=int,
