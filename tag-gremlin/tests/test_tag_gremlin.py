@@ -589,5 +589,194 @@ class DatabaseTests(unittest.TestCase):
             db.close()
 
 
+    def test_reported_counter_can_lag_observed_complete_corpus(self):
+        parsed = tg.ParsedPage(
+            reported_total=5,
+            final_page=2,
+            tags=[
+                tg.TagRecord(1, "one", 1, 0, 0, 0, [], "", True),
+                tg.TagRecord(2, "two", 1, 0, 0, 0, [], "", True),
+                tg.TagRecord(3, "three", 1, 0, 0, 0, [], "", True),
+            ],
+            synonym_mismatches=0,
+        )
+        tail = tg.ParsedPage(
+            reported_total=5,
+            final_page=2,
+            tags=[
+                tg.TagRecord(4, "four", 1, 0, 0, 0, [], "", True),
+                tg.TagRecord(5, "five", 1, 0, 0, 0, [], "", True),
+                tg.TagRecord(6, "six", 1, 0, 0, 0, [], "", True),
+            ],
+            synonym_mismatches=0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db = tg.open_db(Path(tmp) / "lag.sqlite3")
+            tg.set_meta(db, "reported_total", 5)
+            tg.set_meta(db, "final_page", 2)
+            tg.set_meta(db, "rows_per_page", 3)
+            tg.set_meta(db, "crawl_generation", 1)
+            db.commit()
+            tg.write_page(
+                db,
+                page=1,
+                parsed=parsed,
+                generation=1,
+                attempts=1,
+                http_status=200,
+                latency_ms=1,
+                body_sha256="p1",
+            )
+            tg.write_page(
+                db,
+                page=2,
+                parsed=tail,
+                generation=1,
+                attempts=1,
+                http_status=200,
+                latency_ms=1,
+                body_sha256="p2",
+            )
+
+            report = tg.verify_db(db)
+            self.assertTrue(report["complete"])
+            self.assertEqual(report["reported_total"], 5)
+            self.assertEqual(report["tag_count"], 6)
+            self.assertEqual(report["page_tag_sum"], 6)
+            self.assertEqual(report["reported_delta"], 1)
+            db.close()
+
+    def test_reported_counter_ahead_of_corpus_is_not_complete(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = tg.open_db(Path(tmp) / "ahead.sqlite3")
+            tg.set_meta(db, "reported_total", 7)
+            tg.set_meta(db, "final_page", 2)
+            tg.set_meta(db, "rows_per_page", 3)
+            tg.set_meta(db, "crawl_generation", 1)
+            db.executemany(
+                """
+                INSERT INTO pages(
+                    page,status,attempts,http_status,latency_ms,tag_count,
+                    synonym_count,body_sha256,fetched_at,error
+                ) VALUES(?, 'ok', 1, 200, 1, 3, 0, '', '', NULL)
+                """,
+                [(1,), (2,)],
+            )
+            db.executemany(
+                """
+                INSERT INTO tags(
+                    tag_id,name,uses,upvotes,downvotes,reported_synonym_count,
+                    synonym_raw_text,synonym_parse_ok,last_seen_generation
+                ) VALUES(?,?,1,0,0,0,'',1,1)
+                """,
+                [(tag_id, f"tag-{tag_id}") for tag_id in range(1, 7)],
+            )
+            db.commit()
+
+            report = tg.verify_db(db)
+            self.assertFalse(report["complete"])
+            self.assertEqual(report["reported_delta"], -1)
+            db.close()
+
+    def test_stabilizer_confirms_tail_when_counter_lags(self):
+        def page_html(total, final_page, rows):
+            body = [
+                "<!doctype html><html><body>",
+                f"<div>{total} tags</div>",
+                f'<a href="tags.php?page={final_page}">Last</a>',
+                "<table>",
+            ]
+            for tag_id, name in rows:
+                body.append(
+                    "<tr>"
+                    f"<td>{tag_id}</td><td>{name}</td><td>1</td>"
+                    "<td>+0</td><td>-0</td><td>0 [+]</td>"
+                    "</tr>"
+                )
+                body.append(
+                    '<tr style="display:none"><td colspan="5"></td></tr>'
+                )
+            body.extend(["</table>", "</body></html>"])
+            return "".join(body)
+
+        page1_html = page_html(
+            5,
+            2,
+            [(1, "one"), (2, "two"), (3, "three")],
+        )
+        tail_html = page_html(
+            5,
+            2,
+            [(4, "four"), (5, "five"), (6, "six")],
+        )
+
+        class FakeHTTP:
+            def __init__(self):
+                self.tail_fetches = 0
+
+            def fetch_page(self, page, max_attempts):
+                if page == 2:
+                    self.tail_fetches += 1
+                html = page1_html if page == 1 else tail_html
+                return tg.FetchResult(
+                    page=page,
+                    html=html,
+                    status=200,
+                    attempts=1,
+                    latency_ms=1,
+                    had_retry=False,
+                    body_sha256=f"page-{page}",
+                )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db = tg.open_db(Path(tmp) / "confirm.sqlite3")
+            tg.set_meta(db, "reported_total", 5)
+            tg.set_meta(db, "final_page", 2)
+            tg.set_meta(db, "rows_per_page", 3)
+            tg.set_meta(db, "crawl_generation", 1)
+            db.executemany(
+                """
+                INSERT INTO pages(
+                    page,status,attempts,http_status,latency_ms,tag_count,
+                    synonym_count,body_sha256,fetched_at,error
+                ) VALUES(?, 'ok', 1, 200, 1, 3, 0, '', '', NULL)
+                """,
+                [(1,), (2,)],
+            )
+            db.executemany(
+                """
+                INSERT INTO tags(
+                    tag_id,name,uses,upvotes,downvotes,reported_synonym_count,
+                    synonym_raw_text,synonym_parse_ok,last_seen_generation
+                ) VALUES(?,?,1,0,0,0,'',1,1)
+                """,
+                [
+                    (1, "one"),
+                    (2, "two"),
+                    (3, "three"),
+                    (4, "four"),
+                    (5, "five"),
+                    (6, "six"),
+                ],
+            )
+            db.commit()
+
+            http = FakeHTTP()
+            report, final_page, rows_per_page = tg.stabilize_growing_source(
+                db,
+                http,
+                generation=1,
+                rows_per_page=3,
+                max_attempts=5,
+            )
+
+            self.assertTrue(report["complete"])
+            self.assertEqual(report["reported_delta"], 1)
+            self.assertEqual((final_page, rows_per_page), (2, 3))
+            self.assertEqual(http.tail_fetches, 1)
+            db.close()
+
+
 if __name__ == "__main__":
     unittest.main()
