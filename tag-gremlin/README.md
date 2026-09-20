@@ -16,8 +16,7 @@ For every official tag:
 - positive votes
 - negative votes
 - reported synonym count
-- synonym strings already embedded in the page's hidden detail row
-- resolved synonym TagIDs when a synonym string exactly matches one unique official tag name
+- synonym/alias strings already embedded in the page's hidden detail row
 
 The crawler never prints cookie values and never writes Firefox cookies into its database.
 
@@ -56,7 +55,7 @@ If the current crawl is incomplete, pages already committed with status `ok` are
 
 Tags are keyed only by TagID, not by the page where they appeared. If a growing site pushes TagID 123 from page 32 to page 47, the refresh updates the existing TagID 123 row; it cannot create a second row because TagID is the SQLite primary key.
 
-After a new generation verifies COMPLETE, old TagIDs that were not seen anywhere in that generation are removed. Then every raw synonym string is resolved again against the current tag table. An exact unique name match gets that target TagID; zero matches remain `missing`; duplicate exact-name matches remain `ambiguous`. Interrupted refreshes do not purge old rows.
+After a new generation verifies COMPLETE, old TagIDs that were not seen anywhere in that generation are removed. Synonym rows remain simple aliases attached to their owning official TagID. Interrupted refreshes do not purge old rows.
 
 Ctrl-C is safe: completed pages have already been committed.
 
@@ -89,8 +88,8 @@ Outputs:
 
 - `tags.txt` - one official tag per line; intended as the simple corpus input for search/regex tooling
 - `tags.tsv` - tag metadata
-- `synonyms.tsv` - source official tag -> raw synonym, plus resolved target TagID/name and resolution status
-- `synonym-map.tsv` - the same relationship with the synonym string first
+- `synonyms.tsv` - official TagID/name -> alias string
+- `synonym-map.tsv` - alias string -> official TagID/name
 
 Partial export is deliberately blocked. For debugging only, `export --allow-incomplete` overrides that protection.
 
@@ -117,17 +116,19 @@ The old `tag-harvester/` bookmarklet/autocomplete implementations and the v10 sc
 See [DGD.md](DGD.md) for the canonical design, data model, and completeness rules.
 
 
-## Synonym TagID resolution
+## Synonym semantics
 
-The raw synonym string remains the source-of-truth field. After a complete crawl, Tag Gremlin additionally resolves that string to an official TagID when there is exactly one exact, case-sensitive official-name match in the current generation.
+The site's "synonyms" are alternate spellings, typos, or aliases for an official tag. They do not represent separate tag entities with their own IDs. Tag Gremlin stores each alias against the official TagID it belongs to.
 
 Example:
 
 ```text
-source TagID 1234 ("tag5")
-raw synonym "tag6"
-resolved target TagID 5678 ("tag6")
-status exact
+official TagID 1234 ("tag5")
+alias "tagg5"
 ```
 
-If no current official tag has that exact name, the target ID stays empty with status `missing`. If more than one current official tag has that exact name, the target ID stays empty with status `ambiguous`. No fuzzy or case-insensitive guess is made.
+The database stores `1234 -> "tagg5"`. The reverse export makes the same relationship easy to use as `"tagg5" -> 1234 ("tag5")`.
+
+## Growing source during a crawl
+
+Because the live tag list keeps growing, Tag Gremlin rechecks page 1 after a long crawl. If the source total changed but still fits in the same final page, the metadata is updated and verification can complete without rescanning the already-fetched pages. If growth created one or more new page numbers, those pages remain pending and the same command resumes only those missing pages.
