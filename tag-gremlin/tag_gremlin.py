@@ -1373,6 +1373,104 @@ def recheck_live_source_shape(
     return total, final_page, rows_per_page
 
 
+def _refresh_final_page_for_growth(
+    db: sqlite3.Connection,
+    http: HarvesterHTTP,
+    *,
+    generation: int,
+    final_page: int,
+    rows_per_page: int,
+    max_attempts: int,
+) -> None:
+    """Refresh only the tail page when an append-only growing source gained rows."""
+    print(
+        f"Refreshing final page {final_page:,} to catch newly added tags...",
+        flush=True,
+    )
+    result = http.fetch_page(final_page, max_attempts)
+    parsed = parse_tags_page(result.html)
+
+    if not parsed.tags:
+        raise RuntimeError(
+            f"Final page {final_page} returned no official tag rows during growth catch-up"
+        )
+    if parsed.synonym_mismatches:
+        raise RuntimeError(
+            f"Final page {final_page} has {parsed.synonym_mismatches} "
+            "synonym mismatch(es) during growth catch-up"
+        )
+    if len(parsed.tags) > rows_per_page:
+        raise RuntimeError(
+            f"Final page {final_page} parsed {len(parsed.tags)} rows, "
+            f"above the normal page capacity of {rows_per_page}"
+        )
+
+    write_page(
+        db,
+        page=final_page,
+        parsed=parsed,
+        generation=generation,
+        attempts=result.attempts,
+        http_status=result.status,
+        latency_ms=result.latency_ms,
+        body_sha256=result.body_sha256,
+    )
+
+
+def stabilize_growing_source(
+    db: sqlite3.Connection,
+    http: HarvesterHTTP,
+    *,
+    generation: int,
+    rows_per_page: int,
+    max_attempts: int,
+    rounds: int = 3,
+) -> tuple[dict[str, object], int, int]:
+    """Reconcile live growth without rescanning already-OK interior pages."""
+    final_page = int(get_meta(db, "final_page") or "0")
+
+    for _ in range(max(1, rounds)):
+        previous_final_page = final_page
+        total, final_page, rows_per_page = recheck_live_source_shape(
+            db,
+            http,
+            max_attempts=max_attempts,
+            expected_rows_per_page=rows_per_page,
+        )
+        report = verify_db(db)
+
+        if report["complete"]:
+            return report, final_page, rows_per_page
+
+        if final_page > previous_final_page:
+            print(
+                f"The site grew into {final_page - previous_final_page:,} new page(s). "
+                "Rerun the same command; only those newly missing pages will be fetched.",
+                flush=True,
+            )
+            return report, final_page, rows_per_page
+
+        tag_count = int(report["tag_count"])
+        if final_page == previous_final_page and total > tag_count:
+            print(
+                f"Live total is {total - tag_count:,} tag(s) ahead of the saved corpus.",
+                flush=True,
+            )
+            _refresh_final_page_for_growth(
+                db,
+                http,
+                generation=generation,
+                final_page=final_page,
+                rows_per_page=rows_per_page,
+                max_attempts=max_attempts,
+            )
+            continue
+
+        return report, final_page, rows_per_page
+
+    return verify_db(db), final_page, rows_per_page
+
+
 def print_progress(db: sqlite3.Connection, final_page: int) -> None:
     row = db.execute(
         """
@@ -1505,7 +1603,13 @@ def harvest(args: argparse.Namespace) -> int:
     pending = [page for page in range(1, final_page + 1) if page not in ok_pages]
     if not pending:
         print("All pages are already harvested.")
-        report = verify_db(db)
+        report, final_page, rows_per_page = stabilize_growing_source(
+            db,
+            http,
+            generation=generation,
+            rows_per_page=rows_per_page,
+            max_attempts=args.max_attempts,
+        )
         if report["complete"]:
             stale = finalize_generation(db, generation)
             if stale:
@@ -1636,23 +1740,15 @@ def harvest(args: argparse.Namespace) -> int:
             "Stopping because synonym parsing no longer matches the site. "
             "Saved OK pages remain resumable."
         )
+        report = verify_db(db)
     else:
-        previous_final_page = final_page
-        total, final_page, rows_per_page = recheck_live_source_shape(
+        report, final_page, rows_per_page = stabilize_growing_source(
             db,
             http,
+            generation=generation,
+            rows_per_page=rows_per_page,
             max_attempts=args.max_attempts,
-            expected_rows_per_page=rows_per_page,
         )
-        if final_page > previous_final_page:
-            print(
-                f"The site grew into {final_page - previous_final_page:,} new page(s) "
-                "while this crawl was running. Rerun the same command; only those "
-                "newly missing pages will be fetched.",
-                flush=True,
-            )
-
-    report = verify_db(db)
     if report["complete"]:
         stale = finalize_generation(db, generation)
         if stale:
