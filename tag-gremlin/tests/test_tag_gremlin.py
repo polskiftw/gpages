@@ -93,6 +93,22 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(parsed.tags[2].synonyms, ["one", "two"])
 
 
+class CliTests(unittest.TestCase):
+    def test_numeric_worker_shorthand(self):
+        self.assertEqual(
+            tg._expand_numeric_worker_shorthand(
+                ["harvest", "--url", "https://example.invalid/tags.php", "-8"]
+            ),
+            [
+                "harvest",
+                "--url",
+                "https://example.invalid/tags.php",
+                "--workers",
+                "8",
+            ],
+        )
+
+
 class DatabaseTests(unittest.TestCase):
     def test_complete_database_and_exports(self):
         parsed = tg.parse_tags_page(FIXTURE)
