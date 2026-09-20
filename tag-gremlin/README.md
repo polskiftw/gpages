@@ -108,3 +108,16 @@ python3 tag_gremlin.py \
 The old `tag-harvester/` bookmarklet/autocomplete implementations and the v10 scheduler lab remain in the repository as historical/reference work. They are not imported into a new desktop harvest.
 
 See [DGD.md](DGD.md) for the canonical design, data model, and completeness rules.
+
+
+### Fixed workers
+
+Harvesting now uses a fixed continuous worker pool. A worker immediately takes another pending page after its current page finishes. Slow pages, timeouts, 429s, and transient HTTP failures only delay/retry that worker's own request; they do not reduce the global worker count.
+
+Use `-8` as shorthand for eight fixed workers:
+
+```bash
+python3 tag_gremlin.py --db ~/tag-gremlin.sqlite3 harvest --url 'https://YOUR-SITE/tags.php?page=1' -8
+```
+
+The long form is `--workers 8`.
