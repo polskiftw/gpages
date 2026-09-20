@@ -45,7 +45,7 @@ python3 tag_gremlin.py \
   --firefox-profile ~/.mozilla/firefox/<profile>.default-esr
 ```
 
-Firefox may remain open. The cookie database is opened read-only.
+Firefox may remain open on systems that allow a concurrent read. If Tag Gremlin reports that `cookies.sqlite` stayed locked, close Firefox completely, start Tag Gremlin again, and reopen Firefox after the line `Loaded ... matching cookie(s)` appears. The cookie values are only kept in memory and are not written to the Tag Gremlin database.
 
 ## Resume
 
