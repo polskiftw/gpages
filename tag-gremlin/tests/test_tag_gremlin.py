@@ -491,5 +491,103 @@ class DatabaseTests(unittest.TestCase):
             db.close()
 
 
+    def test_stabilizer_catches_growth_on_existing_final_page(self):
+        def page_html(total, final_page, rows):
+            body = [
+                "<!doctype html><html><body>",
+                f"<div>{total} tags</div>",
+                f'<a href="tags.php?page={final_page}">Last</a>',
+                "<table>",
+            ]
+            for tag_id, name in rows:
+                body.append(
+                    "<tr>"
+                    f"<td>{tag_id}</td><td>{name}</td><td>1</td>"
+                    "<td>+0</td><td>-0</td><td>0 [+]</td>"
+                    "</tr>"
+                )
+                body.append(
+                    '<tr style="display:none"><td colspan="5"></td></tr>'
+                )
+            body.extend(["</table>", "</body></html>"])
+            return "".join(body)
+
+        first_html = page_html(
+            1001,
+            334,
+            [(1, "tag-1"), (2, "tag-2"), (3, "tag-3")],
+        )
+        tail_html = page_html(
+            1001,
+            334,
+            [(1000, "tag-1000"), (1001, "tag-1001")],
+        )
+
+        class FakeHTTP:
+            def fetch_page(self, page, max_attempts):
+                html = first_html if page == 1 else tail_html
+                return tg.FetchResult(
+                    page=page,
+                    html=html,
+                    status=200,
+                    attempts=1,
+                    latency_ms=1,
+                    had_retry=False,
+                    body_sha256=f"page-{page}",
+                )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db = tg.open_db(Path(tmp) / "tail.sqlite3")
+            tg.set_meta(db, "reported_total", 1000)
+            tg.set_meta(db, "final_page", 334)
+            tg.set_meta(db, "rows_per_page", 3)
+            tg.set_meta(db, "crawl_generation", 1)
+
+            db.executemany(
+                """
+                INSERT INTO pages(
+                    page,status,attempts,http_status,latency_ms,tag_count,
+                    synonym_count,body_sha256,fetched_at,error
+                ) VALUES(?, 'ok', 1, 200, 1, ?, 0, '', '', NULL)
+                """,
+                [
+                    (page, 1 if page == 334 else 3)
+                    for page in range(1, 335)
+                ],
+            )
+            db.executemany(
+                """
+                INSERT INTO tags(
+                    tag_id,name,uses,upvotes,downvotes,reported_synonym_count,
+                    synonym_raw_text,synonym_parse_ok,last_seen_generation
+                ) VALUES(?,?,1,0,0,0,'',1,1)
+                """,
+                [(tag_id, f"tag-{tag_id}") for tag_id in range(1, 1001)],
+            )
+            db.commit()
+
+            report, final_page, rows_per_page = tg.stabilize_growing_source(
+                db,
+                FakeHTTP(),
+                generation=1,
+                rows_per_page=3,
+                max_attempts=5,
+            )
+
+            self.assertTrue(report["complete"])
+            self.assertEqual(final_page, 334)
+            self.assertEqual(rows_per_page, 3)
+            self.assertEqual(report["reported_total"], 1001)
+            self.assertEqual(report["tag_count"], 1001)
+            self.assertEqual(report["page_tag_sum"], 1001)
+            self.assertEqual(
+                db.execute(
+                    "SELECT name FROM tags WHERE tag_id=1001"
+                ).fetchone()[0],
+                "tag-1001",
+            )
+            db.close()
+
+
 if __name__ == "__main__":
     unittest.main()

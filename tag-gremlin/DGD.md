@@ -57,7 +57,9 @@ The crawler is resumable and uses a fixed continuous worker pool.
 - honor `Retry-After` on HTTP 429 when present;
 - retry transient failures with bounded exponential backoff plus jitter;
 - within an incomplete crawl, pages already committed with status `ok` are skipped;
-- after a long crawl, page 1 is rechecked so a source-total increase during the run can be reconciled without rescanning already-completed pages; if the growth created new page numbers, those pages remain pending for the next resume.
+- after a long crawl, page 1 is rechecked so a source-total increase during the run can be reconciled without rescanning already-completed interior pages;
+- if the total grew but still fits on the same final page, only that final page is refreshed to catch the appended tags;
+- if growth created new page numbers, those pages remain pending for the next resume.
 
 Local CPU and RAM may be used freely for parsing, validation, indexing, and exports.
 
