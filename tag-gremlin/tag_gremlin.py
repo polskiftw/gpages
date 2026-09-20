@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import configparser
 import csv
+from collections import Counter
 import hashlib
 import http.cookiejar
 import json
@@ -76,6 +77,8 @@ class CellCapture:
     text: str = ""
     colspan: int = 1
     links: list[LinkCapture] = field(default_factory=list)
+    data_parts: list[str] = field(default_factory=list)
+    child_tags: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -149,6 +152,9 @@ class TagsHTMLParser(HTMLParser):
             self._current_row.cells.append(self._current_cell)
             return
 
+        if self._current_cell is not None and tag not in ("td", "th"):
+            self._current_cell.child_tags.append(tag)
+
         if tag == "a":
             href = attrs_d.get("href", "")
             if href:
@@ -192,6 +198,7 @@ class TagsHTMLParser(HTMLParser):
         self.all_text.append(data)
         if self._current_cell is not None:
             self._current_cell.text += data
+            self._current_cell.data_parts.append(data)
         if self._current_link_href is not None:
             self._current_link_text.append(data)
 
@@ -211,6 +218,99 @@ def _looks_like_detail_row(row: RowCapture) -> bool:
     return len(row.cells) == 1 and row.cells[0].colspan >= 5
 
 
+def _safe_parser_diagnostic(html: str) -> dict[str, object]:
+    """Describe parser shape without emitting tag names, IDs, cookie data, or raw HTML."""
+    parser = TagsHTMLParser()
+    parser.feed(html)
+    parser.close()
+
+    rows = [row for table in parser.tables for row in table]
+    six = [row for row in rows if len(row.cells) == 6]
+    details = [row for row in rows if _looks_like_detail_row(row)]
+
+    reject = Counter()
+    for row in six:
+        if parse_int(row.cells[0].text) is None:
+            reject["tag_id_not_numeric"] += 1
+        if not clean_space(row.cells[1].text):
+            reject["name_empty"] += 1
+        if parse_int(row.cells[2].text) is None:
+            reject["uses_not_numeric"] += 1
+        if parse_int(row.cells[5].text) is None:
+            reject["synonym_count_not_numeric_or_blank"] += 1
+
+    link_dist = Counter(len(row.cells[0].links) for row in details)
+    nonempty_parts_dist = Counter(
+        sum(1 for part in row.cells[0].data_parts if clean_space(part))
+        for row in details
+    )
+    tag_pattern_dist = Counter(
+        ",".join(row.cells[0].child_tags) or "(none)"
+        for row in details
+    )
+
+    samples: list[dict[str, object]] = []
+    for table in parser.tables:
+        previous_six: RowCapture | None = None
+        for row in table:
+            if len(row.cells) == 6:
+                previous_six = row
+                continue
+            if not _looks_like_detail_row(row):
+                continue
+            cell = row.cells[0]
+            raw = "".join(cell.data_parts)
+            if not clean_space(raw):
+                continue
+            reported = (
+                parse_int(previous_six.cells[5].text)
+                if previous_six is not None
+                else None
+            )
+            parts = [clean_space(x) for x in cell.data_parts if clean_space(x)]
+            samples.append(
+                {
+                    "reported_synonyms": reported,
+                    "text_characters": len(clean_space(raw)),
+                    "link_count": len(cell.links),
+                    "nonempty_text_nodes": len(parts),
+                    "text_node_lengths": [len(x) for x in parts[:12]],
+                    "child_tag_counts": dict(Counter(cell.child_tags)),
+                    "punctuation_counts": {
+                        "comma": raw.count(","),
+                        "semicolon": raw.count(";"),
+                        "pipe": raw.count("|"),
+                        "newline": raw.count("\n"),
+                    },
+                }
+            )
+            if len(samples) >= 5:
+                break
+        if len(samples) >= 5:
+            break
+
+    return {
+        "tables": len(parser.tables),
+        "rows_total": len(rows),
+        "six_cell_rows": len(six),
+        "recognized_tag_rows": sum(1 for row in six if _looks_like_tag_row(row)),
+        "six_cell_rejection_reasons": dict(reject),
+        "detail_rows": len(details),
+        "detail_rows_with_text": sum(
+            1 for row in details if clean_space(row.cells[0].text)
+        ),
+        "detail_link_count_distribution": dict(sorted(link_dist.items())),
+        "detail_text_node_count_distribution": dict(
+            sorted(nonempty_parts_dist.items())
+        ),
+        "detail_child_tag_patterns_top5": [
+            {"pattern": pattern, "count": count}
+            for pattern, count in tag_pattern_dist.most_common(5)
+        ],
+        "detail_samples": samples,
+    }
+
+
 def _synonyms_from_detail(cell: CellCapture | None) -> tuple[list[str], str]:
     if cell is None:
         return [], ""
@@ -219,6 +319,9 @@ def _synonyms_from_detail(cell: CellCapture | None) -> tuple[list[str], str]:
     values: list[str] = []
     seen: set[str] = set()
 
+    # Prefer explicit links when the site supplies them. The real site may instead
+    # render synonym names as plain text; the canary diagnostic below detects that
+    # shape before any bulk crawl is allowed.
     for link in cell.links:
         text = clean_space(link.text)
         if not text:
@@ -1002,6 +1105,27 @@ def harvest(args: argparse.Namespace) -> int:
     first_parsed = parse_tags_page(first_fetch.html)
     total, final_page, rows_per_page = inspect_first_page(first_parsed)
 
+    inferred_page_capacity = (
+        math.ceil(total / final_page) if final_page and total else rows_per_page
+    )
+    canary_problem = (
+        first_parsed.synonym_mismatches > 0
+        or rows_per_page != inferred_page_capacity
+    )
+    if canary_problem:
+        print("")
+        print("PARSER DIAGNOSTIC (privacy-safe; no tag names/IDs/raw HTML)")
+        print("--------------------------------------------------------")
+        print(json.dumps(_safe_parser_diagnostic(first_fetch.html), indent=2))
+        print("")
+        raise RuntimeError(
+            "Page 1 parser canary failed: "
+            f"parsed {rows_per_page} tag rows, expected about "
+            f"{inferred_page_capacity}, with "
+            f"{first_parsed.synonym_mismatches} synonym mismatch(es). "
+            "Bulk crawl was not started."
+        )
+
     set_meta(db, "source_url", source_url)
     set_meta(db, "reported_total", total)
     set_meta(db, "final_page", final_page)
@@ -1026,12 +1150,6 @@ def harvest(args: argparse.Namespace) -> int:
         f"Site reports {total:,} official tags across {final_page:,} page(s); "
         f"page 1 contains {rows_per_page} tag rows."
     )
-    if first_parsed.synonym_mismatches:
-        raise RuntimeError(
-            "Page 1 has "
-            f"{first_parsed.synonym_mismatches} synonym parse mismatch(es). "
-            "Bulk crawl aborted so a parser mismatch cannot contaminate thousands of pages."
-        )
 
     ok_pages = {
         row[0]
