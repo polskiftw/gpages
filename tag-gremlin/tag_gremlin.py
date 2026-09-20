@@ -46,7 +46,7 @@ MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"
 
 _INT_RE = re.compile(r"[-+]?\d[\d,]*")
-_TOTAL_RE = re.compile(r"\b(\d[\d,]{3,})\s+tags?\b", re.IGNORECASE)
+_TOTAL_RE = re.compile(r"\b(\d[\d,]*)\s+tags?\b", re.IGNORECASE)
 
 
 def now_iso() -> str:
