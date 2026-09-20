@@ -131,11 +131,11 @@ The database stores `1234 -> "tagg5"`. The reverse export makes the same relatio
 
 ## Growing source during a crawl
 
-Because the live tag list keeps growing, Tag Gremlin rechecks page 1 after a long crawl. If the source total changed but still fits on the same final page, only that final page is refreshed to catch the newly appended tags; already-fetched interior pages are not rescanned. If growth created one or more new page numbers, those pages remain pending and the same command resumes only those missing pages.
+Because the live tag list keeps growing, Tag Gremlin rechecks page 1 after a long crawl. If the displayed total is ahead of the saved corpus and the final page number is unchanged, only that tail page is refreshed to catch genuinely missing appended rows. If the saved corpus is already internally complete and merely ahead of a stale displayed counter, it is left untouched. If growth created one or more new page numbers, those pages remain pending and the same command resumes only those missing pages.
 
 
 ## If the site's displayed total is stale
 
-Tag Gremlin keeps the page-1 displayed total, but it does not blindly trust it over a fully consistent corpus. If all expected pages are OK and the database contains more unique TagIDs than the displayed counter, Tag Gremlin refreshes the live final page once to confirm the tail. If the unique-ID count still exactly matches the sum of page rows, the crawl can complete and the verification report shows the positive displayed/observed delta.
+Tag Gremlin keeps the page-1 displayed total, but it does not blindly trust it over a fully consistent corpus. If all expected pages are OK and the database contains more unique TagIDs than the displayed counter, the already-consistent snapshot is kept unchanged and the verification report shows the positive displayed/observed delta.
 
-A displayed total that is higher than the observed corpus still prevents completion.
+A displayed total that is higher than the observed corpus still prevents completion. Current builds also repair the narrow bookkeeping side effect from the older "refresh the final page to confirm" behavior without altering harvested tag or alias rows.
