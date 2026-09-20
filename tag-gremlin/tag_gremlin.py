@@ -1323,6 +1323,56 @@ def inspect_first_page(parsed: ParsedPage) -> tuple[int, int, int]:
     return parsed.reported_total, final_page, rows_per_page
 
 
+def recheck_live_source_shape(
+    db: sqlite3.Connection,
+    http: HarvesterHTTP,
+    *,
+    max_attempts: int,
+    expected_rows_per_page: int,
+) -> tuple[int, int, int]:
+    """Refresh the live total/page count after a long crawl without rescanning pages."""
+    print("Rechecking live tag total after crawl...", flush=True)
+    fetched = http.fetch_page(1, max_attempts)
+    parsed = parse_tags_page(fetched.html)
+    total, final_page, rows_per_page = inspect_first_page(parsed)
+
+    inferred_page_capacity = (
+        math.ceil(total / final_page) if final_page and total else rows_per_page
+    )
+    if (
+        parsed.synonym_mismatches > 0
+        or rows_per_page != expected_rows_per_page
+        or rows_per_page != inferred_page_capacity
+    ):
+        raise RuntimeError(
+            "Final source recheck failed the page-1 parser canary; "
+            "leaving the crawl incomplete rather than guessing."
+        )
+
+    old_total = get_meta(db, "reported_total")
+    old_final = get_meta(db, "final_page")
+    set_meta(db, "reported_total", total)
+    set_meta(db, "final_page", final_page)
+    set_meta(db, "rows_per_page", rows_per_page)
+    set_meta(db, "source_rechecked_at", now_iso())
+    set_meta(db, "updated_at", now_iso())
+    db.commit()
+
+    old_total_int = int(old_total) if old_total and old_total.isdigit() else None
+    old_final_int = int(old_final) if old_final and old_final.isdigit() else None
+    if old_total_int != total or old_final_int != final_page:
+        before = "unknown" if old_total_int is None else f"{old_total_int:,}"
+        print(
+            f"Live source changed during crawl: {before} -> {total:,} tags; "
+            f"final page is now {final_page:,}.",
+            flush=True,
+        )
+    else:
+        print("Live source total is unchanged.", flush=True)
+
+    return total, final_page, rows_per_page
+
+
 def print_progress(db: sqlite3.Connection, final_page: int) -> None:
     row = db.execute(
         """
@@ -1586,6 +1636,21 @@ def harvest(args: argparse.Namespace) -> int:
             "Stopping because synonym parsing no longer matches the site. "
             "Saved OK pages remain resumable."
         )
+    else:
+        previous_final_page = final_page
+        total, final_page, rows_per_page = recheck_live_source_shape(
+            db,
+            http,
+            max_attempts=args.max_attempts,
+            expected_rows_per_page=rows_per_page,
+        )
+        if final_page > previous_final_page:
+            print(
+                f"The site grew into {final_page - previous_final_page:,} new page(s) "
+                "while this crawl was running. Rerun the same command; only those "
+                "newly missing pages will be fetched.",
+                flush=True,
+            )
 
     report = verify_db(db)
     if report["complete"]:
