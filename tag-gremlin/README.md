@@ -47,9 +47,15 @@ python3 tag_gremlin.py \
 
 Be logged into the target site in Firefox before starting. By default, Tag Gremlin closes Firefox cleanly, reads the matching cookies from `cookies.sqlite`, then reopens the same Firefox profile automatically. Use `--no-close-firefox` or `--no-reopen-firefox` only if you intentionally want to override that behavior. The cookie values are only kept in memory and are not written to the Tag Gremlin database.
 
-## Resume
+## Resume and later refreshes
 
-Just run the same harvest command again. Pages already committed with status `ok` are skipped.
+Just run the same harvest command again.
+
+If the current crawl is incomplete, pages already committed with status `ok` are skipped and that crawl resumes. If the database already has a COMPLETE crawl, running harvest again automatically starts a new refresh generation and re-fetches the whole current tag index.
+
+Tags are keyed only by TagID, not by the page where they appeared. If a growing site pushes TagID 123 from page 32 to page 47, the refresh updates the existing TagID 123 row; it cannot create a second row because TagID is the SQLite primary key.
+
+After a new generation verifies COMPLETE, old TagIDs that were not seen anywhere in that generation are removed. Interrupted refreshes do not purge old rows.
 
 Ctrl-C is safe: completed pages have already been committed.
 
@@ -65,7 +71,7 @@ Strict verification:
 python3 tag_gremlin.py --db ~/tag-gremlin.sqlite3 verify
 ```
 
-A harvest is not reported COMPLETE unless every expected page is present, tag counts match the site's reported total, tag IDs/names are unique, and every synonym count reconciles.
+A harvest is not reported COMPLETE unless every expected page is present, the unique TagID count and page-row totals match the site's reported total, and every synonym count reconciles. Official names are data rather than identity; TagID is the stable key.
 
 ## Export
 
@@ -89,35 +95,22 @@ Partial export is deliberately blocked. For debugging only, `export --allow-inco
 
 ## Network behavior
 
-The default starts at 2 concurrent requests and can rise to at most 4 after sustained clean, fast batches. It backs off when latency rises or retries occur.
-
-HTTP 429 honors `Retry-After` when the server provides it. Transient network/5xx failures use bounded exponential backoff and jitter.
-
-You can lower the ceiling if desired:
+Harvesting uses a fixed continuous worker pool. Use `-8` for eight workers or the long form `--workers 8`:
 
 ```bash
 python3 tag_gremlin.py \
   --db ~/tag-gremlin.sqlite3 \
   harvest \
   --url 'https://SITE/tags.php' \
-  --max-workers 2
+  -8
 ```
+
+All workers share one central pending-page iterator, so page assignments cannot overlap. As soon as a worker finishes one page, it takes the next unused page.
+
+A timeout, 429, or transient server/network error backs off and retries only that worker's current request. The other workers continue at full speed. HTTP 429 honors `Retry-After` when supplied.
 
 ## Old Gremlin
 
 The old `tag-harvester/` bookmarklet/autocomplete implementations and the v10 scheduler lab remain in the repository as historical/reference work. They are not imported into a new desktop harvest.
 
 See [DGD.md](DGD.md) for the canonical design, data model, and completeness rules.
-
-
-### Fixed workers
-
-Harvesting now uses a fixed continuous worker pool. A worker immediately takes another pending page after its current page finishes. Slow pages, timeouts, 429s, and transient HTTP failures only delay/retry that worker's own request; they do not reduce the global worker count.
-
-Use `-8` as shorthand for eight fixed workers:
-
-```bash
-python3 tag_gremlin.py --db ~/tag-gremlin.sqlite3 harvest --url 'https://YOUR-SITE/tags.php?page=1' -8
-```
-
-The long form is `--workers 8`.
