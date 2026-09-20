@@ -1417,6 +1417,78 @@ def _refresh_final_page_for_growth(
     )
 
 
+def repair_tail_confirmation_bookkeeping(
+    db: sqlite3.Connection,
+    *,
+    final_page: int,
+    rows_per_page: int,
+) -> bool:
+    """Repair the old tail-confirmation side effect without changing harvested tags."""
+    report = verify_db(db)
+    tag_count = int(report["tag_count"])
+    page_tag_sum = int(report["page_tag_sum"])
+    total = report["reported_total"]
+
+    if (
+        final_page < 1
+        or page_tag_sum <= tag_count
+        or int(report["ok_pages"]) != final_page
+        or int(report["failed_pages"]) != 0
+        or int(report["parse_error_pages"]) != 0
+        or int(report["unique_names"]) != tag_count
+        or int(report["synonym_mismatches"]) != 0
+        or int(report["edge_mismatches"]) != 0
+        or report["missing_pages"]
+        or not isinstance(total, int)
+        or tag_count < total
+    ):
+        return False
+
+    other_sum = db.execute(
+        """
+        SELECT COALESCE(SUM(tag_count),0)
+        FROM pages
+        WHERE status IN ('ok','parse_error') AND page<>?
+        """,
+        (final_page,),
+    ).fetchone()[0]
+    current_tail_row = db.execute(
+        "SELECT tag_count FROM pages WHERE page=? AND status='ok'",
+        (final_page,),
+    ).fetchone()
+    if current_tail_row is None:
+        return False
+
+    current_tail = int(current_tail_row[0] or 0)
+    desired_tail = tag_count - int(other_sum or 0)
+    excess = current_tail - desired_tail
+
+    if (
+        desired_tail < 1
+        or desired_tail > rows_per_page
+        or excess < 1
+        or excess != page_tag_sum - tag_count
+    ):
+        return False
+
+    db.execute(
+        "UPDATE pages SET tag_count=? WHERE page=?",
+        (desired_tail, final_page),
+    )
+    set_meta(db, "tail_bookkeeping_repair_at", now_iso())
+    set_meta(db, "tail_bookkeeping_repair_rows", excess)
+    set_meta(db, "updated_at", now_iso())
+    db.commit()
+
+    print(
+        f"Repaired final-page bookkeeping from an earlier live-tail confirmation "
+        f"({current_tail:,} -> {desired_tail:,} rows); harvested tag/synonym data "
+        "was not changed.",
+        flush=True,
+    )
+    return True
+
+
 def stabilize_growing_source(
     db: sqlite3.Connection,
     http: HarvesterHTTP,
@@ -1426,9 +1498,8 @@ def stabilize_growing_source(
     max_attempts: int,
     rounds: int = 3,
 ) -> tuple[dict[str, object], int, int]:
-    """Reconcile live growth without rescanning already-OK interior pages."""
+    """Reconcile live growth without mutating an already-consistent snapshot."""
     final_page = int(get_meta(db, "final_page") or "0")
-    tail_checked_for_counter_mismatch = False
 
     for _ in range(max(1, rounds)):
         previous_final_page = final_page
@@ -1441,31 +1512,32 @@ def stabilize_growing_source(
         report = verify_db(db)
         tag_count = int(report["tag_count"])
 
+        # Older builds tried to "confirm" a stale displayed counter by writing
+        # the current live final page back into an otherwise complete snapshot.
+        # If pagination shifted, that changed only the page-row bookkeeping and
+        # created an overlap. Repair that narrow legacy side effect in place.
         if (
-            report["complete"]
-            and total != tag_count
-            and final_page == previous_final_page
-            and not tail_checked_for_counter_mismatch
-        ):
-            direction = "ahead of" if tag_count > total else "behind"
-            print(
-                f"Observed corpus is {abs(tag_count - total):,} tag(s) {direction} "
-                "the site's displayed counter; refreshing the live final page once "
-                "to confirm the tail.",
-                flush=True,
-            )
-            _refresh_final_page_for_growth(
+            int(report["page_tag_sum"]) > tag_count
+            and repair_tail_confirmation_bookkeeping(
                 db,
-                http,
-                generation=generation,
                 final_page=final_page,
                 rows_per_page=rows_per_page,
-                max_attempts=max_attempts,
             )
-            tail_checked_for_counter_mismatch = True
-            continue
+        ):
+            report = verify_db(db)
+            tag_count = int(report["tag_count"])
 
+        # A fully self-consistent harvested snapshot wins over a lower, stale
+        # page-1 counter. Do not mutate the snapshot merely to re-confirm it.
         if report["complete"]:
+            if total != tag_count:
+                direction = "ahead of" if tag_count > total else "behind"
+                print(
+                    f"Observed corpus is {abs(tag_count - total):,} tag(s) {direction} "
+                    "the site's displayed counter; keeping the internally consistent "
+                    "harvest snapshot unchanged.",
+                    flush=True,
+                )
             return report, final_page, rows_per_page
 
         if final_page > previous_final_page:
@@ -1476,6 +1548,8 @@ def stabilize_growing_source(
             )
             return report, final_page, rows_per_page
 
+        # If the displayed counter is ahead of what we harvested and no new page
+        # appeared, the missing rows can only be on the current tail page.
         if final_page == previous_final_page and total > tag_count:
             print(
                 f"Live total is {total - tag_count:,} tag(s) ahead of the saved corpus.",
@@ -1494,7 +1568,6 @@ def stabilize_growing_source(
         return report, final_page, rows_per_page
 
     return verify_db(db), final_page, rows_per_page
-
 
 def print_progress(db: sqlite3.Connection, final_page: int) -> None:
     row = db.execute(
