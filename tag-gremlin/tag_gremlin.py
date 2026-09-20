@@ -1650,23 +1650,6 @@ def verify_db(db: sqlite3.Connection) -> dict[str, object]:
         (generation,),
     ).fetchone()[0]
 
-    resolution_rows = dict(
-        db.execute(
-            """
-            SELECT s.resolution_status,COUNT(*)
-            FROM tag_synonyms s
-            JOIN tags t ON t.tag_id=s.tag_id
-            WHERE t.last_seen_generation=?
-            GROUP BY s.resolution_status
-            """,
-            (generation,),
-        ).fetchall()
-    )
-    resolution_exact = int(resolution_rows.get("exact", 0))
-    resolution_missing = int(resolution_rows.get("missing", 0))
-    resolution_ambiguous = int(resolution_rows.get("ambiguous", 0))
-    resolution_unresolved = int(resolution_rows.get("unresolved", 0))
-
     missing_pages: list[int] = []
     if final_page:
         present = {
@@ -1709,10 +1692,6 @@ def verify_db(db: sqlite3.Connection) -> dict[str, object]:
         "page_tag_sum": page_tag_sum,
         "synonym_mismatches": synonym_mismatches,
         "edge_mismatches": edge_mismatches,
-        "resolution_exact": resolution_exact,
-        "resolution_missing": resolution_missing,
-        "resolution_ambiguous": resolution_ambiguous,
-        "resolution_unresolved": resolution_unresolved,
         "missing_pages": missing_pages,
     }
 
@@ -1732,10 +1711,6 @@ def print_verify_report(report: dict[str, object]) -> None:
     print(f"Sum of page tag counts:   {report['page_tag_sum']}")
     print(f"Synonym parse mismatches: {report['synonym_mismatches']}")
     print(f"Synonym edge mismatches:  {report['edge_mismatches']}")
-    print(f"Synonym IDs exact:        {report['resolution_exact']}")
-    print(f"Synonym IDs missing:      {report['resolution_missing']}")
-    print(f"Synonym IDs ambiguous:    {report['resolution_ambiguous']}")
-    print(f"Synonym IDs unresolved:   {report['resolution_unresolved']}")
     missing = report["missing_pages"]
     if isinstance(missing, list) and missing:
         preview = ", ".join(str(x) for x in missing[:20])
@@ -1749,7 +1724,7 @@ def status_command(args: argparse.Namespace) -> int:
     if not db_path.exists():
         raise RuntimeError(f"Database does not exist: {db_path}")
     db = open_db(db_path)
-    report = ensure_synonym_resolution(db, verify_db(db))
+    report = verify_db(db)
     print_verify_report(report)
 
     attempts = db.execute(
@@ -1776,7 +1751,7 @@ def verify_command(args: argparse.Namespace) -> int:
     if not db_path.exists():
         raise RuntimeError(f"Database does not exist: {db_path}")
     db = open_db(db_path)
-    report = ensure_synonym_resolution(db, verify_db(db))
+    report = verify_db(db)
     print_verify_report(report)
     db.close()
     return 0 if report["complete"] else 2
@@ -1794,7 +1769,7 @@ def export_command(args: argparse.Namespace) -> int:
     if not db_path.exists():
         raise RuntimeError(f"Database does not exist: {db_path}")
     db = open_db(db_path)
-    report = ensure_synonym_resolution(db, verify_db(db))
+    report = verify_db(db)
     if not report["complete"] and not args.allow_incomplete:
         print_verify_report(report)
         raise RuntimeError(
@@ -1828,16 +1803,9 @@ def export_command(args: argparse.Namespace) -> int:
 
     synonym_rows = db.execute(
         """
-        SELECT
-            source.tag_id,
-            source.name,
-            s.synonym,
-            s.resolved_tag_id,
-            target.name,
-            s.resolution_status
+        SELECT source.tag_id,source.name,s.synonym
         FROM tag_synonyms s
         JOIN tags source ON source.tag_id=s.tag_id
-        LEFT JOIN tags target ON target.tag_id=s.resolved_tag_id
         WHERE source.last_seen_generation=?
         ORDER BY source.name COLLATE NOCASE, s.synonym COLLATE NOCASE
         """,
@@ -1845,29 +1813,15 @@ def export_command(args: argparse.Namespace) -> int:
     ).fetchall()
     _write_tsv(
         out / "synonyms.tsv",
-        [
-            "tag_id",
-            "official_tag",
-            "synonym",
-            "resolved_tag_id",
-            "resolved_tag",
-            "resolution_status",
-        ],
+        ["tag_id", "official_tag", "synonym"],
         synonym_rows,
     )
 
     reverse_rows = db.execute(
         """
-        SELECT
-            s.synonym,
-            source.tag_id,
-            source.name,
-            s.resolved_tag_id,
-            target.name,
-            s.resolution_status
+        SELECT s.synonym,source.tag_id,source.name
         FROM tag_synonyms s
         JOIN tags source ON source.tag_id=s.tag_id
-        LEFT JOIN tags target ON target.tag_id=s.resolved_tag_id
         WHERE source.last_seen_generation=?
         ORDER BY s.synonym COLLATE NOCASE, source.name COLLATE NOCASE
         """,
@@ -1877,14 +1831,7 @@ def export_command(args: argparse.Namespace) -> int:
 
     _write_tsv(
         out / "synonym-map.tsv",
-        [
-            "synonym",
-            "tag_id",
-            "official_tag",
-            "resolved_tag_id",
-            "resolved_tag",
-            "resolution_status",
-        ],
+        ["synonym", "tag_id", "official_tag"],
         reverse_rows,
     )
 
