@@ -312,15 +312,14 @@ def parse_tags_page(html: str) -> ParsedPage:
 
 def open_db(path: Path) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
+    db: sqlite3.Connection | None = None
     try:
         db = sqlite3.connect(path, timeout=30.0)
         db.execute("PRAGMA busy_timeout=30000")
-    except sqlite3.OperationalError as exc:
-        raise RuntimeError(f"Could not open Tag Gremlin database {path}: {exc}") from exc
-    db.execute("PRAGMA foreign_keys=ON")
-    db.execute("PRAGMA journal_mode=WAL")
-    db.execute("PRAGMA synchronous=NORMAL")
-    db.executescript(
+        db.execute("PRAGMA foreign_keys=ON")
+        db.execute("PRAGMA journal_mode=WAL")
+        db.execute("PRAGMA synchronous=NORMAL")
+        db.executescript(
         """
         CREATE TABLE IF NOT EXISTS meta (
             key TEXT PRIMARY KEY,
@@ -366,10 +365,14 @@ def open_db(path: Path) -> sqlite3.Connection:
         CREATE INDEX IF NOT EXISTS synonyms_name_nocase
             ON tag_synonyms(synonym COLLATE NOCASE);
         """
-    )
-    set_meta(db, "schema_version", SCHEMA_VERSION)
-    db.commit()
-    return db
+        )
+        set_meta(db, "schema_version", SCHEMA_VERSION)
+        db.commit()
+        return db
+    except sqlite3.OperationalError as exc:
+        if db is not None:
+            db.close()
+        raise RuntimeError(f"Could not open Tag Gremlin database {path}: {exc}") from exc
 
 
 def get_meta(db: sqlite3.Connection, key: str) -> str | None:
@@ -578,31 +581,64 @@ def _domain_matches(hostname: str, cookie_host: str) -> bool:
     return host == domain or host.endswith("." + domain)
 
 
-def _snapshot_firefox_cookies(cookie_db: Path) -> sqlite3.Connection:
-    """Return an in-memory, transactionally consistent snapshot of cookies.sqlite."""
+def _read_firefox_cookie_rows(
+    cookie_db: Path, *, max_attempts: int = 8
+) -> tuple[set[str], list[tuple[object, ...]]]:
+    """Read Firefox cookies directly with bounded retries; never wait forever."""
     uri = "file:" + urllib.parse.quote(str(cookie_db.resolve())) + "?mode=ro"
-    source: sqlite3.Connection | None = None
-    snapshot: sqlite3.Connection | None = None
-    try:
-        source = sqlite3.connect(uri, uri=True, timeout=30.0)
-        source.execute("PRAGMA query_only=ON")
-        source.execute("PRAGMA busy_timeout=30000")
-        snapshot = sqlite3.connect(":memory:")
-        # SQLite's online backup API handles WAL correctly and waits/retries
-        # around short-lived writer locks without copying cookie data to disk.
-        source.backup(snapshot, pages=256, sleep=0.10)
-        return snapshot
-    except sqlite3.OperationalError as exc:
-        if snapshot is not None:
-            snapshot.close()
-        raise RuntimeError(
-            "Could not snapshot Firefox cookies.sqlite while Firefox was using it. "
-            "Wait a few seconds and retry; cookie values were not exported. "
-            f"SQLite said: {exc}"
-        ) from exc
-    finally:
-        if source is not None:
-            source.close()
+    last_error: sqlite3.OperationalError | None = None
+
+    for attempt in range(1, max_attempts + 1):
+        db: sqlite3.Connection | None = None
+        try:
+            db = sqlite3.connect(uri, uri=True, timeout=2.0)
+            db.execute("PRAGMA query_only=ON")
+            db.execute("PRAGMA busy_timeout=2000")
+
+            columns = {row[1] for row in db.execute("PRAGMA table_info(moz_cookies)")}
+            required = {"host", "path", "isSecure", "expiry", "name", "value"}
+            missing = required - columns
+            if missing:
+                raise RuntimeError(
+                    "Firefox cookie database is missing expected columns: "
+                    + ", ".join(sorted(missing))
+                )
+
+            where = ""
+            if "originAttributes" in columns:
+                where = " WHERE originAttributes=''"
+
+            rows = db.execute(
+                "SELECT host,path,isSecure,expiry,name,value FROM moz_cookies" + where
+            ).fetchall()
+            return columns, rows
+        except sqlite3.OperationalError as exc:
+            last_error = exc
+            message = str(exc).lower()
+            if "locked" not in message and "busy" not in message:
+                raise RuntimeError(
+                    f"Could not read Firefox cookies.sqlite: {exc}"
+                ) from exc
+
+            if attempt >= max_attempts:
+                break
+
+            delay = min(2.0, 0.15 * (2 ** (attempt - 1)))
+            print(
+                f"Firefox cookies.sqlite is busy; retrying "
+                f"({attempt}/{max_attempts}) in {delay:.2f}s...",
+                flush=True,
+            )
+            time.sleep(delay)
+        finally:
+            if db is not None:
+                db.close()
+
+    raise RuntimeError(
+        "Firefox cookies.sqlite stayed locked after bounded retries. "
+        "Close Firefox for a few seconds, run Tag Gremlin again, then reopen Firefox. "
+        f"Last SQLite error: {last_error}"
+    )
 
 
 def load_firefox_cookiejar(profile: Path, target_url: str) -> tuple[http.cookiejar.CookieJar, int]:
@@ -611,26 +647,7 @@ def load_firefox_cookiejar(profile: Path, target_url: str) -> tuple[http.cookiej
         raise RuntimeError("Target URL has no hostname")
 
     cookie_db = profile / "cookies.sqlite"
-    db = _snapshot_firefox_cookies(cookie_db)
-
-    columns = {row[1] for row in db.execute("PRAGMA table_info(moz_cookies)")}
-    required = {"host", "path", "isSecure", "expiry", "name", "value"}
-    missing = required - columns
-    if missing:
-        db.close()
-        raise RuntimeError(
-            "Firefox cookie database is missing expected columns: "
-            + ", ".join(sorted(missing))
-        )
-
-    where = ""
-    if "originAttributes" in columns:
-        where = " WHERE originAttributes=''"
-
-    rows = db.execute(
-        "SELECT host,path,isSecure,expiry,name,value FROM moz_cookies" + where
-    ).fetchall()
-    db.close()
+    _, rows = _read_firefox_cookie_rows(cookie_db)
 
     jar = http.cookiejar.CookieJar()
     now = int(time.time())
@@ -858,7 +875,10 @@ def print_progress(db: sqlite3.Connection, final_page: int) -> None:
 def harvest(args: argparse.Namespace) -> int:
     source_url = validate_source_url(args.url)
     db_path = Path(args.db).expanduser().resolve()
+
+    print(f"Opening Tag Gremlin database: {db_path}", flush=True)
     db = open_db(db_path)
+    print("Harvest database ready.", flush=True)
 
     existing_source = get_meta(db, "source_url")
     if existing_source and existing_source != source_url:
@@ -867,14 +887,20 @@ def harvest(args: argparse.Namespace) -> int:
             "Use a different --db for a fresh harvest."
         )
 
+    print("Finding Firefox profile...", flush=True)
     profile = discover_firefox_profile(args.firefox_profile)
+    print(f"Firefox profile: {profile}", flush=True)
+    print("Reading matching Firefox cookies...", flush=True)
     jar, cookie_count = load_firefox_cookiejar(profile, source_url)
-    print(f"Firefox profile: {profile}")
-    print(f"Loaded {cookie_count} matching cookie(s) for the target host (values not shown).")
+    print(
+        f"Loaded {cookie_count} matching cookie(s) for the target host "
+        "(values not shown).",
+        flush=True,
+    )
 
     http = HarvesterHTTP(source_url, jar, timeout=args.timeout)
 
-    print("Discovering tag index from page 1...")
+    print("Fetching and parsing page 1...", flush=True)
     first_fetch = http.fetch_page(1, args.max_attempts)
     first_parsed = parse_tags_page(first_fetch.html)
     total, final_page, rows_per_page = inspect_first_page(first_parsed)
