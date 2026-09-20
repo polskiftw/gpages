@@ -32,7 +32,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from html.parser import HTMLParser
@@ -41,8 +41,7 @@ from typing import Iterable
 
 SCHEMA_VERSION = "1"
 DEFAULT_DB = "tag-gremlin.sqlite3"
-DEFAULT_INITIAL_WORKERS = 2
-DEFAULT_MAX_WORKERS = 4
+DEFAULT_WORKERS = 4
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"
 
@@ -1214,31 +1213,41 @@ def harvest(args: argparse.Namespace) -> int:
         print_verify_report(report)
         return 0 if report["complete"] else 2
 
-    current_workers = max(1, min(args.initial_workers, args.max_workers))
-    clean_batches = 0
-
+    workers = args.workers
     print(
         f"Resuming with {len(pending):,} page(s) pending; "
-        f"adaptive concurrency {current_workers}..{args.max_workers}."
+        f"fixed concurrency {workers} worker(s)."
+    )
+    print(
+        "Workers back off/retry only for their own timeout/HTTP error; "
+        "other workers keep moving.",
+        flush=True,
     )
 
     fatal_parse_error = False
+    page_iter = iter(pending)
+    in_flight: dict[object, int] = {}
+    completed_since_progress = 0
+    progress_every = max(20, workers * 4)
 
-    while pending and not fatal_parse_error:
-        batch_size = max(current_workers, current_workers * 4)
-        batch = pending[:batch_size]
-        pending = pending[batch_size:]
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        def submit_next() -> bool:
+            try:
+                page = next(page_iter)
+            except StopIteration:
+                return False
+            future = pool.submit(http.fetch_page, page, args.max_attempts)
+            in_flight[future] = page
+            return True
 
-        latencies: list[int] = []
-        stressed = False
+        for _ in range(min(workers, len(pending))):
+            submit_next()
 
-        with ThreadPoolExecutor(max_workers=current_workers) as pool:
-            futures = {
-                pool.submit(http.fetch_page, page, args.max_attempts): page
-                for page in batch
-            }
-            for future in as_completed(futures):
-                page = futures[future]
+        while in_flight and not fatal_parse_error:
+            done, _ = wait(tuple(in_flight), return_when=FIRST_COMPLETED)
+
+            for future in done:
+                page = in_flight.pop(future)
                 try:
                     result = future.result()
                     parsed = parse_tags_page(result.html)
@@ -1267,17 +1276,14 @@ def harvest(args: argparse.Namespace) -> int:
                         latency_ms=result.latency_ms,
                         body_sha256=result.body_sha256,
                     )
-                    latencies.append(result.latency_ms)
-                    stressed = stressed or result.had_retry
+
                     if parsed.synonym_mismatches:
-                        stressed = True
                         fatal_parse_error = True
                         print(
                             f"page {page}: {parsed.synonym_mismatches} "
-                            "synonym mismatch(es); bulk crawl will stop after this batch"
+                            "synonym mismatch(es); bulk crawl will stop"
                         )
                 except FetchFailure as exc:
-                    stressed = True
                     record_page_failure(
                         db,
                         page=page,
@@ -1287,7 +1293,6 @@ def harvest(args: argparse.Namespace) -> int:
                     )
                     print(str(exc), file=sys.stderr)
                 except sqlite3.IntegrityError as exc:
-                    stressed = True
                     record_page_failure(
                         db,
                         page=page,
@@ -1300,7 +1305,6 @@ def harvest(args: argparse.Namespace) -> int:
                         file=sys.stderr,
                     )
                 except Exception as exc:
-                    stressed = True
                     record_page_failure(
                         db,
                         page=page,
@@ -1310,32 +1314,26 @@ def harvest(args: argparse.Namespace) -> int:
                     )
                     print(f"page {page}: {exc}", file=sys.stderr)
 
-        print_progress(db, final_page)
+                completed_since_progress += 1
+                if completed_since_progress >= progress_every:
+                    print_progress(db, final_page)
+                    completed_since_progress = 0
+
+                if not fatal_parse_error:
+                    submit_next()
 
         if fatal_parse_error:
-            print(
-                "Stopping because synonym parsing no longer matches the site. "
-                "Saved OK pages remain resumable."
-            )
-            break
+            for future in in_flight:
+                future.cancel()
 
-        median_ms = statistics.median(latencies) if latencies else None
-        if stressed or (median_ms is not None and median_ms > args.slow_ms):
-            clean_batches = 0
-            if current_workers > 1:
-                current_workers -= 1
-                print(f"Backing off to {current_workers} worker(s).")
-        else:
-            clean_batches += 1
-            if (
-                clean_batches >= 2
-                and median_ms is not None
-                and median_ms < args.fast_ms
-                and current_workers < args.max_workers
-            ):
-                current_workers += 1
-                clean_batches = 0
-                print(f"Clean/fast batches; increasing to {current_workers} worker(s).")
+    if completed_since_progress:
+        print_progress(db, final_page)
+
+    if fatal_parse_error:
+        print(
+            "Stopping because synonym parsing no longer matches the site. "
+            "Saved OK pages remain resumable."
+        )
 
     report = verify_db(db)
     print_verify_report(report)
@@ -1583,16 +1581,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_harvest.set_defaults(close_firefox=True, reopen_firefox=True)
     p_harvest.add_argument(
-        "--initial-workers",
+        "--workers",
         type=int,
-        default=DEFAULT_INITIAL_WORKERS,
-        help=f"Initial concurrent requests (default: {DEFAULT_INITIAL_WORKERS})",
-    )
-    p_harvest.add_argument(
-        "--max-workers",
-        type=int,
-        default=DEFAULT_MAX_WORKERS,
-        help=f"Maximum adaptive concurrency (default: {DEFAULT_MAX_WORKERS})",
+        default=DEFAULT_WORKERS,
+        help=(
+            f"Fixed number of concurrent page workers (default: {DEFAULT_WORKERS}). "
+            "Numeric shorthand like -8 is also accepted."
+        ),
     )
     p_harvest.add_argument(
         "--max-attempts",
@@ -1605,18 +1600,6 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=45.0,
         help="Per-request timeout in seconds (default: 45)",
-    )
-    p_harvest.add_argument(
-        "--fast-ms",
-        type=int,
-        default=2500,
-        help="Median latency below which concurrency may increase (default: 2500)",
-    )
-    p_harvest.add_argument(
-        "--slow-ms",
-        type=int,
-        default=8000,
-        help="Median latency above which concurrency decreases (default: 8000)",
     )
     p_harvest.set_defaults(func=harvest)
 
@@ -1642,15 +1625,27 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _expand_numeric_worker_shorthand(argv: list[str]) -> list[str]:
+    expanded: list[str] = []
+    for arg in argv:
+        match = re.fullmatch(r"-(\d+)", arg)
+        if match:
+            expanded.extend(("--workers", match.group(1)))
+        else:
+            expanded.append(arg)
+    return expanded
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    args = parser.parse_args(_expand_numeric_worker_shorthand(raw_argv))
 
-    if hasattr(args, "initial_workers"):
-        if args.initial_workers < 1 or args.max_workers < 1:
-            parser.error("worker counts must be >= 1")
-        if args.initial_workers > args.max_workers:
-            parser.error("--initial-workers cannot exceed --max-workers")
+    if hasattr(args, "workers"):
+        if args.workers < 1:
+            parser.error("--workers must be >= 1")
+        if args.workers > 128:
+            parser.error("--workers must be <= 128")
         if args.max_attempts < 1:
             parser.error("--max-attempts must be >= 1")
         if args.timeout <= 0:
