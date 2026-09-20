@@ -154,6 +154,9 @@ class TagsHTMLParser(HTMLParser):
 
         if self._current_cell is not None and tag not in ("td", "th"):
             self._current_cell.child_tags.append(tag)
+            if tag == "br":
+                self._current_cell.text += "\n"
+                self._current_cell.data_parts.append("\n")
 
         if tag == "a":
             href = attrs_d.get("href", "")
@@ -206,11 +209,13 @@ class TagsHTMLParser(HTMLParser):
 def _looks_like_tag_row(row: RowCapture) -> bool:
     if len(row.cells) != 6:
         return False
+    # Some zero-synonym rows leave the final cell blank instead of printing 0.
+    # TagID + name + uses are enough to identify the semantic tag row; the
+    # synonym cell is reconciled against its adjacent detail row separately.
     return (
         parse_int(row.cells[0].text) is not None
         and bool(clean_space(row.cells[1].text))
         and parse_int(row.cells[2].text) is not None
-        and parse_int(row.cells[5].text) is not None
     )
 
 
@@ -311,20 +316,17 @@ def _safe_parser_diagnostic(html: str) -> dict[str, object]:
     }
 
 
-def _synonyms_from_detail(cell: CellCapture | None) -> tuple[list[str], str]:
-    if cell is None:
-        return [], ""
-
-    raw = clean_space(cell.text)
-    values: list[str] = []
+def _normalize_synonym_values(values: Iterable[str]) -> list[str]:
+    out: list[str] = []
     seen: set[str] = set()
 
-    # Prefer explicit links when the site supplies them. The real site may instead
-    # render synonym names as plain text; the canary diagnostic below detects that
-    # shape before any bulk crawl is allowed.
-    for link in cell.links:
-        text = clean_space(link.text)
+    for value in values:
+        text = clean_space(value)
+        text = re.sub(r"^synonyms?\s*:\s*", "", text, flags=re.IGNORECASE)
+        text = text.strip(" ,;|")
         if not text:
+            continue
+        if text.casefold() in {"no synonyms", "no synonyms.", "none"}:
             continue
         if re.fullmatch(r"[\[\](){}+\-\s]+", text):
             continue
@@ -332,9 +334,50 @@ def _synonyms_from_detail(cell: CellCapture | None) -> tuple[list[str], str]:
         if key in seen:
             continue
         seen.add(key)
-        values.append(text)
+        out.append(text)
 
-    return values, raw
+    return out
+
+
+def _synonyms_from_detail(
+    cell: CellCapture | None, expected_count: int
+) -> tuple[list[str], str]:
+    if cell is None:
+        return [], ""
+
+    raw_uncompacted = "".join(cell.data_parts)
+    raw = clean_space(cell.text)
+
+    if expected_count == 0:
+        return [], raw
+
+    candidates: list[list[str]] = []
+
+    # 1) Explicit links.
+    candidates.append(_normalize_synonym_values(link.text for link in cell.links))
+
+    # 2) Separate text nodes/elements. This handles spans and other inline markup.
+    candidates.append(_normalize_synonym_values(cell.data_parts))
+
+    # 3) Common plain-text separators. A candidate is accepted only when its
+    # resulting count exactly matches the site's advertised count.
+    stripped = re.sub(
+        r"^\s*synonyms?\s*:\s*", "", raw_uncompacted, flags=re.IGNORECASE
+    )
+    for splitter in (
+        lambda x: x.splitlines(),
+        lambda x: x.split(","),
+        lambda x: x.split(";"),
+        lambda x: x.split("|"),
+    ):
+        candidates.append(_normalize_synonym_values(splitter(stripped)))
+
+    for values in candidates:
+        if len(values) == expected_count:
+            return values, raw
+
+    # Never guess. The caller marks this tag/page as a parser mismatch.
+    return [], raw
 
 
 def parse_tags_page(html: str) -> ParsedPage:
@@ -378,7 +421,7 @@ def parse_tags_page(html: str) -> ParsedPage:
             downvotes = parse_int(cells[4].text, absolute=True)
             synonym_count = parse_int(cells[5].text)
 
-            if tag_id is None or uses is None or synonym_count is None:
+            if tag_id is None or uses is None:
                 i += 1
                 continue
 
@@ -388,8 +431,17 @@ def parse_tags_page(html: str) -> ParsedPage:
                 detail = table[i + 1].cells[0]
                 i += 1
 
-            synonyms, raw_detail = _synonyms_from_detail(detail)
-            parse_ok = len(synonyms) == synonym_count
+            # The site leaves the count cell blank for tags with no synonyms.
+            if synonym_count is None:
+                if detail is None or not clean_space(detail.text):
+                    synonym_count = 0
+                else:
+                    # Preserve strictness: a nonempty detail row with no numeric
+                    # advertised count is not safe to infer.
+                    synonym_count = -1
+
+            synonyms, raw_detail = _synonyms_from_detail(detail, synonym_count)
+            parse_ok = synonym_count >= 0 and len(synonyms) == synonym_count
             if not parse_ok:
                 mismatches += 1
 
