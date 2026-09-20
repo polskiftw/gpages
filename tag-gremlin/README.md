@@ -45,7 +45,7 @@ python3 tag_gremlin.py \
   --firefox-profile ~/.mozilla/firefox/<profile>.default-esr
 ```
 
-Firefox may remain open on systems that allow a concurrent read. If Tag Gremlin reports that `cookies.sqlite` stayed locked, close Firefox completely, start Tag Gremlin again, and reopen Firefox after the line `Loaded ... matching cookie(s)` appears. The cookie values are only kept in memory and are not written to the Tag Gremlin database.
+Firefox may remain open on systems that allow a concurrent read. If Tag Gremlin reports that `cookies.sqlite` stayed locked, close Firefox completely and start Tag Gremlin again. Once the cookies are loaded, Tag Gremlin automatically reopens the same Firefox profile. Use `--no-reopen-firefox` only if you intentionally want Firefox to stay closed. The cookie values are only kept in memory and are not written to the Tag Gremlin database.
 
 ## Resume
 
