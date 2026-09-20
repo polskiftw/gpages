@@ -34,6 +34,24 @@ FIXTURE = """
 """
 
 
+PLAIN_TEXT_FIXTURE = """
+<!doctype html>
+<html><body>
+<div>3 tags</div>
+<a href="tags.php?page=1">Last</a>
+<table>
+<tr><td>TagID</td><td>Tag</td><td>Uses</td><td colspan="2">Votes</td><td>Synonyms</td></tr>
+<tr><td>1</td><td>alpha</td><td>10</td><td>+3</td><td>-1</td><td>3 [+]</td></tr>
+<tr style="display:none"><td colspan="5">first alias, second_alias, third.alias</td></tr>
+<tr><td>2</td><td>beta</td><td>9</td><td>+2</td><td>-0</td><td></td></tr>
+<tr style="display:none"><td colspan="5"></td></tr>
+<tr><td>3</td><td>gamma</td><td>8</td><td>+1</td><td>-0</td><td>2 [+]</td></tr>
+<tr style="display:none"><td colspan="5"><span>one</span><br><span>two</span></td></tr>
+</table>
+</body></html>
+"""
+
+
 class ParserTests(unittest.TestCase):
     def test_full_page_shape(self):
         parsed = tg.parse_tags_page(FIXTURE)
@@ -61,6 +79,18 @@ class ParserTests(unittest.TestCase):
         parsed = tg.parse_tags_page(html)
         self.assertEqual(parsed.synonym_mismatches, 1)
         self.assertFalse(parsed.tags[0].synonym_parse_ok)
+
+    def test_plain_text_synonyms_and_blank_zero_count(self):
+        parsed = tg.parse_tags_page(PLAIN_TEXT_FIXTURE)
+        self.assertEqual(len(parsed.tags), 3)
+        self.assertEqual(parsed.synonym_mismatches, 0)
+        self.assertEqual(
+            parsed.tags[0].synonyms,
+            ["first alias", "second_alias", "third.alias"],
+        )
+        self.assertEqual(parsed.tags[1].reported_synonym_count, 0)
+        self.assertEqual(parsed.tags[1].synonyms, [])
+        self.assertEqual(parsed.tags[2].synonyms, ["one", "two"])
 
 
 class DatabaseTests(unittest.TestCase):
