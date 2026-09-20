@@ -33,7 +33,8 @@ curl -fLO https://raw.githubusercontent.com/polskiftw/gpages/main/tag-gremlin/ta
 python3 tag_gremlin.py \
   --db ~/tag-gremlin.sqlite3 \
   harvest \
-  --url 'https://YOUR-SITE/tags.php'</div>
+  --url 'https://YOUR-SITE/tags.php' \
+  -8</div>
 <div class="row"><button class="btn copy" data-copy="harvestCmd">Copy harvest command</button></div>
 
 <p class="note small"><span class="good">Safe to interrupt:</span> completed pages are committed to SQLite as it goes. Run the same harvest command again to resume.</p>
