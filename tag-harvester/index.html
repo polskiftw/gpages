@@ -66,8 +66,8 @@ python3 tag_gremlin.py \
 <ul>
 <li><code>~/tag-gremlin-export/tags.txt</code> — one official tag per line; this is the simple corpus for the regex/search tool.</li>
 <li><code>tags.tsv</code> — TagID, name, uses, votes, synonym count.</li>
-<li><code>synonyms.tsv</code> — source official tag → raw synonym, plus resolved target TagID/name and resolution status.</li>
-<li><code>synonym-map.tsv</code> — the same relationship with the synonym string first.</li>
+<li><code>synonyms.tsv</code> — official TagID/name → alias string.</li>
+<li><code>synonym-map.tsv</code> — alias string → official TagID/name.</li>
 </ul>
 </div>
 
@@ -78,9 +78,10 @@ python3 tag_gremlin.py \
 <li>Harvests the directly pageable <code>tags.php?page=N</code> index instead of brute-forcing autocomplete.</li>
 <li>Stores the full tag corpus locally in SQLite.</li>
 <li>Keys tags by TagID rather than page number, so tags can move between pages on later refreshes without creating duplicates. A completed refresh UPSERTs known TagIDs and removes old TagIDs no longer seen only after verification succeeds.</li>
-<li>Keeps every raw synonym string and, after a complete crawl, resolves it to a target TagID only when it exactly matches one unique current official tag name. Missing or ambiguous names stay explicitly unresolved rather than being guessed.</li>
+<li>Keeps every synonym as an alias/alternate spelling attached directly to its owning official TagID. Aliases are not treated as separate tag entities.</li>
 <li>Captures TagID, official name, uses, positive/negative votes, reported synonym count, and the hidden synonym data already embedded in each page.</li>
 <li>Uses the fixed worker count you choose (for example <code>-8</code>). Workers share one non-overlapping page queue; only the request that hits a timeout/429/transient error backs off while the others keep moving.</li>
+<li>Rechecks the live source total after a long crawl so tags added during the run can be reconciled without rescanning already-completed pages when they still fit on the same final page.</li>
 <li>Stops rather than silently accepting parser drift or synonym-count mismatches.</li>
 </ul>
 <p class="note">The complete design notes live in <a href="https://github.com/polskiftw/gpages/blob/main/tag-gremlin/DGD.md">tag-gremlin/DGD.md</a>. The source is <a href="https://github.com/polskiftw/gpages/blob/main/tag-gremlin/tag_gremlin.py">tag_gremlin.py</a>.</p>
