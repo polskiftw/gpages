@@ -33,6 +33,12 @@ ITEMSOURCE_BATCH = 12
 USER_AGENT = "polskiftw/gpages terraria-shopping availability-badges/1.8 (GitHub Pages data refresh)"
 ITEM_FIELDS = "name,hardmode"
 
+# Stable classifications for known items that can temporarily disappear from
+# the Wiki Cargo Items table. Unknown names still fail the build below.
+ITEM_MODE_OVERRIDES: dict[str, bool] = {
+    "Magic Quiver": True,
+}
+
 # item -> (availability conditions, acquisition source, progression rank)
 PROGRESSION_OVERRIDES: dict[str, tuple[list[str], str, int]] = {
     "Starfury": ([], "Skyware Chest / Sky Crate", 10),
@@ -644,6 +650,8 @@ def main() -> int:
             continue
         if name in item_modes:
             mode = "Hardmode" if item_modes[name] else "Pre-Hardmode"
+        elif name in ITEM_MODE_OVERRIDES:
+            mode = "Hardmode" if ITEM_MODE_OVERRIDES[name] else "Pre-Hardmode"
         else:
             mode = infer_pseudo_mode(name)
         if mode is None:
