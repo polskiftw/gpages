@@ -89,13 +89,13 @@ var specs=[
 {title:"General",open:true,fields:[
 {path:"general.import",type:"list",def:"",label:"Imports",hint:"Additional config files, one path per line. Missing imports are skipped."},
 {path:"general.working_directory",type:"text",def:"None",label:"Working directory",hint:"Shell startup directory. \"None\" follows the parent process."},
-{path:"general.live_config_reload",type:"bool",def:true,label:"Live config reload",hint:"Automatically reload the config when it changes."},
+{path:"general.live_config_reload",type:"bool",def:true,label:"Live config reload",hint:"Automatically reload the config when it changes. Changing this setting itself requires restarting Alacritty."},
 {path:"general.ipc_socket",type:"bool",def:true,label:"IPC socket",hint:"Offer IPC through alacritty msg.",platform:"Unix"}
 ]},
 {title:"Environment",dynamic:"env",hint:"Add environment variables passed to processes spawned by Alacritty."},
 {title:"Window",fields:[
-{path:"window.dimensions.columns",type:"int",def:0,min:0,disallow:[1],label:"Window columns",hint:"Terminal width in columns. 0 uses the window manager recommendation. Both columns and lines must be non-zero for explicit dimensions to take effect; non-zero columns must be at least 2."},
-{path:"window.dimensions.lines",type:"int",def:0,min:0,label:"Window lines",hint:"Terminal height in lines. 0 uses the window manager recommendation. Both columns and lines must be non-zero for explicit dimensions to take effect."},
+{path:"window.dimensions.columns",type:"int",def:0,min:0,disallow:[1],label:"Window columns",hint:"Terminal width in columns. 0 uses the window manager recommendation. Both columns and lines must be non-zero for explicit dimensions to take effect; non-zero columns must be at least 2. Changing dimensions requires restarting Alacritty."},
+{path:"window.dimensions.lines",type:"int",def:0,min:0,label:"Window lines",hint:"Terminal height in lines. 0 uses the window manager recommendation. Both columns and lines must be non-zero for explicit dimensions to take effect. Changing dimensions requires restarting Alacritty."},
 {path:"window.position",type:"select",def:"None",values:["None"],label:"Clear startup position",hint:"Explicitly resets an imported startup position to None. Do not combine this with Position X or Position Y.",platform:"No effect on Wayland"},
 {path:"window.position.x",type:"int",def:0,min:-2147483648,max:2147483647,label:"Position X",hint:"Horizontal startup position in pixels. The omitted Y coordinate defaults to 0 unless supplied elsewhere.",platform:"No effect on Wayland"},
 {path:"window.position.y",type:"int",def:0,min:-2147483648,max:2147483647,label:"Position Y",hint:"Vertical startup position in pixels. The omitted X coordinate defaults to 0 unless supplied elsewhere.",platform:"No effect on Wayland"},
@@ -184,7 +184,7 @@ var specs=[
 {path:"colors.dim.white",type:"text",def:"#8e8e8e",label:"Dim white"},
 {path:"colors.transparent_background_colors",type:"bool",def:false,label:"Transparent cell colors",hint:"Apply window opacity to all cell backgrounds, not just the default background."},
 {path:"colors.draw_bold_text_with_bright_colors",type:"bool",def:false,label:"Bright bold text",hint:"Render bold text with the bright palette."}
-],dynamic:"indexed",hint:"Indexed colors cover palette indexes 16 through 255. Note: setting any colors.dim.* value activates Alacritty's explicit dim palette; unspecified dim colors then use Alacritty's fixed dim defaults instead of being auto-derived from your normal palette."},
+],dynamic:"indexed",hint:"Indexed colors cover palette indexes 16 through 255. Note: setting any colors.dim.* value activates an explicit dim palette. If no earlier imported dim palette exists, omitted dim members use Alacritty's fixed dim defaults instead of being auto-derived from your normal palette."},
 {title:"Bell",fields:[
 {path:"bell.animation",type:"select",def:"Linear",values:["Ease","EaseOut","EaseOutSine","EaseOutQuad","EaseOutCubic","EaseOutQuart","EaseOutQuint","EaseOutExpo","EaseOutCirc","Linear"],label:"Animation",hint:"Visual bell animation curve."},
 {path:"bell.duration",type:"int",def:0,min:0,max:65535,label:"Duration",hint:"Visual bell duration in milliseconds. 0 disables the animation."},
@@ -214,7 +214,7 @@ var specs=[
 {path:"mouse.hide_when_typing",type:"bool",def:false,label:"Hide while typing",hint:"Temporarily hide the mouse cursor when typing."}
 ],dynamic:"mouse",hint:"Mouse bindings support button, modifiers, terminal mode, and action/chars/command results."},
 {title:"Hints",fields:[
-{path:"hints.alphabet",type:"text",def:"jfkdls;ahgurieowpq",label:"Hint alphabet",hint:"Characters used for hint labels."}
+{path:"hints.alphabet",type:"text",def:"jfkdls;ahgurieowpq",label:"Hint alphabet",hint:"Characters used for hint labels. Alacritty requires at least 2 characters and every character must occupy exactly one terminal cell."}
 ],dynamic:"hints",hint:"Each hint needs regex or hyperlinks, plus an action or command. Supplying hints.enabled replaces Alacritty's built-in default URL hint list; it does not append to it."},
 {title:"Keyboard",dynamic:"keyboard",hint:"Add custom keyboard bindings. Use ReceiveChar to remove a default binding or None to inhibit it."},
 {title:"Debug",fields:[
@@ -303,7 +303,7 @@ if(kind==="indexed"){
 row.innerHTML='<div class="rowhead"><span class="rowtitle">Indexed color</span><button class="remove" type="button">Remove</button></div><div class="fieldgrid"><div><label>Index (16–255)</label><input class="idx" type="number" min="16" max="255" step="1" value="16"></div><div><label>Color</label><input class="color" type="text" value="#ffffff"></div></div>';
 }
 if(kind==="keyboard"||kind==="mouse"){
-var first=kind==="keyboard"?'<div><label>Key type</label><select class="triggerType"><option value="key">Key name</option><option value="scancode">Scancode</option></select></div><div><label>Key / scancode</label><input class="trigger" type="text" placeholder="N, 0, F1, or 42"></div>':'<div><label>Mouse button</label><input class="trigger" type="text" placeholder="Right, Back, Forward, or number"></div>';
+var first=kind==="keyboard"?'<div><label>Key type</label><select class="triggerType"><option value="key">Key name</option><option value="scancode">Scancode</option></select></div><div><label>Key / scancode</label><input class="trigger" type="text" placeholder="N, 0, F1 — or decimal scancode"></div>':'<div><label>Mouse button</label><input class="trigger" type="text" placeholder="Left, Right, Middle, Back, Forward, or 0–65536"></div>';
 var bindingActions=kind==="mouse"?actions.concat(["ExpandSelection"]):actions;
 row.innerHTML='<div class="rowhead"><span class="rowtitle">'+(kind==="keyboard"?"Keyboard binding":"Mouse binding")+'</span><button class="remove" type="button">Remove</button></div><div class="fieldgrid">'+first+'<div><label>Modifiers</label><input class="mods" type="text" placeholder="Control|Shift"></div><div><label>Mode</label><input class="termmode" type="text" placeholder="~Vi|Search"></div><div><label>Result type</label><select class="resultType"><option value="action">Action</option><option value="chars">Chars</option><option value="command">Command</option></select></div><div class="wide actionWrap"><label>Action</label><select class="action">'+selectedOptions(bindingActions,"Copy")+'</select></div><div class="wide charsWrap" hidden><label>Chars</label><input class="chars" type="text" placeholder="Text or escape sequence"></div><div class="commandWrap" hidden><label>Program</label><input class="program" type="text" placeholder="/path/to/program"></div><div class="commandWrap" hidden><label>Arguments — one per line</label><textarea class="args" rows="2"></textarea></div></div>';
 var rt=row.querySelector(".resultType");
@@ -385,7 +385,10 @@ var n=r.querySelector(".name").value.trim();if(!n)return;
 out.push('env.'+tomlString(n)+" = "+tomlString(r.querySelector(".val").value));
 });
 document.querySelectorAll('.dynamic-list[data-dynamic="indexed"] .dynrow').forEach(function(r){
-var idx=parseInt(r.querySelector(".idx").value,10);if(!Number.isFinite(idx)||idx<16||idx>255)throw new Error("Indexed color must be between 16 and 255");
+var rawIndex=r.querySelector(".idx").value.trim();
+if(!/^\d+$/.test(rawIndex))throw new Error("Indexed color index must be an integer from 16 through 255");
+var idx=Number(rawIndex);
+if(!Number.isSafeInteger(idx)||idx<16||idx>255)throw new Error("Indexed color index must be an integer from 16 through 255");
 out.push("[[colors.indexed_colors]]\nindex = "+idx+"\ncolor = "+tomlString(r.querySelector(".color").value.trim()));
 });
 ["mouse","keyboard"].forEach(function(kind){
@@ -404,7 +407,14 @@ lines.push("key = "+tomlString(trigger));
 }
 }else{
 var numericTrigger=/^\d+$/.test(trigger);
-lines.push("mouse = "+(numericTrigger?String(Number(trigger)):tomlString(trigger)));
+if(numericTrigger){
+var mouseNumber=Number(trigger);
+if(!Number.isSafeInteger(mouseNumber)||mouseNumber<0||mouseNumber>65536)throw new Error("Numeric mouse button must be from 0 through 65536");
+lines.push("mouse = "+String(mouseNumber));
+}else{
+if(["Left","Right","Middle","Back","Forward"].indexOf(trigger)===-1)throw new Error("Mouse button must be Left, Right, Middle, Back, Forward, or a number from 0 through 65536");
+lines.push("mouse = "+tomlString(trigger));
+}
 }
 var mods=r.querySelector(".mods").value.trim(),mode=r.querySelector(".termmode").value.trim();
 if(mods)lines.push("mods = "+tomlString(mods));if(mode)lines.push("mode = "+tomlString(mode));
