@@ -21,7 +21,7 @@ input,select,textarea,button{font:inherit}
 input[type=text],input[type=number],input[type=search],select,textarea{width:100%;border:1px solid var(--border);border-radius:11px;background:var(--field);color:var(--text);padding:10px 11px;outline:none}
 input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 input:disabled,select:disabled,textarea:disabled{opacity:.55}
-button{border:0;border-radius:11px;min-height:42px;padding:0 13px;font-weight:750;cursor:pointer}.primary{background:var(--accent);color:#fff}.secondary{background:var(--field);color:var(--accent);border:1px solid var(--border)}button:active{transform:scale(.985)}
+button{border:0;border-radius:11px;min-height:42px;padding:0 13px;font-weight:750;cursor:pointer}.primary{background:var(--accent);color:#fff}.secondary{background:var(--field);color:var(--accent);border:1px solid var(--border)}button:active{transform:scale(.985)}button:disabled{opacity:.45;cursor:not-allowed;transform:none}
 details{margin:0 0 12px;overflow:hidden}summary{cursor:pointer;font-size:18px;font-weight:800;padding:16px 18px;list-style:none}summary::-webkit-details-marker{display:none}summary:after{content:"+";float:right;color:var(--muted)}details[open] summary:after{content:"−"}details[open] summary{border-bottom:1px solid var(--border)}
 .sectionbody{padding:4px 16px 12px}.setting{display:grid;grid-template-columns:95px minmax(0,1fr);gap:12px;padding:13px 2px;border-bottom:1px solid var(--border)}.setting:last-child{border-bottom:0}.emit{display:flex;align-items:flex-start;gap:7px;font-size:13px;font-weight:800;padding-top:3px}.emit input{width:18px;height:18px;margin:0}.settingname{font-weight:800;margin-bottom:4px}.path{font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted);margin-bottom:6px}.hint{font-size:13px;line-height:1.42;color:var(--muted);margin:6px 0 0}.platform{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.35px;margin-left:6px}
 .inline2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.inline3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.subfield label{display:block;font-size:11px;font-weight:800;color:var(--muted);margin:0 0 4px 2px;text-transform:uppercase;letter-spacing:.35px}
@@ -486,9 +486,17 @@ fieldEls.forEach(function(item){var s=serializeField(item);if(s)lines.push(s);})
 var dyn=dynamicToml();if(dyn.length){if(lines[lines.length-1]!=="")lines.push("");dyn.forEach(function(block,i){lines.push(block);if(i<dyn.length-1)lines.push("");});}
 while(lines.length&&lines[lines.length-1]==="")lines.pop();
 output.value=lines.join("\n")+"\n";
+document.getElementById("downloadBtn").disabled=false;
+document.getElementById("copyBtn").disabled=false;
 status.textContent="Ready. "+fieldEls.filter(function(x){return x.row.querySelector(".override").checked;}).length+" fixed setting override(s), plus any dynamic entries shown above.";
 status.className="status";
-}catch(e){output.value=lines.join("\n")+"\n";status.textContent=e.message;status.className="status error";}
+}catch(e){
+output.value=lines.join("\n")+"\n# ERROR: "+e.message+"\n";
+document.getElementById("downloadBtn").disabled=true;
+document.getElementById("copyBtn").disabled=true;
+status.textContent=e.message;
+status.className="status error";
+}
 }
 document.getElementById("filter").addEventListener("input",function(){
 var q=this.value.trim().toLowerCase();
