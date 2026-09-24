@@ -176,7 +176,8 @@ var specs=[
 {path:"selection.save_to_clipboard",type:"bool",def:false,label:"Save to clipboard",hint:"Copy selected text to the primary clipboard."}
 ]},
 {title:"Cursor",fields:[
-{path:"cursor.style",type:"cursorstyle",label:"Cursor style",hint:"Shape and blinking behavior."},
+{path:"cursor.style.shape",type:"select",def:"Block",values:["Block","Underline","Beam"],label:"Cursor shape",hint:"Cursor shape. Omit this to keep Alacritty's default Block shape."},
+{path:"cursor.style.blinking",type:"select",def:"Off",values:["Never","Off","On","Always"],label:"Cursor blinking",hint:"Cursor blinking behavior. This can be overridden independently of cursor shape."},
 {path:"cursor.vi_mode_style",type:"vistyle",label:"Vi cursor style",hint:"None inherits the normal cursor style."},
 {path:"cursor.blink_interval",type:"int",def:750,min:1,label:"Blink interval",hint:"Blink interval in milliseconds."},
 {path:"cursor.blink_timeout",type:"int",def:5,min:0,label:"Blink timeout",hint:"Seconds until blinking stops. 0 disables the timeout."},
