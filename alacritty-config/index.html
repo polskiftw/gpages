@@ -310,7 +310,8 @@ row.querySelectorAll(".commandWrap").forEach(function(e){e.hidden=t!=="command";
 function numericValue(el,integer){
 var n=integer?parseInt(el.value,10):parseFloat(el.value);
 if(!Number.isFinite(n)) throw new Error("Invalid number");
-return String(n);
+if(integer)return String(n);
+var s=String(n);return /^[+-]?\d+$/.test(s)?s+".0":s;
 }
 function serializeField(item){
 var f=item.spec,row=item.row;
@@ -325,7 +326,7 @@ var vals=q(".value").value.split(/\r?\n/).map(function(x){return x.trim();}).fil
 return f.path+" = ["+vals.map(tomlString).join(", ")+"]";
 }
 if(f.type==="intpair")return f.path+" = { "+f.a+" = "+numericValue(q(".a"),true)+", "+f.b+" = "+numericValue(q(".b"),true)+" }";
-if(f.type==="stringpair")return f.path+" = { "+f.a+" = "+tomlString(q(".a").value)+", "+f.b+" = "+tomlString(q(".b").value)+" }";
+if(f.type==="stringpair"){var parts=[];var av=q(".a").value,bv=q(".b").value;if(av!=="")parts.push(f.a+" = "+tomlString(av));if(bv!=="")parts.push(f.b+" = "+tomlString(bv));if(!parts.length)throw new Error(f.path+" needs at least one value");return f.path+" = { "+parts.join(", ")+" }";}
 if(f.type==="position"){
 if(q(".mode").value==="none")return f.path+' = "None"';
 return f.path+" = { x = "+numericValue(q(".a"),true)+", y = "+numericValue(q(".b"),true)+" }";
