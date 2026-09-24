@@ -94,9 +94,13 @@ var specs=[
 ]},
 {title:"Environment",dynamic:"env",hint:"Add environment variables passed to processes spawned by Alacritty."},
 {title:"Window",fields:[
-{path:"window.dimensions",type:"intpair",a:"columns",b:"lines",av:0,bv:0,label:"Dimensions",hint:"Terminal columns and lines. Both must be non-zero to take effect; columns must be at least 2."},
-{path:"window.position",type:"position",label:"Position",hint:"Startup position in pixels. Coordinates have no effect on Wayland.",platform:"No effect on Wayland"},
-{path:"window.padding",type:"intpair",a:"x",b:"y",av:0,bv:0,label:"Padding",hint:"Blank space around terminal content, in pixels."},
+{path:"window.dimensions.columns",type:"int",def:0,min:0,disallow:[1],label:"Window columns",hint:"Terminal width in columns. 0 uses the window manager recommendation. Both columns and lines must be non-zero for explicit dimensions to take effect; non-zero columns must be at least 2."},
+{path:"window.dimensions.lines",type:"int",def:0,min:0,label:"Window lines",hint:"Terminal height in lines. 0 uses the window manager recommendation. Both columns and lines must be non-zero for explicit dimensions to take effect."},
+{path:"window.position",type:"select",def:"None",values:["None"],label:"Clear startup position",hint:"Explicitly resets an imported startup position to None. Do not combine this with Position X or Position Y.",platform:"No effect on Wayland"},
+{path:"window.position.x",type:"int",def:0,min:-2147483648,max:2147483647,label:"Position X",hint:"Horizontal startup position in pixels. The omitted Y coordinate defaults to 0 unless supplied elsewhere.",platform:"No effect on Wayland"},
+{path:"window.position.y",type:"int",def:0,min:-2147483648,max:2147483647,label:"Position Y",hint:"Vertical startup position in pixels. The omitted X coordinate defaults to 0 unless supplied elsewhere.",platform:"No effect on Wayland"},
+{path:"window.padding.x",type:"int",def:0,min:0,max:65535,label:"Horizontal padding",hint:"Blank space on the left and right of terminal content, in pixels."},
+{path:"window.padding.y",type:"int",def:0,min:0,max:65535,label:"Vertical padding",hint:"Blank space above and below terminal content, in pixels."},
 {path:"window.dynamic_padding",type:"bool",def:false,label:"Dynamic padding",hint:"Spread extra padding evenly around terminal content."},
 {path:"window.decorations",type:"select",def:"Full",values:["Full","None","Transparent","Buttonless"],label:"Decorations",hint:"Transparent and Buttonless are macOS-only."},
 {path:"window.opacity",type:"float",def:1,min:0,max:1,step:0.05,label:"Opacity",hint:"Background opacity from 0.0 (transparent) to 1.0 (opaque)."},
@@ -104,7 +108,8 @@ var specs=[
 {path:"window.startup_mode",type:"select",def:"Windowed",values:["Windowed","Maximized","Fullscreen","SimpleFullscreen"],label:"Startup mode",hint:"SimpleFullscreen is macOS-only. Requires restart."},
 {path:"window.title",type:"text",def:"Alacritty",label:"Title",hint:"Initial window title."},
 {path:"window.dynamic_title",type:"bool",def:true,label:"Dynamic title",hint:"Allow terminal applications to change the window title."},
-{path:"window.class",type:"stringpair",a:"instance",b:"general",av:"Alacritty",bv:"Alacritty",label:"Window class",hint:"On Wayland, general is the app_id and instance is ignored.",platform:"Linux / BSD"},
+{path:"window.class.instance",type:"text",def:"Alacritty",label:"Window class instance",hint:"X11 window class instance. Ignored on Wayland.",platform:"Linux / BSD"},
+{path:"window.class.general",type:"text",def:"Alacritty",label:"Window class / app ID",hint:"X11 general class; on Wayland this is used as the app_id.",platform:"Linux / BSD"},
 {path:"window.decorations_theme_variant",type:"select",def:"None",values:["Dark","Light","None"],label:"Decoration theme",hint:"Override system/GTK/Wayland decoration theme variant."},
 {path:"window.resize_increments",type:"bool",def:false,label:"Resize increments",hint:"Prefer window resizing in discrete cell-sized steps.",platform:"macOS / X11"},
 {path:"window.option_as_alt",type:"select",def:"None",values:["OnlyLeft","OnlyRight","Both","None"],label:"Option as Alt",hint:"Make Option behave as Alt.",platform:"macOS"},
@@ -112,16 +117,22 @@ var specs=[
 ]},
 {title:"Scrolling",fields:[
 {path:"scrolling.history",type:"int",def:10000,min:0,max:100000,label:"History",hint:"Maximum scrollback lines. 0 disables scrolling."},
-{path:"scrolling.multiplier",type:"int",def:3,min:0,label:"Scroll multiplier",hint:"Lines scrolled for each input scroll increment."}
+{path:"scrolling.multiplier",type:"int",def:3,min:0,max:255,label:"Scroll multiplier",hint:"Lines scrolled for each input scroll increment."}
 ]},
 {title:"Font",fields:[
-{path:"font.normal",type:"stringpair",a:"family",b:"style",av:"monospace",bv:"Regular",label:"Normal font",hint:"Linux/BSD default shown. Other platforms have different built-in defaults."},
-{path:"font.bold",type:"stringpair",a:"family",b:"style",av:"",bv:"Bold",label:"Bold font",hint:"Blank family falls back to the normal font family."},
-{path:"font.italic",type:"stringpair",a:"family",b:"style",av:"",bv:"Italic",label:"Italic font",hint:"Blank family falls back to the normal font family."},
-{path:"font.bold_italic",type:"stringpair",a:"family",b:"style",av:"",bv:"Bold Italic",label:"Bold italic font",hint:"Blank family falls back to the normal font family."},
-{path:"font.size",type:"float",def:11.25,min:1,step:0.25,label:"Font size",hint:"Font size in points."},
-{path:"font.offset",type:"intpair",a:"x",b:"y",av:0,bv:0,label:"Cell offset",hint:"Extra cell spacing. x changes letter spacing; y changes line spacing."},
-{path:"font.glyph_offset",type:"intpair",a:"x",b:"y",av:0,bv:0,label:"Glyph offset",hint:"Move glyphs inside their cells. Positive x moves right; positive y moves up."},
+{path:"font.normal.family",type:"text",def:"monospace",label:"Normal font family",hint:"Linux/BSD default shown. Windows defaults to Consolas and macOS to Menlo."},
+{path:"font.normal.style",type:"text",def:"Regular",label:"Normal font style",hint:"Omit this to let the normal font use its default style."},
+{path:"font.bold.family",type:"text",def:"",label:"Bold font family",hint:"Omitted by default, which falls back to the normal font family."},
+{path:"font.bold.style",type:"text",def:"Bold",label:"Bold font style",hint:"Style used for bold text."},
+{path:"font.italic.family",type:"text",def:"",label:"Italic font family",hint:"Omitted by default, which falls back to the normal font family."},
+{path:"font.italic.style",type:"text",def:"Italic",label:"Italic font style",hint:"Style used for italic text."},
+{path:"font.bold_italic.family",type:"text",def:"",label:"Bold italic font family",hint:"Omitted by default, which falls back to the normal font family."},
+{path:"font.bold_italic.style",type:"text",def:"Bold Italic",label:"Bold italic font style",hint:"Style used for bold italic text."},
+{path:"font.size",type:"float",def:11.25,step:0.25,label:"Font size",hint:"Font size in points."},
+{path:"font.offset.x",type:"int",def:0,min:-128,max:127,label:"Letter spacing offset",hint:"Extra horizontal cell spacing."},
+{path:"font.offset.y",type:"int",def:0,min:-128,max:127,label:"Line spacing offset",hint:"Extra vertical cell spacing."},
+{path:"font.glyph_offset.x",type:"int",def:0,min:-128,max:127,label:"Glyph X offset",hint:"Moves glyphs horizontally inside their cells; positive values move right."},
+{path:"font.glyph_offset.y",type:"int",def:0,min:-128,max:127,label:"Glyph Y offset",hint:"Moves glyphs vertically inside their cells; positive values move up."},
 {path:"font.builtin_box_drawing",type:"bool",def:true,label:"Built-in box drawing",hint:"Use Alacritty's built-in glyphs for box drawing, legacy computing, and powerline symbols."}
 ]},
 {title:"Colors",fields:[
@@ -129,15 +140,24 @@ var specs=[
 {path:"colors.primary.background",type:"text",def:"#181818",label:"Primary background",hint:"Hex color."},
 {path:"colors.primary.dim_foreground",type:"text",def:"#828482",label:"Dim foreground",hint:"If omitted, Alacritty can calculate it from the foreground."},
 {path:"colors.primary.bright_foreground",type:"text",def:"None",label:"Bright foreground",hint:"Used when bold text is drawn with bright colors."},
-{path:"colors.cursor",type:"stringpair",a:"text",b:"cursor",av:"CellBackground",bv:"CellForeground",label:"Cursor colors",hint:"Use hex, CellForeground, or CellBackground."},
-{path:"colors.vi_mode_cursor",type:"stringpair",a:"text",b:"cursor",av:"CellBackground",bv:"CellForeground",label:"Vi cursor colors",hint:"Use hex, CellForeground, or CellBackground."},
-{path:"colors.search.matches",type:"stringpair",a:"foreground",b:"background",av:"#181818",bv:"#ac4242",label:"Search matches",hint:"Foreground and background for normal search matches."},
-{path:"colors.search.focused_match",type:"stringpair",a:"foreground",b:"background",av:"#181818",bv:"#f4bf75",label:"Focused search match",hint:"Foreground and background for the focused search match."},
-{path:"colors.hints.start",type:"stringpair",a:"foreground",b:"background",av:"#181818",bv:"#f4bf75",label:"Hint start",hint:"First character of a hint label."},
-{path:"colors.hints.end",type:"stringpair",a:"foreground",b:"background",av:"#181818",bv:"#ac4242",label:"Hint end",hint:"Remaining characters of a hint label."},
-{path:"colors.line_indicator",type:"stringpair",a:"foreground",b:"background",av:"None",bv:"None",label:"Line indicator",hint:"History position indicator colors. None uses opposing primary color."},
-{path:"colors.footer_bar",type:"stringpair",a:"foreground",b:"background",av:"#181818",bv:"#d8d8d8",label:"Footer bar",hint:"Search input and URI preview footer colors."},
-{path:"colors.selection",type:"stringpair",a:"text",b:"background",av:"CellBackground",bv:"CellForeground",label:"Selection",hint:"Selection text and background colors."},
+{path:"colors.cursor.text",type:"text",def:"CellBackground",label:"Cursor text color",hint:"Use a #RRGGBB color, CellForeground, or CellBackground."},
+{path:"colors.cursor.cursor",type:"text",def:"CellForeground",label:"Cursor color",hint:"Use a #RRGGBB color, CellForeground, or CellBackground."},
+{path:"colors.vi_mode_cursor.text",type:"text",def:"CellBackground",label:"Vi cursor text color",hint:"Use a #RRGGBB color, CellForeground, or CellBackground."},
+{path:"colors.vi_mode_cursor.cursor",type:"text",def:"CellForeground",label:"Vi cursor color",hint:"Use a #RRGGBB color, CellForeground, or CellBackground."},
+{path:"colors.search.matches.foreground",type:"text",def:"#181818",label:"Search match foreground"},
+{path:"colors.search.matches.background",type:"text",def:"#ac4242",label:"Search match background"},
+{path:"colors.search.focused_match.foreground",type:"text",def:"#181818",label:"Focused match foreground"},
+{path:"colors.search.focused_match.background",type:"text",def:"#f4bf75",label:"Focused match background"},
+{path:"colors.hints.start.foreground",type:"text",def:"#181818",label:"Hint start foreground",hint:"Foreground for the first character in a hint label."},
+{path:"colors.hints.start.background",type:"text",def:"#f4bf75",label:"Hint start background",hint:"Background for the first character in a hint label."},
+{path:"colors.hints.end.foreground",type:"text",def:"#181818",label:"Hint end foreground",hint:"Foreground for the remaining characters in a hint label."},
+{path:"colors.hints.end.background",type:"text",def:"#ac4242",label:"Hint end background",hint:"Background for the remaining characters in a hint label."},
+{path:"colors.line_indicator.foreground",type:"text",def:"None",label:"Line indicator foreground",hint:"Use #RRGGBB or None. None uses the opposing primary color."},
+{path:"colors.line_indicator.background",type:"text",def:"None",label:"Line indicator background",hint:"Use #RRGGBB or None. None uses the opposing primary color."},
+{path:"colors.footer_bar.foreground",type:"text",def:"#181818",label:"Footer bar foreground"},
+{path:"colors.footer_bar.background",type:"text",def:"#d8d8d8",label:"Footer bar background"},
+{path:"colors.selection.text",type:"text",def:"CellBackground",label:"Selection text color",hint:"Use a #RRGGBB color, CellForeground, or CellBackground."},
+{path:"colors.selection.background",type:"text",def:"CellForeground",label:"Selection background",hint:"Use a #RRGGBB color, CellForeground, or CellBackground."},
 {path:"colors.normal.black",type:"text",def:"#181818",label:"Normal black"},
 {path:"colors.normal.red",type:"text",def:"#ac4242",label:"Normal red"},
 {path:"colors.normal.green",type:"text",def:"#90a959",label:"Normal green"},
@@ -164,23 +184,25 @@ var specs=[
 {path:"colors.dim.white",type:"text",def:"#8e8e8e",label:"Dim white"},
 {path:"colors.transparent_background_colors",type:"bool",def:false,label:"Transparent cell colors",hint:"Apply window opacity to all cell backgrounds, not just the default background."},
 {path:"colors.draw_bold_text_with_bright_colors",type:"bool",def:false,label:"Bright bold text",hint:"Render bold text with the bright palette."}
-],dynamic:"indexed",hint:"Indexed colors cover palette indexes 16 through 255."},
+],dynamic:"indexed",hint:"Indexed colors cover palette indexes 16 through 255. Note: setting any colors.dim.* value activates Alacritty's explicit dim palette; unspecified dim colors then use Alacritty's fixed dim defaults instead of being auto-derived from your normal palette."},
 {title:"Bell",fields:[
 {path:"bell.animation",type:"select",def:"Linear",values:["Ease","EaseOut","EaseOutSine","EaseOutQuad","EaseOutCubic","EaseOutQuart","EaseOutQuint","EaseOutExpo","EaseOutCirc","Linear"],label:"Animation",hint:"Visual bell animation curve."},
-{path:"bell.duration",type:"int",def:0,min:0,label:"Duration",hint:"Visual bell duration in milliseconds. 0 disables the animation."},
+{path:"bell.duration",type:"int",def:0,min:0,max:65535,label:"Duration",hint:"Visual bell duration in milliseconds. 0 disables the animation."},
 {path:"bell.color",type:"text",def:"#ffffff",label:"Color",hint:"Visual bell flash color."},
 {path:"bell.command",type:"command",allowNone:true,label:"Command",hint:"Program executed when the bell rings. None disables it."}
 ]},
 {title:"Selection",fields:[
-{path:"selection.semantic_escape_chars",type:"text",def:",│\u0060|:\\\"' ()[]{}<>\\t",label:"Semantic separators",hint:"Characters used as boundaries for semantic word selection."},
+{path:"selection.semantic_escape_chars",type:"text",def:",│\u0060|:\"' ()[]{}<>\t",label:"Semantic separators",hint:"Characters used as boundaries for semantic word selection. The default includes a literal tab character."},
 {path:"selection.save_to_clipboard",type:"bool",def:false,label:"Save to clipboard",hint:"Copy selected text to the primary clipboard."}
 ]},
 {title:"Cursor",fields:[
 {path:"cursor.style.shape",type:"select",def:"Block",values:["Block","Underline","Beam"],label:"Cursor shape",hint:"Cursor shape. Omit this to keep Alacritty's default Block shape."},
 {path:"cursor.style.blinking",type:"select",def:"Off",values:["Never","Off","On","Always"],label:"Cursor blinking",hint:"Cursor blinking behavior. This can be overridden independently of cursor shape."},
-{path:"cursor.vi_mode_style",type:"vistyle",label:"Vi cursor style",hint:"None inherits the normal cursor style."},
-{path:"cursor.blink_interval",type:"int",def:750,min:1,label:"Blink interval",hint:"Blink interval in milliseconds."},
-{path:"cursor.blink_timeout",type:"int",def:5,min:0,label:"Blink timeout",hint:"Seconds until blinking stops. 0 disables the timeout."},
+{path:"cursor.vi_mode_style",type:"select",def:"None",values:["None"],label:"Clear Vi cursor style",hint:"Explicitly resets an imported Vi cursor style to None, which inherits the normal cursor style. Do not combine this with Vi cursor shape or blinking."},
+{path:"cursor.vi_mode_style.shape",type:"select",def:"Block",values:["Block","Underline","Beam"],label:"Vi cursor shape",hint:"Any Vi style override creates a separate Vi cursor style; an omitted blinking member defaults to Off."},
+{path:"cursor.vi_mode_style.blinking",type:"select",def:"Off",values:["Never","Off","On","Always"],label:"Vi cursor blinking",hint:"Any Vi style override creates a separate Vi cursor style; an omitted shape member defaults to Block rather than inheriting the normal cursor shape."},
+{path:"cursor.blink_interval",type:"int",def:750,min:0,label:"Blink interval",hint:"Blink interval in milliseconds. Alacritty clamps values below 10 ms to 10 ms."},
+{path:"cursor.blink_timeout",type:"int",def:5,min:0,max:255,label:"Blink timeout",hint:"Seconds until blinking stops. 0 disables the timeout."},
 {path:"cursor.unfocused_hollow",type:"bool",def:true,label:"Unfocused hollow",hint:"Render a hollow box cursor while the window is unfocused."},
 {path:"cursor.thickness",type:"float",def:0.15,min:0,max:1,step:0.05,label:"Thickness",hint:"Beam/underline thickness relative to cell width, from 0.0 to 1.0."}
 ]},
@@ -193,7 +215,7 @@ var specs=[
 ],dynamic:"mouse",hint:"Mouse bindings support button, modifiers, terminal mode, and action/chars/command results."},
 {title:"Hints",fields:[
 {path:"hints.alphabet",type:"text",def:"jfkdls;ahgurieowpq",label:"Hint alphabet",hint:"Characters used for hint labels."}
-],dynamic:"hints",hint:"Each hint needs regex or hyperlinks, plus an action or command."},
+],dynamic:"hints",hint:"Each hint needs regex or hyperlinks, plus an action or command. Supplying hints.enabled replaces Alacritty's built-in default URL hint list; it does not append to it."},
 {title:"Keyboard",dynamic:"keyboard",hint:"Add custom keyboard bindings. Use ReceiveChar to remove a default binding or None to inhibit it."},
 {title:"Debug",fields:[
 {path:"debug.render_timer",type:"bool",def:false,label:"Render timer",hint:"Display frame render time."},
@@ -281,7 +303,7 @@ if(kind==="indexed"){
 row.innerHTML='<div class="rowhead"><span class="rowtitle">Indexed color</span><button class="remove" type="button">Remove</button></div><div class="fieldgrid"><div><label>Index (16–255)</label><input class="idx" type="number" min="16" max="255" step="1" value="16"></div><div><label>Color</label><input class="color" type="text" value="#ffffff"></div></div>';
 }
 if(kind==="keyboard"||kind==="mouse"){
-var first=kind==="keyboard"?'<div><label>Key</label><input class="trigger" type="text" placeholder="N or F1 or 42"></div>':'<div><label>Mouse button</label><input class="trigger" type="text" placeholder="Right, Back, Forward, or number"></div>';
+var first=kind==="keyboard"?'<div><label>Key type</label><select class="triggerType"><option value="key">Key name</option><option value="scancode">Scancode</option></select></div><div><label>Key / scancode</label><input class="trigger" type="text" placeholder="N, 0, F1, or 42"></div>':'<div><label>Mouse button</label><input class="trigger" type="text" placeholder="Right, Back, Forward, or number"></div>';
 var bindingActions=kind==="mouse"?actions.concat(["ExpandSelection"]):actions;
 row.innerHTML='<div class="rowhead"><span class="rowtitle">'+(kind==="keyboard"?"Keyboard binding":"Mouse binding")+'</span><button class="remove" type="button">Remove</button></div><div class="fieldgrid">'+first+'<div><label>Modifiers</label><input class="mods" type="text" placeholder="Control|Shift"></div><div><label>Mode</label><input class="termmode" type="text" placeholder="~Vi|Search"></div><div><label>Result type</label><select class="resultType"><option value="action">Action</option><option value="chars">Chars</option><option value="command">Command</option></select></div><div class="wide actionWrap"><label>Action</label><select class="action">'+selectedOptions(bindingActions,"Copy")+'</select></div><div class="wide charsWrap" hidden><label>Chars</label><input class="chars" type="text" placeholder="Text or escape sequence"></div><div class="commandWrap" hidden><label>Program</label><input class="program" type="text" placeholder="/path/to/program"></div><div class="commandWrap" hidden><label>Arguments — one per line</label><textarea class="args" rows="2"></textarea></div></div>';
 var rt=row.querySelector(".resultType");
@@ -308,9 +330,15 @@ var t=row.querySelector(".hintResult").value;
 row.querySelector(".actionWrap").hidden=t!=="action";
 row.querySelectorAll(".commandWrap").forEach(function(e){e.hidden=t!=="command";});
 }
-function numericValue(el,integer){
-var n=integer?parseInt(el.value,10):parseFloat(el.value);
-if(!Number.isFinite(n)) throw new Error("Invalid number");
+function numericValue(el,integer,spec){
+var raw=el.value.trim();
+if(integer&&!/^[+-]?\d+$/.test(raw)) throw new Error((spec&&spec.label?spec.label:"Value")+" must be an integer");
+var n=integer?Number(raw):Number(raw);
+if(!Number.isFinite(n)) throw new Error((spec&&spec.label?spec.label:"Value")+" must be a number");
+if(integer&&!Number.isSafeInteger(n)) throw new Error((spec&&spec.label?spec.label:"Value")+" is outside the browser's safe integer range");
+if(spec&&spec.min!==undefined&&n<spec.min) throw new Error(spec.label+" must be at least "+spec.min);
+if(spec&&spec.max!==undefined&&n>spec.max) throw new Error(spec.label+" must be at most "+spec.max);
+if(spec&&spec.disallow&&spec.disallow.indexOf(n)!==-1) throw new Error(spec.label+" cannot be "+n);
 if(integer)return String(n);
 var s=String(n);return /^[+-]?\d+$/.test(s)?s+".0":s;
 }
@@ -319,9 +347,13 @@ var f=item.spec,row=item.row;
 if(!row.querySelector(".override").checked)return null;
 function q(sel){return row.querySelector(sel);}
 if(f.type==="bool")return f.path+" = "+q(".value").value;
-if(f.type==="select"||f.type==="text")return f.path+" = "+tomlString(q(".value").value);
-if(f.type==="int")return f.path+" = "+numericValue(q(".value"),true);
-if(f.type==="float")return f.path+" = "+numericValue(q(".value"),false);
+if(f.type==="select"||f.type==="text"){
+var textValue=q(".value").value;
+if(f.path==="hints.alphabet"&&Array.from(textValue).length<2)throw new Error("Hint alphabet must contain at least 2 characters");
+return f.path+" = "+tomlString(textValue);
+}
+if(f.type==="int")return f.path+" = "+numericValue(q(".value"),true,f);
+if(f.type==="float")return f.path+" = "+numericValue(q(".value"),false,f);
 if(f.type==="list"){
 var vals=q(".value").value.split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean);
 return f.path+" = ["+vals.map(tomlString).join(", ")+"]";
@@ -360,7 +392,20 @@ out.push("[[colors.indexed_colors]]\nindex = "+idx+"\ncolor = "+tomlString(r.que
 document.querySelectorAll('.dynamic-list[data-dynamic="'+kind+'"] .dynrow').forEach(function(r){
 var trigger=r.querySelector(".trigger").value.trim();if(!trigger)return;
 var lines=["[["+kind+".bindings]]"];
-var numericTrigger=/^\d+$/.test(trigger);lines.push((kind==="keyboard"?"key":"mouse")+" = "+(numericTrigger?String(parseInt(trigger,10)):tomlString(trigger)));
+if(kind==="keyboard"){
+var triggerType=r.querySelector(".triggerType").value;
+if(triggerType==="scancode"){
+if(!/^\d+$/.test(trigger))throw new Error("Keyboard scancode must be a non-negative integer");
+var scancode=Number(trigger);
+if(!Number.isSafeInteger(scancode)||scancode>4294967295)throw new Error("Keyboard scancode must fit in an unsigned 32-bit integer");
+lines.push("key = "+String(scancode));
+}else{
+lines.push("key = "+tomlString(trigger));
+}
+}else{
+var numericTrigger=/^\d+$/.test(trigger);
+lines.push("mouse = "+(numericTrigger?String(Number(trigger)):tomlString(trigger)));
+}
 var mods=r.querySelector(".mods").value.trim(),mode=r.querySelector(".termmode").value.trim();
 if(mods)lines.push("mods = "+tomlString(mods));if(mode)lines.push("mode = "+tomlString(mode));
 var t=r.querySelector(".resultType").value;
@@ -402,9 +447,18 @@ out.push(lines.join("\n"));
 });
 return out;
 }
+function overridden(path){
+var item=fieldEls.find(function(x){return x.spec.path===path;});
+return !!(item&&item.row.querySelector(".override").checked);
+}
+function validateOverrideConflicts(){
+if(overridden("window.position")&&(overridden("window.position.x")||overridden("window.position.y")))throw new Error("Clear startup position cannot be combined with Position X or Position Y");
+if(overridden("cursor.vi_mode_style")&&(overridden("cursor.vi_mode_style.shape")||overridden("cursor.vi_mode_style.blinking")))throw new Error("Clear Vi cursor style cannot be combined with Vi cursor shape or Vi cursor blinking");
+}
 function render(){
 var lines=["# Generated by gpages Alacritty Config Generator","# Target: Alacritty 0.16.1",""];
 try{
+validateOverrideConflicts();
 fieldEls.forEach(function(item){var s=serializeField(item);if(s)lines.push(s);});
 var dyn=dynamicToml();if(dyn.length){if(lines[lines.length-1]!=="")lines.push("");dyn.forEach(function(block,i){lines.push(block);if(i<dyn.length-1)lines.push("");});}
 while(lines.length&&lines[lines.length-1]==="")lines.pop();
