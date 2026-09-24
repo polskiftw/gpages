@@ -274,11 +274,26 @@ row.innerHTML='<label class="emit"><input class="override" type="checkbox"> Over
 body.appendChild(row);
 fieldEls.push({spec:f,row:row});
 var cb=row.querySelector(".override");
+function syncCommandControls(){
+if(f.type!=="command")return;
+var mode=row.querySelector(".mode"),program=row.querySelector(".program"),args=row.querySelector(".args");
+var enabled=cb.checked;
+var none=mode.value==="none";
+var object=mode.value==="object";
+program.disabled=!enabled||none;
+args.disabled=!enabled||!object;
+args.closest(".wide").hidden=!object;
+}
 cb.addEventListener("change",function(){
 row.querySelectorAll(".value,.a,.b,.mode,.program,.args").forEach(function(el){el.disabled=!cb.checked;});
+syncCommandControls();
 render();
 });
-row.querySelectorAll("input,select,textarea").forEach(function(el){el.addEventListener("input",render);el.addEventListener("change",render);});
+row.querySelectorAll("input,select,textarea").forEach(function(el){
+el.addEventListener("input",render);
+el.addEventListener("change",function(){syncCommandControls();render();});
+});
+syncCommandControls();
 });
 }
 if(sec.dynamic){
