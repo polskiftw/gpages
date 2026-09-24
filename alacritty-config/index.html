@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2f2f7">
+<title>Alacritty Config Generator</title>
+<style>
+:root{color-scheme:light dark;--bg:#f2f2f7;--card:#fff;--field:#f7f7fa;--text:#111;--muted:#6e6e73;--border:rgba(60,60,67,.18);--accent:#007aff;--danger:#c62828;--shadow:0 1px 2px rgba(0,0,0,.04),0 8px 28px rgba(0,0,0,.05)}
+@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--field:#2c2c2e;--text:#f5f5f7;--muted:#98989d;--border:rgba(84,84,88,.65);--accent:#0a84ff;--danger:#ff6961;--shadow:none}}
+*{box-sizing:border-box}
+body{margin:0;padding:max(22px,env(safe-area-inset-top)) 16px max(32px,env(safe-area-inset-bottom));background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+main{width:min(100%,980px);margin:0 auto}
+.topline{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 2px 16px}.back{color:var(--accent);text-decoration:none;font-weight:700}.version{font-size:12px;font-weight:800;padding:5px 9px;border-radius:999px;background:var(--field);border:1px solid var(--border)}
+h1{font-size:32px;line-height:1.05;letter-spacing:-.7px;margin:0 2px 7px}.subtitle{color:var(--muted);line-height:1.5;margin:0 2px 18px}
+.card,details{background:var(--card);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow)}
+.card{padding:16px;margin-bottom:14px}
+.notice{line-height:1.5}.notice strong{font-weight:800}.notice code,code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.toolbar{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.toolbar input{min-width:0}
+input,select,textarea,button{font:inherit}
+input[type=text],input[type=number],input[type=search],select,textarea{width:100%;border:1px solid var(--border);border-radius:11px;background:var(--field);color:var(--text);padding:10px 11px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+input:disabled,select:disabled,textarea:disabled{opacity:.55}
+button{border:0;border-radius:11px;min-height:42px;padding:0 13px;font-weight:750;cursor:pointer}.primary{background:var(--accent);color:#fff}.secondary{background:var(--field);color:var(--accent);border:1px solid var(--border)}button:active{transform:scale(.985)}
+details{margin:0 0 12px;overflow:hidden}summary{cursor:pointer;font-size:18px;font-weight:800;padding:16px 18px;list-style:none}summary::-webkit-details-marker{display:none}summary:after{content:"+";float:right;color:var(--muted)}details[open] summary:after{content:"−"}details[open] summary{border-bottom:1px solid var(--border)}
+.sectionbody{padding:4px 16px 12px}.setting{display:grid;grid-template-columns:95px minmax(0,1fr);gap:12px;padding:13px 2px;border-bottom:1px solid var(--border)}.setting:last-child{border-bottom:0}.emit{display:flex;align-items:flex-start;gap:7px;font-size:13px;font-weight:800;padding-top:3px}.emit input{width:18px;height:18px;margin:0}.settingname{font-weight:800;margin-bottom:4px}.path{font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted);margin-bottom:6px}.hint{font-size:13px;line-height:1.42;color:var(--muted);margin:6px 0 0}.platform{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.35px;margin-left:6px}
+.inline2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.inline3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.subfield label{display:block;font-size:11px;font-weight:800;color:var(--muted);margin:0 0 4px 2px;text-transform:uppercase;letter-spacing:.35px}
+.dynamic-head{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:12px 2px 4px}.dynamic-head h3{font-size:16px;margin:0}.dynamic-help{font-size:13px;color:var(--muted);line-height:1.45;margin:0 2px 10px}
+.dynamic-list{display:grid;gap:10px}.dynrow{border:1px solid var(--border);border-radius:13px;background:var(--field);padding:11px}.dynrow .rowhead{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:9px}.dynrow .rowtitle{font-size:13px;font-weight:800}.remove{min-height:32px;padding:0 9px;background:transparent;color:var(--danger);border:1px solid var(--border)}
+.fieldgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.fieldgrid .wide{grid-column:1/-1}.fieldgrid label{display:block;font-size:11px;font-weight:800;color:var(--muted);margin:0 0 4px 2px;text-transform:uppercase;letter-spacing:.35px}
+.output textarea{min-height:300px;resize:vertical;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;white-space:pre}.outputbar{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:10px}.status{min-height:20px;margin-top:9px;color:var(--muted);font-size:13px}.status.error{color:var(--danger)}
+.empty{color:var(--muted);font-size:13px;padding:8px 2px}
+footer{color:var(--muted);font-size:12px;line-height:1.5;text-align:center;margin:18px 8px 0}footer a{color:var(--accent)}
+@media(max-width:650px){.setting{grid-template-columns:1fr}.emit{padding-top:0}.fieldgrid,.inline3{grid-template-columns:1fr}.toolbar,.outputbar{grid-template-columns:1fr}.inline2{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body><main>
+<div class="topline"><a class="back" href="../">‹ gpages</a><span class="version">Alacritty 0.16.1</span></div>
+<h1>Alacritty Config Generator</h1>
+<p class="subtitle">Turn on only the settings you want to override. Everything else is omitted from <code>alacritty.toml</code>, so Alacritty keeps its built-in default behavior.</p>
+
+<section class="card notice">
+<strong>Default means absent.</strong> The values shown in the controls are Alacritty 0.16.1 defaults or examples, but a setting is not written until its <strong>Override</strong> switch is enabled. Dynamic lists are also omitted until you add an entry.
+</section>
+
+<section class="card toolbar">
+<input id="filter" type="search" placeholder="Find a setting… e.g. opacity, cursor, font, clipboard" autocomplete="off" spellcheck="false">
+<button class="secondary" id="expandAll" type="button">Expand all</button>
+</section>
+
+<div id="sections"></div>
+
+<section class="card output">
+<div class="settingname">Generated alacritty.toml</div>
+<div class="hint">This preview updates immediately. Only explicit overrides are emitted.</div>
+<textarea id="output" readonly spellcheck="false"></textarea>
+<div class="outputbar">
+<button class="primary" id="downloadBtn" type="button">Download alacritty.toml</button>
+<button class="secondary" id="copyBtn" type="button">Copy TOML</button>
+<button class="secondary" id="resetBtn" type="button">Reset overrides</button>
+</div>
+<div id="status" class="status" aria-live="polite"></div>
+</section>
+
+<footer>Schema pinned to the official Alacritty 0.16.1 configuration manual. Put the result at <code>~/.config/alacritty/alacritty.toml</code> on a normal Linux setup.</footer>
+</main>
+
+<script>
+(function(){
+"use strict";
+
+var actions=[
+"ReceiveChar","None","Paste","Copy","IncreaseFontSize","DecreaseFontSize","ResetFontSize",
+"ScrollPageUp","ScrollPageDown","ScrollHalfPageUp","ScrollHalfPageDown","ScrollLineUp","ScrollLineDown",
+"ScrollToTop","ScrollToBottom","ClearHistory","Hide","Minimize","Quit","ClearLogNotice","SpawnNewInstance",
+"CreateNewWindow","ToggleFullscreen","ToggleMaximized","ClearSelection","ToggleViMode","SearchForward","SearchBackward",
+"Up","Down","Left","Right","First","Last","FirstOccupied","High","Middle","Low","SemanticLeft","SemanticRight",
+"SemanticLeftEnd","SemanticRightEnd","WordLeft","WordRight","WordLeftEnd","WordRightEnd","Bracket","ParagraphUp","ParagraphDown",
+"ToggleNormalSelection","ToggleLineSelection","ToggleBlockSelection","ToggleSemanticSelection","SearchNext","SearchPrevious",
+"SearchStart","SearchEnd","Open","CenterAroundViCursor","InlineSearchForward","InlineSearchBackward","InlineSearchForwardShort",
+"InlineSearchBackwardShort","InlineSearchNext","InlineSearchPrevious","SemanticSearchForward","SemanticSearchBackward",
+"SearchFocusNext","SearchFocusPrevious","SearchConfirm","SearchCancel","SearchClear","SearchDeleteWord","SearchHistoryPrevious",
+"SearchHistoryNext","ToggleSimpleFullscreen","HideOtherApplications","CreateNewTab","SelectNextTab","SelectPreviousTab",
+"SelectTab1","SelectTab2","SelectTab3","SelectTab4","SelectTab5","SelectTab6","SelectTab7","SelectTab8","SelectTab9",
+"SelectLastTab","CopySelection","PasteSelection"
+];
+
+var specs=[
+{title:"General",open:true,fields:[
+{path:"general.import",type:"list",def:"",label:"Imports",hint:"Additional config files, one path per line. Missing imports are skipped."},
+{path:"general.working_directory",type:"text",def:"None",label:"Working directory",hint:"Shell startup directory. \"None\" follows the parent process."},
+{path:"general.live_config_reload",type:"bool",def:true,label:"Live config reload",hint:"Automatically reload the config when it changes."},
+{path:"general.ipc_socket",type:"bool",def:true,label:"IPC socket",hint:"Offer IPC through alacritty msg.",platform:"Unix"}
+]},
+{title:"Environment",dynamic:"env",hint:"Add environment variables passed to processes spawned by Alacritty."},
+{title:"Window",fields:[
+{path:"window.dimensions",type:"intpair",a:"columns",b:"lines",av:0,bv:0,label:"Dimensions",hint:"Terminal columns and lines. Both must be non-zero to take effect; columns must be at least 2."},
+{path:"window.position",type:"position",label:"Position",hint:"Startup position in pixels. Coordinates have no effect on Wayland.",platform:"No effect on Wayland"},
+{path:"window.padding",type:"intpair",a:"x",b:"y",av:0,bv:0,label:"Padding",hint:"Blank space around terminal content, in pixels."},
+{path:"window.dynamic_padding",type:"bool",def:false,label:"Dynamic padding",hint:"Spread extra padding evenly around terminal content."},
+{path:"window.decorations",type:"select",def:"Full",values:["Full","None","Transparent","Buttonless"],label:"Decorations",hint:"Transparent and Buttonless are macOS-only."},
+{path:"window.opacity",type:"float",def:1,min:0,max:1,step:0.05,label:"Opacity",hint:"Background opacity from 0.0 (transparent) to 1.0 (opaque)."},
+{path:"window.blur",type:"bool",def:false,label:"Blur",hint:"Request compositor blur behind transparent windows.",platform:"macOS / KDE Wayland"},
+{path:"window.startup_mode",type:"select",def:"Windowed",values:["Windowed","Maximized","Fullscreen","SimpleFullscreen"],label:"Startup mode",hint:"SimpleFullscreen is macOS-only. Requires restart."},
+{path:"window.title",type:"text",def:"Alacritty",label:"Title",hint:"Initial window title."},
+{path:"window.dynamic_title",type:"bool",def:true,label:"Dynamic title",hint:"Allow terminal applications to change the window title."},
+{path:"window.class",type:"stringpair",a:"instance",b:"general",av:"Alacritty",bv:"Alacritty",label:"Window class",hint:"On Wayland, general is the app_id and instance is ignored.",platform:"Linux / BSD"},
+{path:"window.decorations_theme_variant",type:"select",def:"None",values:["Dark","Light","None"],label:"Decoration theme",hint:"Override system/GTK/Wayland decoration theme variant."},
+{path:"window.resize_increments",type:"bool",def:false,label:"Resize increments",hint:"Prefer window resizing in discrete cell-sized steps.",platform:"macOS / X11"},
+{path:"window.option_as_alt",type:"select",def:"None",values:["OnlyLeft","OnlyRight","Both","None"],label:"Option as Alt",hint:"Make Option behave as Alt.",platform:"macOS"},
+{path:"window.level",type:"select",def:"Normal",values:["Normal","AlwaysOnTop"],label:"Window level",hint:"Control normal versus always-on-top z-order."}
+]},
+{title:"Scrolling",fields:[
+{path:"scrolling.history",type:"int",def:10000,min:0,max:100000,label:"History",hint:"Maximum scrollback lines. 0 disables scrolling."},
+{path:"scrolling.multiplier",type:"int",def:3,min:0,label:"Scroll multiplier",hint:"Lines scrolled for each input scroll increment."}
+]},
+{title:"Font",fields:[
+{path:"font.normal",type:"stringpair",a:"family",b:"style",av:"monospace",bv:"Regular",label:"Normal font",hint:"Linux/BSD default shown. Other platforms have different built-in defaults."},
+{path:"font.bold",type:"stringpair",a:"family",b:"style",av:"",bv:"Bold",label:"Bold font",hint:"Blank family falls back to the normal font family."},
+{path:"font.italic",type:"stringpair",a:"family",b:"style",av:"",bv:"Italic",label:"Italic font",hint:"Blank family falls back to the normal font family."},
+{path:"font.bold_italic",type:"stringpair",a:"family",b:"style",av:"",bv:"Bold Italic",label:"Bold italic font",hint:"Blank family falls back to the normal font family."},
+{path:"font.size",type:"float",def:11.25,min:1,step:0.25,label:"Font size",hint:"Font size in points."},
+{path:"font.offset",type:"intpair",a:"x",b:"y",av:0,bv:0,label:"Cell offset",hint:"Extra cell spacing. x changes letter spacing; y changes line spacing."},
+{path:"font.glyph_offset",type:"intpair",a:"x",b:"y",av:0,bv:0,label:"Glyph offset",hint:"Move glyphs inside their cells. Positive x moves right; positive y moves up."},
+{path:"font.builtin_box_drawing",type:"bool",def:true,label:"Built-in box drawing",hint:"Use Alacritty's built-in glyphs for box drawing, legacy computing, and powerline symbols."}
+]},
+{title:"Colors",fields:[
+{path:"colors.primary.foreground",type:"text",def:"#d8d8d8",label:"Primary foreground",hint:"Hex color."},
+{path:"colors.primary.background",type:"text",def:"#181818",label:"Primary background",hint:"Hex color."},
+{path:"colors.primary.dim_foreground",type:"text",def:"#828482",label:"Dim foreground",hint:"If omitted, Alacritty can calculate it from the foreground."},
+{path:"colors.primary.bright_foreground",type:"text",def:"None",label:"Bright foreground",hint:"Used when bold text is drawn with bright colors."},
+{path:"colors.cursor",type:"stringpair",a:"text",b:"cursor",av:"CellBackground",bv:"CellForeground",label:"Cursor colors",hint:"Use hex, CellForeground, or CellBackground."},
+{path:"colors.vi_mode_cursor",type:"stringpair",a:"text",b:"cursor",av:"CellBackground",bv:"CellForeground",label:"Vi cursor colors",hint:"Use hex, CellForeground, or CellBackground."},
+{path:"colors.search.matches",type:"stringpair",a:"foreground",b:"background",av:"#181818",bv:"#ac4242",label:"Search matches",hint:"Foreground and background for normal search matches."},
+{path:"colors.search.focused_match",type:"stringpair",a:"foreground",b:"background",av:"#181818",bv:"#f4bf75",label:"Focused search match",hint:"Foreground and background for the focused search match."},
+{path:"colors.hints.start",type:"stringpair",a:"foreground",b:"background",av:"#181818",bv:"#f4bf75",label:"Hint start",hint:"First character of a hint label."},
+{path:"colors.hints.end",type:"stringpair",a:"foreground",b:"background",av:"#181818",bv:"#ac4242",label:"Hint end",hint:"Remaining characters of a hint label."},
+{path:"colors.line_indicator",type:"stringpair",a:"foreground",b:"background",av:"None",bv:"None",label:"Line indicator",hint:"History position indicator colors. None uses opposing primary color."},
+{path:"colors.footer_bar",type:"stringpair",a:"foreground",b:"background",av:"#181818",bv:"#d8d8d8",label:"Footer bar",hint:"Search input and URI preview footer colors."},
+{path:"colors.selection",type:"stringpair",a:"text",b:"background",av:"CellBackground",bv:"CellForeground",label:"Selection",hint:"Selection text and background colors."},
+{path:"colors.normal.black",type:"text",def:"#181818",label:"Normal black"},
+{path:"colors.normal.red",type:"text",def:"#ac4242",label:"Normal red"},
+{path:"colors.normal.green",type:"text",def:"#90a959",label:"Normal green"},
+{path:"colors.normal.yellow",type:"text",def:"#f4bf75",label:"Normal yellow"},
+{path:"colors.normal.blue",type:"text",def:"#6a9fb5",label:"Normal blue"},
+{path:"colors.normal.magenta",type:"text",def:"#aa759f",label:"Normal magenta"},
+{path:"colors.normal.cyan",type:"text",def:"#75b5aa",label:"Normal cyan"},
+{path:"colors.normal.white",type:"text",def:"#d8d8d8",label:"Normal white"},
+{path:"colors.bright.black",type:"text",def:"#6b6b6b",label:"Bright black"},
+{path:"colors.bright.red",type:"text",def:"#c55555",label:"Bright red"},
+{path:"colors.bright.green",type:"text",def:"#aac474",label:"Bright green"},
+{path:"colors.bright.yellow",type:"text",def:"#feca88",label:"Bright yellow"},
+{path:"colors.bright.blue",type:"text",def:"#82b8c8",label:"Bright blue"},
+{path:"colors.bright.magenta",type:"text",def:"#c28cb8",label:"Bright magenta"},
+{path:"colors.bright.cyan",type:"text",def:"#93d3c3",label:"Bright cyan"},
+{path:"colors.bright.white",type:"text",def:"#f8f8f8",label:"Bright white"},
+{path:"colors.dim.black",type:"text",def:"#0f0f0f",label:"Dim black"},
+{path:"colors.dim.red",type:"text",def:"#712b2b",label:"Dim red"},
+{path:"colors.dim.green",type:"text",def:"#5f6f3a",label:"Dim green"},
+{path:"colors.dim.yellow",type:"text",def:"#a17e4d",label:"Dim yellow"},
+{path:"colors.dim.blue",type:"text",def:"#456877",label:"Dim blue"},
+{path:"colors.dim.magenta",type:"text",def:"#704d68",label:"Dim magenta"},
+{path:"colors.dim.cyan",type:"text",def:"#4d7770",label:"Dim cyan"},
+{path:"colors.dim.white",type:"text",def:"#8e8e8e",label:"Dim white"},
+{path:"colors.transparent_background_colors",type:"bool",def:false,label:"Transparent cell colors",hint:"Apply window opacity to all cell backgrounds, not just the default background."},
+{path:"colors.draw_bold_text_with_bright_colors",type:"bool",def:false,label:"Bright bold text",hint:"Render bold text with the bright palette."}
+],dynamic:"indexed",hint:"Indexed colors cover palette indexes 16 through 255."},
+{title:"Bell",fields:[
+{path:"bell.animation",type:"select",def:"Linear",values:["Ease","EaseOut","EaseOutSine","EaseOutQuad","EaseOutCubic","EaseOutQuart","EaseOutQuint","EaseOutExpo","EaseOutCirc","Linear"],label:"Animation",hint:"Visual bell animation curve."},
+{path:"bell.duration",type:"int",def:0,min:0,label:"Duration",hint:"Visual bell duration in milliseconds. 0 disables the animation."},
+{path:"bell.color",type:"text",def:"#ffffff",label:"Color",hint:"Visual bell flash color."},
+{path:"bell.command",type:"command",allowNone:true,label:"Command",hint:"Program executed when the bell rings. None disables it."}
+]},
+{title:"Selection",fields:[
+{path:"selection.semantic_escape_chars",type:"text",def:",│\u0060|:\\\"' ()[]{}<>\\t",label:"Semantic separators",hint:"Characters used as boundaries for semantic word selection."},
+{path:"selection.save_to_clipboard",type:"bool",def:false,label:"Save to clipboard",hint:"Copy selected text to the primary clipboard."}
+]},
+{title:"Cursor",fields:[
+{path:"cursor.style",type:"cursorstyle",label:"Cursor style",hint:"Shape and blinking behavior."},
+{path:"cursor.vi_mode_style",type:"vistyle",label:"Vi cursor style",hint:"None inherits the normal cursor style."},
+{path:"cursor.blink_interval",type:"int",def:750,min:1,label:"Blink interval",hint:"Blink interval in milliseconds."},
+{path:"cursor.blink_timeout",type:"int",def:5,min:0,label:"Blink timeout",hint:"Seconds until blinking stops. 0 disables the timeout."},
+{path:"cursor.unfocused_hollow",type:"bool",def:true,label:"Unfocused hollow",hint:"Render a hollow box cursor while the window is unfocused."},
+{path:"cursor.thickness",type:"float",def:0.15,min:0,max:1,step:0.05,label:"Thickness",hint:"Beam/underline thickness relative to cell width, from 0.0 to 1.0."}
+]},
+{title:"Terminal",fields:[
+{path:"terminal.shell",type:"command",allowNone:false,label:"Shell",hint:"Startup shell program and optional arguments."},
+{path:"terminal.osc52",type:"select",def:"OnlyCopy",values:["Disabled","OnlyCopy","OnlyPaste","CopyPaste"],label:"OSC 52",hint:"Control clipboard access through OSC 52 escape sequences."}
+]},
+{title:"Mouse",fields:[
+{path:"mouse.hide_when_typing",type:"bool",def:false,label:"Hide while typing",hint:"Temporarily hide the mouse cursor when typing."}
+],dynamic:"mouse",hint:"Mouse bindings support button, modifiers, terminal mode, and action/chars/command results."},
+{title:"Hints",fields:[
+{path:"hints.alphabet",type:"text",def:"jfkdls;ahgurieowpq",label:"Hint alphabet",hint:"Characters used for hint labels."}
+],dynamic:"hints",hint:"Each hint needs regex or hyperlinks, plus an action or command."},
+{title:"Keyboard",dynamic:"keyboard",hint:"Add custom keyboard bindings. Use ReceiveChar to remove a default binding or None to inhibit it."},
+{title:"Debug",fields:[
+{path:"debug.render_timer",type:"bool",def:false,label:"Render timer",hint:"Display frame render time."},
+{path:"debug.persistent_logging",type:"bool",def:false,label:"Persistent logging",hint:"Keep the log file after Alacritty quits."},
+{path:"debug.log_level",type:"select",def:"Warn",values:["Off","Error","Warn","Info","Debug","Trace"],label:"Log level"},
+{path:"debug.renderer",type:"select",def:"None",values:["glsl3","gles2","gles2pure","None"],label:"Renderer",hint:"Force a renderer, or None for automatic selection."},
+{path:"debug.print_events",type:"bool",def:false,label:"Print events",hint:"Log all received window events."},
+{path:"debug.highlight_damage",type:"bool",def:false,label:"Highlight damage",hint:"Highlight window damage regions."},
+{path:"debug.prefer_egl",type:"bool",def:false,label:"Prefer EGL",hint:"Prefer EGL when available. Transparency may not work with EGL on Linux/BSD."}
+]}
+];
+
+var sectionsEl=document.getElementById("sections");
+var output=document.getElementById("output");
+var status=document.getElementById("status");
+var fieldEls=[];
+
+function escHtml(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];});}
+function tomlString(s){return JSON.stringify(String(s));}
+function selectedOptions(values,def){return values.map(function(v){return '<option value="'+escHtml(v)+'"'+(v===def?' selected':'')+'>'+escHtml(v)+'</option>';}).join("");}
+function controlHtml(f){
+var dis=' disabled';
+if(f.type==="bool") return '<select class="value"'+dis+'><option value="true"'+(f.def===true?' selected':'')+'>true</option><option value="false"'+(f.def===false?' selected':'')+'>false</option></select>';
+if(f.type==="select") return '<select class="value"'+dis+'>'+selectedOptions(f.values,f.def)+'</select>';
+if(f.type==="int"||f.type==="float"){
+var attrs=' type="number" value="'+escHtml(f.def)+'"';
+if(f.min!==undefined) attrs+=' min="'+f.min+'"';
+if(f.max!==undefined) attrs+=' max="'+f.max+'"';
+if(f.step!==undefined) attrs+=' step="'+f.step+'"'; else if(f.type==="int") attrs+=' step="1"';
+return '<input class="value"'+attrs+dis+'>';
+}
+if(f.type==="text") return '<input class="value" type="text" value="'+escHtml(f.def||"")+'"'+dis+'>';
+if(f.type==="list") return '<textarea class="value" rows="3" placeholder="one path per line"'+dis+'>'+escHtml(f.def||"")+'</textarea>';
+if(f.type==="intpair"||f.type==="stringpair"){
+var typ=f.type==="intpair"?"number":"text";
+return '<div class="inline2"><div class="subfield"><label>'+escHtml(f.a)+'</label><input class="a" type="'+typ+'" value="'+escHtml(f.av)+'"'+(typ==="number"?' step="1"':'')+dis+'></div><div class="subfield"><label>'+escHtml(f.b)+'</label><input class="b" type="'+typ+'" value="'+escHtml(f.bv)+'"'+(typ==="number"?' step="1"':'')+dis+'></div></div>';
+}
+if(f.type==="position") return '<div class="inline3"><div class="subfield"><label>Mode</label><select class="mode"'+dis+'><option value="none">None</option><option value="coords">Coordinates</option></select></div><div class="subfield"><label>x</label><input class="a" type="number" value="0" step="1"'+dis+'></div><div class="subfield"><label>y</label><input class="b" type="number" value="0" step="1"'+dis+'></div></div>';
+if(f.type==="cursorstyle") return '<div class="inline2"><div class="subfield"><label>Shape</label><select class="a"'+dis+'>'+selectedOptions(["Block","Underline","Beam"],"Block")+'</select></div><div class="subfield"><label>Blinking</label><select class="b"'+dis+'>'+selectedOptions(["Never","Off","On","Always"],"Off")+'</select></div></div>';
+if(f.type==="vistyle") return '<div class="inline3"><div class="subfield"><label>Mode</label><select class="mode"'+dis+'><option value="none">None</option><option value="custom">Custom</option></select></div><div class="subfield"><label>Shape</label><select class="a"'+dis+'>'+selectedOptions(["Block","Underline","Beam"],"Block")+'</select></div><div class="subfield"><label>Blinking</label><select class="b"'+dis+'>'+selectedOptions(["Never","Off","On","Always"],"Off")+'</select></div></div>';
+if(f.type==="command") return '<div class="fieldgrid"><div><label>Form</label><select class="mode"'+dis+'>'+(f.allowNone?'<option value="none">None</option>':'')+'<option value="string">Program only</option><option value="object">Program + args</option></select></div><div><label>Program</label><input class="program" type="text" placeholder="/path/to/program"'+dis+'></div><div class="wide"><label>Arguments — one per line</label><textarea class="args" rows="2" placeholder="-l"'+dis+'></textarea></div></div>';
+return '';
+}
+
+function buildSections(){
+specs.forEach(function(sec){
+var d=document.createElement("details");
+if(sec.open)d.open=true;
+d.dataset.search=(sec.title+" "+(sec.hint||"")).toLowerCase();
+var s=document.createElement("summary");s.textContent=sec.title;d.appendChild(s);
+var body=document.createElement("div");body.className="sectionbody";
+if(sec.fields){
+sec.fields.forEach(function(f){
+var row=document.createElement("div");row.className="setting";row.dataset.search=(f.label+" "+f.path+" "+(f.hint||"")+" "+(f.platform||"")).toLowerCase();row.dataset.path=f.path;row.dataset.type=f.type;
+row.innerHTML='<label class="emit"><input class="override" type="checkbox"> Override</label><div><div class="settingname">'+escHtml(f.label)+(f.platform?'<span class="platform">'+escHtml(f.platform)+'</span>':'')+'</div><div class="path">'+escHtml(f.path)+'</div>'+controlHtml(f)+(f.hint?'<div class="hint">'+escHtml(f.hint)+'</div>':'')+'</div>';
+body.appendChild(row);
+fieldEls.push({spec:f,row:row});
+var cb=row.querySelector(".override");
+cb.addEventListener("change",function(){
+row.querySelectorAll(".value,.a,.b,.mode,.program,.args").forEach(function(el){el.disabled=!cb.checked;});
+render();
+});
+row.querySelectorAll("input,select,textarea").forEach(function(el){el.addEventListener("input",render);el.addEventListener("change",render);});
+});
+}
+if(sec.dynamic){
+if(sec.hint){var p=document.createElement("p");p.className="dynamic-help";p.textContent=sec.hint;body.appendChild(p);}
+var dh=document.createElement("div");dh.className="dynamic-head";dh.innerHTML='<h3>'+dynamicTitle(sec.dynamic)+'</h3><button class="secondary add" type="button">Add</button>';body.appendChild(dh);
+var list=document.createElement("div");list.className="dynamic-list";list.dataset.dynamic=sec.dynamic;body.appendChild(list);
+var empty=document.createElement("div");empty.className="empty";empty.textContent="No entries added.";list.appendChild(empty);
+dh.querySelector(".add").addEventListener("click",function(){addDynamic(sec.dynamic,list);});
+}
+d.appendChild(body);sectionsEl.appendChild(d);
+});
+}
+function dynamicTitle(kind){return {env:"Environment variables",indexed:"Indexed colors",mouse:"Mouse bindings",hints:"Enabled hints",keyboard:"Keyboard bindings"}[kind]||"Entries";}
+
+function addDynamic(kind,list){
+var empty=list.querySelector(".empty");if(empty)empty.remove();
+var row=document.createElement("div");row.className="dynrow";row.dataset.kind=kind;
+if(kind==="env"){
+row.innerHTML='<div class="rowhead"><span class="rowtitle">Environment variable</span><button class="remove" type="button">Remove</button></div><div class="fieldgrid"><div><label>Name</label><input class="name" type="text" placeholder="WINIT_X11_SCALE_FACTOR"></div><div><label>Value</label><input class="val" type="text" placeholder="1.0"></div></div>';
+}
+if(kind==="indexed"){
+row.innerHTML='<div class="rowhead"><span class="rowtitle">Indexed color</span><button class="remove" type="button">Remove</button></div><div class="fieldgrid"><div><label>Index (16–255)</label><input class="idx" type="number" min="16" max="255" step="1" value="16"></div><div><label>Color</label><input class="color" type="text" value="#ffffff"></div></div>';
+}
+if(kind==="keyboard"||kind==="mouse"){
+var first=kind==="keyboard"?'<div><label>Key</label><input class="trigger" type="text" placeholder="N or F1 or 42"></div>':'<div><label>Mouse button</label><input class="trigger" type="text" placeholder="Right, Back, Forward, or number"></div>';
+row.innerHTML='<div class="rowhead"><span class="rowtitle">'+(kind==="keyboard"?"Keyboard binding":"Mouse binding")+'</span><button class="remove" type="button">Remove</button></div><div class="fieldgrid">'+first+'<div><label>Modifiers</label><input class="mods" type="text" placeholder="Control|Shift"></div><div><label>Mode</label><input class="termmode" type="text" placeholder="~Vi|Search"></div><div><label>Result type</label><select class="resultType"><option value="action">Action</option><option value="chars">Chars</option><option value="command">Command</option></select></div><div class="wide actionWrap"><label>Action</label><select class="action">'+selectedOptions(actions,"Copy")+'</select></div><div class="wide charsWrap" hidden><label>Chars</label><input class="chars" type="text" placeholder="Text or escape sequence"></div><div class="commandWrap" hidden><label>Program</label><input class="program" type="text" placeholder="/path/to/program"></div><div class="commandWrap" hidden><label>Arguments — one per line</label><textarea class="args" rows="2"></textarea></div></div>';
+var rt=row.querySelector(".resultType");
+rt.addEventListener("change",function(){updateBindingType(row);render();});
+}
+if(kind==="hints"){
+row.innerHTML='<div class="rowhead"><span class="rowtitle">Hint</span><button class="remove" type="button">Remove</button></div><div class="fieldgrid"><div class="wide"><label>Regex (optional when hyperlinks=true)</label><textarea class="regex" rows="2" placeholder="https?://[^\\\\s]+"></textarea></div><div><label>Hyperlinks</label><select class="hyperlinks"><option value="">Omit</option><option value="true">true</option><option value="false">false</option></select></div><div><label>Post processing</label><select class="post"><option value="">Omit</option><option value="true">true</option><option value="false">false</option></select></div><div><label>Persist</label><select class="persist"><option value="">Omit</option><option value="true">true</option><option value="false">false</option></select></div><div><label>Result</label><select class="hintResult"><option value="action">Action</option><option value="command">Command</option></select></div><div class="actionWrap"><label>Action</label><select class="action">'+selectedOptions(["Copy","Paste","Select","MoveViModeCursor"],"Copy")+'</select></div><div class="commandWrap" hidden><label>Program</label><input class="program" type="text" placeholder="xdg-open"></div><div class="wide commandWrap" hidden><label>Command args — one per line</label><textarea class="args" rows="2"></textarea></div><div><label>Binding key (optional)</label><input class="bindKey" type="text" placeholder="O"></div><div><label>Binding modifiers</label><input class="bindMods" type="text" placeholder="Control|Shift"></div><div><label>Binding mode</label><input class="bindMode" type="text" placeholder="Vi"></div><div><label>Mouse enabled</label><select class="mouseEnabled"><option value="">Omit</option><option value="true">true</option><option value="false">false</option></select></div><div><label>Mouse modifiers</label><input class="mouseMods" type="text" placeholder="Control"></div></div>';
+var hr=row.querySelector(".hintResult");
+hr.addEventListener("change",function(){updateHintType(row);render();});
+}
+row.querySelector(".remove").addEventListener("click",function(){row.remove();ensureEmpty(list);render();});
+row.querySelectorAll("input,select,textarea").forEach(function(el){el.addEventListener("input",render);el.addEventListener("change",render);});
+list.appendChild(row);render();
+}
+function ensureEmpty(list){if(!list.querySelector(".dynrow")){var e=document.createElement("div");e.className="empty";e.textContent="No entries added.";list.appendChild(e);}}
+function updateBindingType(row){
+var t=row.querySelector(".resultType").value;
+row.querySelector(".actionWrap").hidden=t!=="action";
+row.querySelector(".charsWrap").hidden=t!=="chars";
+row.querySelectorAll(".commandWrap").forEach(function(e){e.hidden=t!=="command";});
+}
+function updateHintType(row){
+var t=row.querySelector(".hintResult").value;
+row.querySelector(".actionWrap").hidden=t!=="action";
+row.querySelectorAll(".commandWrap").forEach(function(e){e.hidden=t!=="command";});
+}
+function numericValue(el,integer){
+var n=integer?parseInt(el.value,10):parseFloat(el.value);
+if(!Number.isFinite(n)) throw new Error("Invalid number");
+return String(n);
+}
+function serializeField(item){
+var f=item.spec,row=item.row;
+if(!row.querySelector(".override").checked)return null;
+function q(sel){return row.querySelector(sel);}
+if(f.type==="bool")return f.path+" = "+q(".value").value;
+if(f.type==="select"||f.type==="text")return f.path+" = "+tomlString(q(".value").value);
+if(f.type==="int")return f.path+" = "+numericValue(q(".value"),true);
+if(f.type==="float")return f.path+" = "+numericValue(q(".value"),false);
+if(f.type==="list"){
+var vals=q(".value").value.split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean);
+return f.path+" = ["+vals.map(tomlString).join(", ")+"]";
+}
+if(f.type==="intpair")return f.path+" = { "+f.a+" = "+numericValue(q(".a"),true)+", "+f.b+" = "+numericValue(q(".b"),true)+" }";
+if(f.type==="stringpair")return f.path+" = { "+f.a+" = "+tomlString(q(".a").value)+", "+f.b+" = "+tomlString(q(".b").value)+" }";
+if(f.type==="position"){
+if(q(".mode").value==="none")return f.path+' = "None"';
+return f.path+" = { x = "+numericValue(q(".a"),true)+", y = "+numericValue(q(".b"),true)+" }";
+}
+if(f.type==="cursorstyle")return f.path+" = { shape = "+tomlString(q(".a").value)+", blinking = "+tomlString(q(".b").value)+" }";
+if(f.type==="vistyle"){
+if(q(".mode").value==="none")return f.path+' = "None"';
+return f.path+" = { shape = "+tomlString(q(".a").value)+", blinking = "+tomlString(q(".b").value)+" }";
+}
+if(f.type==="command"){
+var mode=q(".mode").value,program=q(".program").value.trim(),args=q(".args").value.split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean);
+if(mode==="none")return f.path+' = "None"';
+if(!program)throw new Error(f.path+" needs a program");
+if(mode==="string")return f.path+" = "+tomlString(program);
+return f.path+" = { program = "+tomlString(program)+", args = ["+args.map(tomlString).join(", ")+"] }";
+}
+return null;
+}
+function dynamicToml(){
+var out=[];
+document.querySelectorAll('.dynamic-list[data-dynamic="env"] .dynrow').forEach(function(r){
+var n=r.querySelector(".name").value.trim();if(!n)return;
+out.push('env.'+tomlString(n)+" = "+tomlString(r.querySelector(".val").value));
+});
+document.querySelectorAll('.dynamic-list[data-dynamic="indexed"] .dynrow').forEach(function(r){
+var idx=parseInt(r.querySelector(".idx").value,10);if(!Number.isFinite(idx)||idx<16||idx>255)throw new Error("Indexed color must be between 16 and 255");
+out.push("[[colors.indexed_colors]]\nindex = "+idx+"\ncolor = "+tomlString(r.querySelector(".color").value.trim()));
+});
+["mouse","keyboard"].forEach(function(kind){
+document.querySelectorAll('.dynamic-list[data-dynamic="'+kind+'"] .dynrow').forEach(function(r){
+var trigger=r.querySelector(".trigger").value.trim();if(!trigger)return;
+var lines=["[["+kind+".bindings]]"];
+lines.push((kind==="keyboard"?"key":"mouse")+" = "+tomlString(trigger));
+var mods=r.querySelector(".mods").value.trim(),mode=r.querySelector(".termmode").value.trim();
+if(mods)lines.push("mods = "+tomlString(mods));if(mode)lines.push("mode = "+tomlString(mode));
+var t=r.querySelector(".resultType").value;
+if(t==="action")lines.push("action = "+tomlString(r.querySelector(".action").value));
+if(t==="chars")lines.push("chars = "+tomlString(r.querySelector(".chars").value));
+if(t==="command"){
+var program=r.querySelector(".program").value.trim();if(!program)throw new Error((kind==="keyboard"?"Keyboard":"Mouse")+" binding needs a command program");
+var args=r.querySelector(".args").value.split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean);
+lines.push("command = "+(args.length?"{ program = "+tomlString(program)+", args = ["+args.map(tomlString).join(", ")+"] }":tomlString(program)));
+}
+out.push(lines.join("\n"));
+});
+});
+document.querySelectorAll('.dynamic-list[data-dynamic="hints"] .dynrow').forEach(function(r){
+var regex=r.querySelector(".regex").value.trim(),hyper=r.querySelector(".hyperlinks").value;
+if(!regex&&hyper!=="true")throw new Error("Each hint needs a regex or hyperlinks=true");
+var lines=["[[hints.enabled]]"];
+if(regex)lines.push("regex = "+tomlString(regex));
+if(hyper)lines.push("hyperlinks = "+hyper);
+var post=r.querySelector(".post").value,persist=r.querySelector(".persist").value;
+if(post)lines.push("post_processing = "+post);if(persist)lines.push("persist = "+persist);
+if(r.querySelector(".hintResult").value==="action")lines.push("action = "+tomlString(r.querySelector(".action").value));
+else{
+var p=r.querySelector(".program").value.trim();if(!p)throw new Error("Hint command needs a program");
+var a=r.querySelector(".args").value.split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean);
+lines.push("command = "+(a.length?"{ program = "+tomlString(p)+", args = ["+a.map(tomlString).join(", ")+"] }":tomlString(p)));
+}
+var bk=r.querySelector(".bindKey").value.trim(),bm=r.querySelector(".bindMods").value.trim(),bmode=r.querySelector(".bindMode").value.trim();
+if(bk){
+var bits=["key = "+tomlString(bk)];if(bm)bits.push("mods = "+tomlString(bm));if(bmode)bits.push("mode = "+tomlString(bmode));
+lines.push("binding = { "+bits.join(", ")+" }");
+}
+var me=r.querySelector(".mouseEnabled").value,mm=r.querySelector(".mouseMods").value.trim();
+if(me||mm){
+var mb=[];if(mm)mb.push("mods = "+tomlString(mm));if(me)mb.push("enabled = "+me);
+lines.push("mouse = { "+mb.join(", ")+" }");
+}
+out.push(lines.join("\n"));
+});
+return out;
+}
+function render(){
+var lines=["# Generated by gpages Alacritty Config Generator","# Target: Alacritty 0.16.1",""];
+try{
+fieldEls.forEach(function(item){var s=serializeField(item);if(s)lines.push(s);});
+var dyn=dynamicToml();if(dyn.length){if(lines[lines.length-1]!=="")lines.push("");dyn.forEach(function(block,i){lines.push(block);if(i<dyn.length-1)lines.push("");});}
+while(lines.length&&lines[lines.length-1]==="")lines.pop();
+output.value=lines.join("\n")+"\n";
+status.textContent="Ready. "+fieldEls.filter(function(x){return x.row.querySelector(".override").checked;}).length+" fixed setting override(s), plus any dynamic entries shown above.";
+status.className="status";
+}catch(e){output.value=lines.join("\n")+"\n";status.textContent=e.message;status.className="status error";}
+}
+document.getElementById("filter").addEventListener("input",function(){
+var q=this.value.trim().toLowerCase();
+document.querySelectorAll("#sections details").forEach(function(d){
+var visible=false;
+d.querySelectorAll(".setting").forEach(function(r){var match=!q||r.dataset.search.indexOf(q)!==-1;r.hidden=!match;if(match)visible=true;});
+if(d.querySelector(".dynamic-list")&&(!q||d.dataset.search.indexOf(q)!==-1)){visible=true;}
+d.hidden=!visible;if(q&&visible)d.open=true;
+});
+});
+document.getElementById("expandAll").addEventListener("click",function(){
+var ds=Array.from(document.querySelectorAll("#sections details:not([hidden])"));
+var open=ds.every(function(d){return d.open;});ds.forEach(function(d){d.open=!open;});this.textContent=open?"Expand all":"Collapse all";
+});
+document.getElementById("copyBtn").addEventListener("click",async function(){
+try{await navigator.clipboard.writeText(output.value);status.textContent="Copied TOML to clipboard.";status.className="status";}catch(e){output.focus();output.select();status.textContent="Clipboard API unavailable; the TOML is selected for manual copy.";status.className="status error";}
+});
+document.getElementById("downloadBtn").addEventListener("click",function(){
+var blob=new Blob([output.value],{type:"text/plain;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="alacritty.toml";document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href);},500);
+});
+document.getElementById("resetBtn").addEventListener("click",function(){
+document.querySelectorAll(".override").forEach(function(cb){cb.checked=false;cb.dispatchEvent(new Event("change"));});
+document.querySelectorAll(".dynamic-list").forEach(function(list){list.querySelectorAll(".dynrow").forEach(function(r){r.remove();});ensureEmpty(list);});
+render();window.scrollTo({top:0,behavior:"smooth"});
+});
+buildSections();render();
+})();
+</script>
+</body>
+</html>
