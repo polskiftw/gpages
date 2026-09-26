@@ -176,6 +176,7 @@ class Krea2Window(QMainWindow):
         self._load_loras()
         self._prepare_output_watcher()
         self._restore_window_state()
+        self._restore_control_state()
         self._update_lora_enabled()
 
         self.shortcut_return = QShortcut(QKeySequence("Ctrl+Return"), self)
@@ -379,8 +380,46 @@ class Krea2Window(QMainWindow):
         if isinstance(geometry, QByteArray):
             self.restoreGeometry(geometry)
 
-    def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
+    def _restore_control_state(self) -> None:
+        prompt = self.settings.value("controls/prompt", "")
+        self.prompt.setPlainText(str(prompt) if prompt is not None else "")
+
+        lora = self.settings.value("controls/lora", "None")
+        self.lora.setCurrentText(str(lora) if lora is not None else "None")
+
+        try:
+            self.strength.setValue(float(self.settings.value("controls/strength", 1.0)))
+        except (TypeError, ValueError):
+            self.strength.setValue(1.0)
+
+        seed = self.settings.value("controls/seed", "Random")
+        self.seed.setCurrentText(str(seed) if seed is not None else "Random")
+
+        try:
+            self.queue.setValue(int(self.settings.value("controls/queue", 1)))
+        except (TypeError, ValueError):
+            self.queue.setValue(1)
+
+        rebalance = self.settings.value("controls/rebalance", None)
+        index = self.rebalance.findData(rebalance)
+        self.rebalance.setCurrentIndex(index if index >= 0 else 0)
+
+        details_open = self.settings.value("ui/details_open", False, type=bool)
+        self.details_toggle.setChecked(details_open)
+
+    def _save_state(self) -> None:
         self.settings.setValue("geometry", self.saveGeometry())
+        self.settings.setValue("controls/prompt", self.prompt.toPlainText())
+        self.settings.setValue("controls/lora", self.lora.currentText())
+        self.settings.setValue("controls/strength", self.strength.value())
+        self.settings.setValue("controls/seed", self.seed.currentText())
+        self.settings.setValue("controls/queue", self.queue.value())
+        self.settings.setValue("controls/rebalance", self.rebalance.currentData())
+        self.settings.setValue("ui/details_open", self.details_toggle.isChecked())
+        self.settings.sync()
+
+    def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
+        self._save_state()
         if self.process is not None and self.process.state() != QProcess.ProcessState.NotRunning:
             answer = QMessageBox.question(
                 self,
@@ -473,6 +512,7 @@ class Krea2Window(QMainWindow):
         if rebalance_value:
             args.extend(["--rebalance", str(rebalance_value)])
 
+        self._save_state()
         self._known_output_paths = set(self._list_output_images())
         self._run_new_paths.clear()
         self._run_seeds.clear()
