@@ -280,6 +280,7 @@ class Krea2Window(QMainWindow):
         self._run_rebalance: Optional[str] = None
         self._run_queue_total = 1
         self._run_label = "Krea2"
+        self._run_temp_dir: Optional[Path] = None
         self._cancel_requested = False
         self._selected_meta: Optional[GenerationMeta] = None
         self._elapsed = QElapsedTimer()
@@ -649,6 +650,7 @@ class Krea2Window(QMainWindow):
         self._run_rebalance = str(rebalance_value) if rebalance_value else None
         self._run_queue_total = queue_total
         self._run_label = "Krea2"
+        self._run_temp_dir = None
         self._cancel_requested = False
         self._elapsed.restart()
 
@@ -730,6 +732,7 @@ class Krea2Window(QMainWindow):
         self._run_rebalance = None
         self._run_queue_total = request.queue
         self._run_label = "AnyPaint"
+        self._run_temp_dir = Path(request.mask).parent
         self._cancel_requested = False
         self._elapsed.restart()
 
@@ -810,6 +813,7 @@ class Krea2Window(QMainWindow):
             self.elapsed_timer.stop()
             self.process = None
             self._process_group_pid = None
+            self._cleanup_run_temp()
             self._set_controls_running(False)
 
     def process_finished(self, exit_code: int, exit_status: QProcess.ExitStatus) -> None:
@@ -829,15 +833,25 @@ class Krea2Window(QMainWindow):
             self.progress.setValue(maximum)
             self.progress.setFormat("Done")
         else:
-            self.status.setText(f"Krea2 exited with code {exit_code}")
+            self.status.setText(f"{self._run_label} exited with code {exit_code}")
             self.progress.setFormat(f"Error ({exit_code})")
             if not self.details_toggle.isChecked():
                 self.details_toggle.setChecked(True)
 
         self.process = None
         self._process_group_pid = None
+        self._cleanup_run_temp()
         self._set_controls_running(False)
         self._refresh_generate_text()
+
+    def _cleanup_run_temp(self) -> None:
+        if self._run_temp_dir is None:
+            return
+        try:
+            shutil.rmtree(self._run_temp_dir)
+        except OSError:
+            pass
+        self._run_temp_dir = None
 
     def cancel_generation(self) -> None:
         if self.process is None or self.process.state() == QProcess.ProcessState.NotRunning:
