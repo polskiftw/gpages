@@ -3,18 +3,15 @@ set -eu
 
 root=${KREA2_ROOT:-"$HOME/ai/krea2"}
 python="$root/.venv/bin/python"
-backend="$HOME/.local/lib/krea2-gui/krea2_anypaint.py"
 anypaint_dir="$root/models/krea2-anypaint"
 processor_dir="$root/models/Qwen3-VL-4B-Instruct-processor"
 wrapper="$root/bin/krea2-anypaint"
+backend_cache="$root/cache/krea2-gui/krea2_anypaint.py"
+repo_ref=${KREA2_GUI_REF:-main}
+backend_url="https://raw.githubusercontent.com/polskiftw/gpages/$repo_ref/krea2-gui/krea2_anypaint.py"
 
 if [ ! -x "$python" ]; then
     printf 'Missing Krea2 virtualenv Python: %s\n' "$python" >&2
-    exit 1
-fi
-if [ ! -f "$backend" ]; then
-    printf 'Missing installed AnyPaint backend: %s\n' "$backend" >&2
-    printf 'Run the krea2-gui install-user.sh first.\n' >&2
     exit 1
 fi
 if [ ! -f "$root/models/Krea-2-Turbo/model_index.json" ]; then
@@ -22,7 +19,7 @@ if [ ! -f "$root/models/Krea-2-Turbo/model_index.json" ]; then
     exit 1
 fi
 
-mkdir -p "$root/models" "$root/bin" "$root/cache/huggingface" "$root/cache/torch" "$root/cache/uv"
+mkdir -p "$root/models" "$root/bin" "$root/cache/huggingface" "$root/cache/torch" "$root/cache/uv" "$root/cache/krea2-gui"
 
 HF_HOME="$root/cache/huggingface" "$python" - "$anypaint_dir" "$processor_dir" <<'PY'
 from pathlib import Path
@@ -75,18 +72,36 @@ PY
 cat > "$wrapper" <<EOF
 #!/bin/sh
 set -eu
-export KREA2_ROOT="$root"
-export HF_HOME="$root/cache/huggingface"
-export TORCH_HOME="$root/cache/torch"
-export UV_CACHE_DIR="$root/cache/uv"
+root=${KREA2_ROOT:-"$root"}
+python="$python"
+backend="$backend_cache"
+repo_ref=${KREA2_GUI_REF:-main}
+backend_url="https://raw.githubusercontent.com/polskiftw/gpages/\$repo_ref/krea2-gui/krea2_anypaint.py"
+
+mkdir -p "\$(dirname "\$backend")"
+tmp="\$backend.tmp.\$\$"
+trap 'rm -f "\$tmp"' EXIT HUP INT TERM
+
+curl -fsSL "\$backend_url" -o "\$tmp"
+mv "\$tmp" "\$backend"
+trap - EXIT HUP INT TERM
+
+export KREA2_ROOT="\$root"
+export HF_HOME="\$root/cache/huggingface"
+export TORCH_HOME="\$root/cache/torch"
+export UV_CACHE_DIR="\$root/cache/uv"
 export PYTORCH_ALLOC_CONF=expandable_segments:True
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
-exec "$python" "$backend" "\$@"
+exec "\$python" "\$backend" "\$@"
 EOF
 chmod 0755 "$wrapper"
+
+# Prime the cache now so setup fails early if the repo copy cannot be reached.
+curl -fsSL "$backend_url" -o "$backend_cache"
 
 printf '\nAnyPaint installed.\n'
 printf '  runtime: %s\n' "$anypaint_dir"
 printf '  processor metadata: %s\n' "$processor_dir"
 printf '  command: %s\n' "$wrapper"
+printf '  backend source: %s\n' "$backend_url"
