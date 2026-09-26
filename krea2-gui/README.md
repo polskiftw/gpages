@@ -61,10 +61,16 @@ From this directory:
 This installs:
 
 - `~/.local/bin/krea2-gui`
-- `~/.local/bin/krea2_anypaint_editor.py`
-- `~/.local/lib/krea2-gui/krea2_anypaint.py`
 - `~/.local/bin/krea2-anypaint-setup`
 - `~/.local/share/applications/krea2-gui.desktop`
+
+You do **not** need a local checkout to use the GUI. The single-file launcher style remains supported, including Claire's existing desktop shortcut:
+
+```ini
+Exec=sh -c 'curl -fsSL https://raw.githubusercontent.com/polskiftw/gpages/main/krea2-gui/krea2_gui.py | python3 -'
+```
+
+That continues to fetch a fresh `krea2_gui.py` on every launch. The AnyPaint editor UI is embedded in that one file, so it does not import sibling files from a checkout.
 
 You can also run the source tree directly with:
 
@@ -80,7 +86,9 @@ Normal generation needs no additional setup. To enable editing, run once:
 krea2-anypaint-setup
 ```
 
-The setup helper downloads the current `yijunwang2/krea2-anypaint` functional adapter into `~/ai/krea2/models/krea2-anypaint` and creates `~/ai/krea2/bin/krea2-anypaint`.
+The setup helper downloads the pinned `yijunwang2/krea2-anypaint` functional adapter into `~/ai/krea2/models/krea2-anypaint` and creates `~/ai/krea2/bin/krea2-anypaint`.
+
+No `gpages` checkout is required. The wrapper fetches the current `krea2_anypaint.py` backend from this repository when an edit run starts, caches that copy under `~/ai/krea2/cache/krea2-gui/`, and then executes it with the existing Krea2 virtualenv. In normal use it follows `main`; `KREA2_GUI_REF` can point it at a development branch for testing.
 
 The 229 MB AnyPaint adapter shares the existing local `~/ai/krea2/models/Krea-2-Turbo` base. It does **not** download a second Krea2 checkpoint. The helper also downloads only Qwen3-VL processor/tokenizer metadata needed to encode reference images; it explicitly excludes Qwen model weights because the existing Krea2 text encoder is reused.
 
@@ -130,7 +138,7 @@ On Linux the GUI launches both Krea2 backends through `setsid` when available. C
 
 ## Privacy / networking
 
-The GUI itself has no networking code. Normal generation and AnyPaint inference are local. `krea2-anypaint-setup` is the only AnyPaint component that uses the network: it downloads the adapter/pipeline and processor metadata once, after which the installed AnyPaint wrapper forces Hugging Face and Transformers offline mode.
+The GUI source itself has no networking code beyond whatever launcher is used to obtain it. Normal Krea2 inference is local. AnyPaint setup downloads the adapter/pipeline and processor metadata once; the small `krea2-anypaint` wrapper also refreshes this repository's backend script before an edit run, then forces Hugging Face and Transformers offline mode for model execution.
 
 ## Upstream AnyPaint licensing
 
