@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import signal
+import subprocess
 import sys
 from dataclasses import dataclass, asdict
 from pathlib import Path
@@ -23,7 +24,17 @@ from PySide6.QtCore import (
     QUrl,
     Signal,
 )
-from PySide6.QtGui import QAction, QCloseEvent, QDesktopServices, QIcon, QKeySequence, QPixmap, QShortcut
+from PySide6.QtGui import (
+    QAction,
+    QCloseEvent,
+    QDesktopServices,
+    QIcon,
+    QKeySequence,
+    QPixmap,
+    QShortcut,
+    QTextCharFormat,
+    QTextCursor,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -45,6 +56,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSpinBox,
     QSplitter,
+    QTextEdit,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -55,6 +67,7 @@ APP_ORG = "polskiftw"
 DEFAULT_ROOT = Path.home() / "ai" / "krea2"
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 SEED_RE = re.compile(r"Generating\s+(\d+)\s*/\s*(\d+).*?seed\s+(-?\d+)", re.IGNORECASE)
+WORD_RE = re.compile(r"[A-Za-z][A-Za-z'’-]*")
 
 
 @dataclass
@@ -140,6 +153,95 @@ class ImagePreview(QLabel):
         self.setPixmap(scaled)
 
 
+class SpellcheckPlainTextEdit(QPlainTextEdit):
+    def __init__(self, parent: Optional[QWidget] = None, dictionary: Optional[str] = None) -> None:
+        super().__init__(parent)
+        self.dictionary = dictionary or os.environ.get("KREA2_SPELLCHECK_DICT", "en_US")
+        self.hunspell = shutil.which("hunspell")
+        self._misspelled: set[str] = set()
+
+        self._spell_timer = QTimer(self)
+        self._spell_timer.setSingleShot(True)
+        self._spell_timer.setInterval(350)
+        self._spell_timer.timeout.connect(self._run_spellcheck)
+        self.textChanged.connect(self._schedule_spellcheck)
+
+        if self.hunspell:
+            self.setToolTip(f"Spellcheck: {self.dictionary} via hunspell")
+        else:
+            self.setToolTip("Spellcheck unavailable: hunspell was not found")
+
+    def _schedule_spellcheck(self) -> None:
+        if self.hunspell:
+            self._spell_timer.start()
+
+    def _run_spellcheck(self) -> None:
+        if not self.hunspell:
+            return
+
+        text = self.toPlainText()
+        words = sorted({match.group(0) for match in WORD_RE.finditer(text)}, key=str.casefold)
+        if not words:
+            self._misspelled.clear()
+            self.setExtraSelections([])
+            return
+
+        try:
+            result = subprocess.run(
+                [self.hunspell, "-a", "-d", self.dictionary],
+                input="\n".join(words) + "\n",
+                text=True,
+                capture_output=True,
+                timeout=3,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return
+
+        if result.returncode not in (0, 1):
+            return
+
+        misspelled: set[str] = set()
+        for raw_line in result.stdout.splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("@"):
+                continue
+            if line[0] in {"*", "+", "-"}:
+                continue
+            if line[0] in {"&", "#", "?"}:
+                parts = line.split()
+                if len(parts) >= 2:
+                    misspelled.add(parts[1].casefold())
+
+        self._misspelled = misspelled
+        self._apply_spellcheck()
+
+    def _apply_spellcheck(self) -> None:
+        selections: list[QTextEdit.ExtraSelection] = []
+        if not self._misspelled:
+            self.setExtraSelections(selections)
+            return
+
+        fmt = QTextCharFormat()
+        fmt.setUnderlineStyle(QTextCharFormat.UnderlineStyle.SpellCheckUnderline)
+
+        text = self.toPlainText()
+        for match in WORD_RE.finditer(text):
+            if match.group(0).casefold() not in self._misspelled:
+                continue
+
+            cursor = QTextCursor(self.document())
+            cursor.setPosition(match.start())
+            cursor.setPosition(match.end(), QTextCursor.MoveMode.KeepAnchor)
+
+            selection = QTextEdit.ExtraSelection()
+            selection.cursor = cursor
+            selection.format = fmt
+            selections.append(selection)
+
+        self.setExtraSelections(selections)
+
+
 class Krea2Window(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -201,7 +303,7 @@ class Krea2Window(QMainWindow):
         root_layout.setSpacing(10)
         self.setCentralWidget(central)
 
-        self.prompt = QPlainTextEdit()
+        self.prompt = SpellcheckPlainTextEdit()
         self.prompt.setPlaceholderText("Describe what you want Krea2 to generate…")
         self.prompt.setMinimumHeight(120)
         root_layout.addWidget(QLabel("Prompt"))
