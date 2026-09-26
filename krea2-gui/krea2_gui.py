@@ -156,7 +156,10 @@ class ImagePreview(QLabel):
 class SpellcheckPlainTextEdit(QPlainTextEdit):
     def __init__(self, parent: Optional[QWidget] = None, dictionary: Optional[str] = None) -> None:
         super().__init__(parent)
-        self.dictionary = dictionary or os.environ.get("KREA2_SPELLCHECK_DICT", "en_US")
+        self.dictionary = dictionary or os.environ.get(
+            "KREA2_SPELLCHECK_DICT",
+            "en_US,en_GB,en_GB-oxendict",
+        )
         self.hunspell = shutil.which("hunspell")
         self._misspelled: set[str] = set()
 
