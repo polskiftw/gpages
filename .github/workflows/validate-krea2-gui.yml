@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check Python syntax
         run: |
-          python3 -m py_compile             krea2-gui/krea2_gui.py             krea2-gui/krea2_anypaint.py             krea2-gui/krea2_anypaint_editor.py
+          python3 -m py_compile krea2-gui/krea2_gui.py krea2-gui/krea2_anypaint.py
       - name: Check shell syntax
         run: |
-          sh -n             krea2-gui/install-user.sh             krea2-gui/setup-anypaint.sh
+          sh -n krea2-gui/install-user.sh krea2-gui/setup-anypaint.sh
