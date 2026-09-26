@@ -233,7 +233,7 @@ def slug(text: str, limit: int = 48) -> str:
 
 
 def output_path(out_dir: Path, prompt: str, seed: int, index: int) -> Path:
-    stamp = time.strftime("%Y%m%d-%H%M%S")
+    stamp = time.strftime("%Y%m%d-%H%M%S") + f"-{time.time_ns() % 1_000_000_000:09d}"
     return out_dir / f"{stamp}-anypaint-{slug(prompt)}-seed{seed}-{index:03d}.png"
 
 
@@ -297,6 +297,9 @@ def main() -> int:
     )
     prompt_embeds = prompt_embeds.to("cpu", dtype=torch.bfloat16)
     prompt_mask = prompt_mask.to("cpu")
+    if encode_reference:
+        del ref_tensor
+    del vl_images
 
     pipe.text_encoder.to("cpu")
     pipe.text_encoder = None
