@@ -31,10 +31,12 @@ from huggingface_hub import snapshot_download
 
 anypaint_dir = Path(sys.argv[1])
 processor_dir = Path(sys.argv[2])
+anypaint_revision = "1a9fb37a304c27523939c44fc2b770c11472451b"
 
 print("Downloading Krea2 AnyPaint pipeline + adapter...")
 snapshot_download(
     repo_id="yijunwang2/krea2-anypaint",
+    revision=anypaint_revision,
     local_dir=anypaint_dir,
     allow_patterns=[
         "pipeline.py",
