@@ -146,7 +146,13 @@ class Krea2Window(QMainWindow):
         self.settings = QSettings(APP_ORG, APP_NAME)
         self.krea2_root = Path(os.environ.get("KREA2_ROOT", str(DEFAULT_ROOT))).expanduser()
         self.out_dir = self.krea2_root / "out"
-        self.cli = os.environ.get("KREA2_CLI") or shutil.which("krea2") or "krea2"
+        local_cli = self.krea2_root / "bin" / "krea2"
+        self.cli = (
+            os.environ.get("KREA2_CLI")
+            or (str(local_cli) if local_cli.is_file() else None)
+            or shutil.which("krea2")
+            or "krea2"
+        )
 
         self.process: Optional[QProcess] = None
         self._process_group_pid: Optional[int] = None
