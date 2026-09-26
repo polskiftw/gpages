@@ -1,0 +1,62 @@
+name: Tag Gremlin corrected direct-certificate proof floor
+
+# Expensive structural matrix: manual reproduction only after initial launch.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  proof-floor-10k:
+    timeout-minutes: 90
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { archetype: balanced,   seed: 98001 }
+          - { archetype: linguistic, seed: 98101 }
+          - { archetype: names,      seed: 98201 }
+          - { archetype: weird,      seed: 98301 }
+          - { archetype: shortheavy, seed: 98401 }
+          - { archetype: compound,   seed: 98501 }
+    defaults:
+      run:
+        working-directory: research/tag-gremlin-v10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build grammar-corrected period-only simulator
+        run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
+
+      - name: Compile corrected proof-floor harness
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_certificate_floor.cpp -o period_certificate_floor
+
+      - name: Generate fresh exact-prevalence 10k world
+        run: |
+          set -euo pipefail
+          python3 period_quota_worldgen.py \
+            --target-total 10000 \
+            --target-dotted 6939 \
+            --seed-base ${{ matrix.seed }} \
+            --archetype ${{ matrix.archetype }} \
+            --shard-n 10000 \
+            --max-shards 80 \
+            --out world.tsv | tee floor-world-${{ matrix.archetype }}.txt
+          grep -q 'total=10000 dotted=6939 plain=3061 dotted_fraction=0.693900' floor-world-${{ matrix.archetype }}.txt
+
+      - name: Compute rigorous and constructive proof bounds
+        run: |
+          set -euo pipefail
+          ./period_certificate_floor world.tsv | tee floor-${{ matrix.archetype }}.txt
+          grep -q 'PERIOD_PROOF_FLOOR' floor-${{ matrix.archetype }}.txt
+
+      - name: Upload proof-floor result
+        uses: actions/upload-artifact@v4
+        with:
+          name: period-proof-floor-${{ matrix.archetype }}
+          path: |
+            research/tag-gremlin-v10/floor-world-${{ matrix.archetype }}.txt
+            research/tag-gremlin-v10/floor-${{ matrix.archetype }}.txt
+          if-no-files-found: error
