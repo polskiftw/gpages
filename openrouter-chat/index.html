@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111318">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src https://openrouter.ai; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self';">
+  <title>OpenRouter Chat</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <div>
+          <div class="eyebrow">gpages</div>
+          <h1>OpenRouter Chat</h1>
+        </div>
+        <button class="icon-button" id="newChatButton" type="button" title="New chat" aria-label="New chat">+</button>
+      </div>
+
+      <div class="sidebar-tools">
+        <button class="secondary-button" id="exportButton" type="button">Export</button>
+        <button class="secondary-button" id="importButton" type="button">Import</button>
+        <input id="importFile" type="file" accept="application/json,.json" hidden>
+      </div>
+
+      <nav class="chat-list" id="chatList" aria-label="Chat history"></nav>
+
+      <div class="sidebar-foot">
+        <span>Chats stay in this browser.</span>
+        <a href="../">gpages</a>
+      </div>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <button class="mobile-only icon-button" id="sidebarToggle" type="button" aria-label="Toggle chats">☰</button>
+
+        <div class="model-area">
+          <label for="modelSearch">Model</label>
+          <div class="model-combo" id="modelCombo">
+            <input id="modelSearch" type="search" autocomplete="off" spellcheck="false" placeholder="Connect an API key to load models" aria-autocomplete="list" aria-controls="modelMenu">
+            <button class="favorite-button" id="favoriteModelButton" type="button" title="Favorite model" aria-label="Favorite model">☆</button>
+            <div class="model-menu" id="modelMenu" role="listbox" hidden></div>
+          </div>
+          <div class="model-meta" id="modelMeta">No model loaded</div>
+        </div>
+
+        <button class="secondary-button key-button" id="keyButton" type="button">API key</button>
+      </header>
+
+      <section class="control-panel">
+        <div class="control-heading">
+          <label for="systemPrompt">System prompt</label>
+          <div class="prompt-tools">
+            <select id="promptPreset" aria-label="System prompt preset">
+              <option value="">Presets…</option>
+            </select>
+            <button class="text-button" id="savePresetButton" type="button">Save preset</button>
+            <button class="text-button danger-text" id="deletePresetButton" type="button">Delete</button>
+          </div>
+        </div>
+        <textarea id="systemPrompt" rows="4" placeholder="Optional. This is sent as the system message on the next request."></textarea>
+
+        <details class="advanced" id="advancedControls">
+          <summary>Generation controls</summary>
+          <div class="parameter-grid">
+            <label class="parameter" id="temperatureField">
+              <span>Temperature</span>
+              <input id="temperatureInput" type="number" min="0" max="2" step="0.05" placeholder="model default">
+            </label>
+            <label class="parameter" id="topPField">
+              <span>Top P</span>
+              <input id="topPInput" type="number" min="0" max="1" step="0.05" placeholder="model default">
+            </label>
+            <label class="parameter" id="maxTokensField">
+              <span>Max output tokens</span>
+              <input id="maxTokensInput" type="number" min="1" step="1" placeholder="model default">
+            </label>
+            <label class="parameter" id="reasoningField">
+              <span>Reasoning effort</span>
+              <select id="reasoningInput">
+                <option value="">model default</option>
+                <option value="none">none</option>
+                <option value="minimal">minimal</option>
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+                <option value="xhigh">xhigh</option>
+              </select>
+            </label>
+          </div>
+          <p class="parameter-note" id="parameterNote">Controls are enabled only when the selected model reports support for them.</p>
+        </details>
+      </section>
+
+      <main class="messages" id="messages" aria-live="polite"></main>
+
+      <section class="request-inspector">
+        <details>
+          <summary>Next request JSON</summary>
+          <pre id="requestPreview">{}</pre>
+        </details>
+      </section>
+
+      <footer class="composer-wrap">
+        <div class="status-row">
+          <span id="contextStatus">~0 tokens</span>
+          <span id="costStatus">$0.0000 this chat</span>
+          <span id="connectionStatus">Not connected</span>
+        </div>
+        <div class="composer">
+          <textarea id="composerInput" rows="2" placeholder="Message the selected model…" aria-label="Message"></textarea>
+          <div class="composer-buttons">
+            <button class="secondary-button" id="stopButton" type="button" hidden>Stop</button>
+            <button class="primary-button" id="sendButton" type="button">Send</button>
+          </div>
+        </div>
+        <div class="composer-hint">Enter to send · Shift+Enter for a new line</div>
+      </footer>
+    </section>
+  </div>
+
+  <dialog id="keyDialog">
+    <form method="dialog" id="keyForm">
+      <div class="dialog-head">
+        <div>
+          <div class="eyebrow">OpenRouter</div>
+          <h2>API key</h2>
+        </div>
+        <button class="icon-button" value="cancel" type="submit" aria-label="Close">×</button>
+      </div>
+      <p class="dialog-copy">The key is sent only to <code>openrouter.ai</code>. Session storage is the default; persistent storage is opt-in.</p>
+      <label class="stacked-field">
+        <span>Key</span>
+        <input id="apiKeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="sk-or-v1-…">
+      </label>
+      <label class="check-row">
+        <input id="rememberKeyInput" type="checkbox">
+        <span>Remember on this device (localStorage)</span>
+      </label>
+      <div class="dialog-error" id="keyError" role="alert"></div>
+      <div class="dialog-actions">
+        <button class="danger-button" id="forgetKeyButton" type="button">Forget key</button>
+        <button class="primary-button" id="connectButton" type="button">Connect</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>
