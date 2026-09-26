@@ -11,6 +11,8 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Optional
 
+from krea2_anypaint_editor import AnyPaintDialog, AnyPaintRequest
+
 from PySide6.QtCore import (
     QByteArray,
     QElapsedTimer,
@@ -258,6 +260,13 @@ class Krea2Window(QMainWindow):
             or shutil.which("krea2")
             or "krea2"
         )
+        local_anypaint_cli = self.krea2_root / "bin" / "krea2-anypaint"
+        self.anypaint_cli = (
+            os.environ.get("KREA2_ANYPAINT_CLI")
+            or (str(local_anypaint_cli) if local_anypaint_cli.is_file() else None)
+            or shutil.which("krea2-anypaint")
+            or str(local_anypaint_cli)
+        )
 
         self.process: Optional[QProcess] = None
         self._process_group_pid: Optional[int] = None
@@ -269,6 +278,7 @@ class Krea2Window(QMainWindow):
         self._run_strength = 1.0
         self._run_rebalance: Optional[str] = None
         self._run_queue_total = 1
+        self._run_label = "Krea2"
         self._cancel_requested = False
         self._selected_meta: Optional[GenerationMeta] = None
         self._elapsed = QElapsedTimer()
@@ -407,6 +417,11 @@ class Krea2Window(QMainWindow):
         for button in (self.open_file_button, self.open_folder_button, self.copy_seed_button):
             button.setEnabled(False)
             info_row.addWidget(button)
+
+        self.edit_button = QPushButton("Edit / Inpaint / Outpaint…")
+        self.edit_button.setToolTip("Open the local AnyPaint mask editor")
+        self.edit_button.clicked.connect(self.open_anypaint_editor)
+        info_row.addWidget(self.edit_button)
         preview_layout.addLayout(info_row)
         splitter.addWidget(preview_container)
 
@@ -632,6 +647,7 @@ class Krea2Window(QMainWindow):
         self._run_strength = strength
         self._run_rebalance = str(rebalance_value) if rebalance_value else None
         self._run_queue_total = queue_total
+        self._run_label = "Krea2"
         self._cancel_requested = False
         self._elapsed.restart()
 
@@ -665,6 +681,87 @@ class Krea2Window(QMainWindow):
         self.elapsed_timer.start()
         process.start()
 
+    def open_anypaint_editor(self) -> None:
+        if self.process is not None and self.process.state() != QProcess.ProcessState.NotRunning:
+            return
+        initial_source = self.preview.path
+        dialog = AnyPaintDialog(
+            self.krea2_root,
+            initial_source=initial_source,
+            initial_prompt=self.prompt.toPlainText(),
+            initial_seed=self.seed.currentText(),
+            initial_queue=self.queue.value(),
+            parent=self,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted or dialog.request is None:
+            return
+        self.start_anypaint(dialog.request)
+
+    def start_anypaint(self, request: AnyPaintRequest) -> None:
+        cli_path = shutil.which(self.anypaint_cli) if os.path.basename(self.anypaint_cli) == self.anypaint_cli else self.anypaint_cli
+        if not cli_path or not Path(cli_path).exists():
+            QMessageBox.critical(
+                self,
+                APP_NAME,
+                "AnyPaint is not installed yet.\n\n"
+                "Run krea2-anypaint-setup once, then reopen the editor.",
+            )
+            return
+
+        args = [
+            "--source", request.source,
+            "--mask", request.mask,
+            "--prompt", request.prompt,
+            "--width", str(request.width),
+            "--height", str(request.height),
+            "--bbox", *(str(value) for value in request.bbox),
+            "-q", str(request.queue),
+        ]
+        if request.seed is not None:
+            args.extend(["--seed", str(request.seed)])
+
+        self._known_output_paths = set(self._list_output_images())
+        self._run_new_paths.clear()
+        self._run_seeds.clear()
+        self._run_prompt = request.prompt
+        self._run_lora = "AnyPaint"
+        self._run_strength = 1.0
+        self._run_rebalance = None
+        self._run_queue_total = request.queue
+        self._run_label = "AnyPaint"
+        self._cancel_requested = False
+        self._elapsed.restart()
+
+        self.details.clear()
+        self._append_detail("$ " + self._display_command(str(cli_path), args))
+        self.status.setText("Starting AnyPaint…")
+        self.progress.setRange(0, request.queue)
+        self.progress.setValue(0)
+        self.progress.setFormat(f"0 / {request.queue}")
+        self._set_controls_running(True)
+
+        process = QProcess(self)
+        process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        process.setWorkingDirectory(str(self.krea2_root))
+        process.readyReadStandardOutput.connect(self.process_output)
+        process.started.connect(self.process_started)
+        process.errorOccurred.connect(self.process_error)
+        process.finished.connect(self.process_finished)
+
+        setsid = shutil.which("setsid")
+        if setsid:
+            process.setProgram(setsid)
+            process.setArguments([str(cli_path), *args])
+        else:
+            process.setProgram(str(cli_path))
+            process.setArguments(args)
+
+        self.process = process
+        self._process_group_pid = None
+        self.output_poll.start()
+        self.elapsed_timer.start()
+        process.start()
+
     def _display_command(self, program: str, args: list[str]) -> str:
         import shlex
         return " ".join(shlex.quote(x) for x in [program, *args])
@@ -674,7 +771,7 @@ class Krea2Window(QMainWindow):
             return
         pid = int(self.process.processId())
         self._process_group_pid = pid if shutil.which("setsid") else None
-        self.status.setText("Krea2 is running…")
+        self.status.setText(f"{self._run_label} is running…")
 
     def process_output(self) -> None:
         if self.process is None:
@@ -706,7 +803,7 @@ class Krea2Window(QMainWindow):
         if self.process is None:
             return
         if error == QProcess.ProcessError.FailedToStart:
-            self.status.setText("Failed to start Krea2")
+            self.status.setText(f"Failed to start {self._run_label}")
             self._append_detail(self.process.errorString())
             self.output_poll.stop()
             self.elapsed_timer.stop()
@@ -779,6 +876,7 @@ class Krea2Window(QMainWindow):
             self.random_seed,
             self.queue,
             self.rebalance,
+            self.edit_button,
         ):
             widget.setEnabled(not running)
         if not running:
