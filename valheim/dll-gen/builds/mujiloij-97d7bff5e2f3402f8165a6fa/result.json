@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "job_id": "mujiloij-97d7bff5e2f3402f8165a6fa",
+  "state": "success",
+  "mod_name": "ODEN MODE",
+  "dll": "ODEN_MODE.dll",
+  "size": 7168,
+  "sha256": "6a05ce1d30061aa38e55da354f11e922a443a8edf7391d52977f2df9a4fb7c78",
+  "finished_at": "2026-09-27T07:46:25.0847935+00:00"
+}
