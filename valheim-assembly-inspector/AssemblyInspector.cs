@@ -99,7 +99,7 @@ namespace AssemblyInspectorMod
         {
             try
             {
-                _harmony.UnpatchAll(HarmonyId);
+                _harmony.UnpatchSelf();
             }
             catch
             {
@@ -804,7 +804,7 @@ namespace AssemblyInspectorMod
         {
             try
             {
-                _harmony.UnpatchAll(HarmonyId);
+                _harmony.UnpatchSelf();
             }
             catch (Exception ex)
             {
