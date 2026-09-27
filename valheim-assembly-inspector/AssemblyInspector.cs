@@ -17,9 +17,13 @@ namespace AssemblyInspectorMod
     {
         public const string PluginGuid = "claire.valheim.assemblyinspector";
         public const string PluginName = "Assembly Inspector";
-        public const string PluginVersion = "1.0.0";
+        public const string PluginVersion = "1.1.0";
         private const string HarmonyId = PluginGuid + ".live-overrides";
+        private const string UiHarmonyId = PluginGuid + ".ui-input";
         private const int WindowId = 845112;
+
+        private static AssemblyInspector _instance;
+        private static bool _uiCapturingInput;
 
         private static readonly BindingFlags DeclaredMembers =
             BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public |
@@ -38,8 +42,10 @@ namespace AssemblyInspectorMod
 
         private ConfigEntry<KeyCode> _toggleKey;
         private ConfigEntry<string> _assemblyName;
+        private ConfigEntry<int> _fontSize;
 
         private Harmony _harmony;
+        private Harmony _uiHarmony;
         private Assembly _targetAssembly;
         private List<Type> _types = new List<Type>();
 
@@ -59,7 +65,7 @@ namespace AssemblyInspectorMod
         private bool _showSpecialMethods;
         private MemberTab _tab = MemberTab.Methods;
 
-        private Rect _windowRect = new Rect(24f, 24f, 1370f, 790f);
+        private Rect _windowRect = new Rect(24f, 24f, 1650f, 960f);
         private Vector2 _typeScroll;
         private Vector2 _memberScroll;
         private Vector2 _detailScroll;
@@ -67,6 +73,28 @@ namespace AssemblyInspectorMod
         private bool _cursorSaved;
         private bool _savedCursorVisible;
         private CursorLockMode _savedCursorLock;
+
+        private Type _zCursorType;
+        private PropertyInfo _zCursorLockState;
+        private PropertyInfo _zCursorIsRequested;
+        private PropertyInfo _zCursorIsVisible;
+        private MethodInfo _zCursorShow;
+        private MethodInfo _zCursorSetRequested;
+        private MethodInfo _zCursorSetVisible;
+        private MethodInfo _zInputResetAllButtonStates;
+        private object _savedZCursorLock;
+        private bool _savedZCursorRequested;
+        private bool _savedZCursorVisible;
+        private bool _savedZCursorState;
+
+        private GUISkin _inspectorSkin;
+        private int _skinFontSize;
+        private Texture2D _windowTexture;
+        private Texture2D _buttonTexture;
+        private Texture2D _buttonHoverTexture;
+        private Texture2D _buttonActiveTexture;
+        private Texture2D _fieldTexture;
+        private Texture2D _fieldFocusedTexture;
 
         private enum MemberTab
         {
@@ -77,6 +105,8 @@ namespace AssemblyInspectorMod
 
         private void Awake()
         {
+            _instance = this;
+
             _toggleKey = Config.Bind(
                 "General",
                 "ToggleKey",
@@ -89,17 +119,38 @@ namespace AssemblyInspectorMod
                 "assembly_valheim",
                 "Managed assembly to browse by simple assembly name.");
 
+            _fontSize = Config.Bind(
+                "Interface",
+                "FontSize",
+                16,
+                "Assembly Inspector font size. Values from 12 to 28 are used.");
+
             _harmony = new Harmony(HarmonyId);
+            _uiHarmony = new Harmony(UiHarmonyId);
+
             ResolveAssembly();
+            ResolveValheimUiIntegration();
+            PatchValheimUiInput();
 
             Logger.LogInfo(PluginName + " " + PluginVersion + " loaded. Toggle: " + _toggleKey.Value + ".");
         }
 
         private void OnDestroy()
         {
+            _uiCapturingInput = false;
+
             try
             {
-                _harmony.UnpatchSelf();
+                _uiHarmony?.UnpatchSelf();
+            }
+            catch
+            {
+                // Best effort during shutdown.
+            }
+
+            try
+            {
+                _harmony?.UnpatchSelf();
             }
             catch
             {
@@ -110,6 +161,10 @@ namespace AssemblyInspectorMod
                 RuntimeOverrides.Clear();
 
             RestoreCursor();
+            DestroyInspectorSkin();
+
+            if (ReferenceEquals(_instance, this))
+                _instance = null;
         }
 
         private void Update()
@@ -121,21 +176,38 @@ namespace AssemblyInspectorMod
                 ForceCursor();
         }
 
+        private void LateUpdate()
+        {
+            if (_visible)
+                ForceCursor();
+        }
+
         private void OnGUI()
         {
             if (!_visible)
                 return;
 
             ForceCursor();
+            EnsureInspectorSkin();
 
-            float maxWidth = Mathf.Max(980f, Screen.width - 20f);
-            float maxHeight = Mathf.Max(600f, Screen.height - 20f);
-            _windowRect.width = Mathf.Min(_windowRect.width, maxWidth);
-            _windowRect.height = Mathf.Min(_windowRect.height, maxHeight);
-            _windowRect.x = Mathf.Clamp(_windowRect.x, 0f, Mathf.Max(0f, Screen.width - _windowRect.width));
-            _windowRect.y = Mathf.Clamp(_windowRect.y, 0f, Mathf.Max(0f, Screen.height - _windowRect.height));
+            GUISkin previousSkin = GUI.skin;
+            GUI.skin = _inspectorSkin;
 
-            _windowRect = GUI.Window(WindowId, _windowRect, DrawWindow, PluginName + " " + PluginVersion);
+            try
+            {
+                float maxWidth = Mathf.Max(760f, Screen.width - 20f);
+                float maxHeight = Mathf.Max(560f, Screen.height - 20f);
+                _windowRect.width = Mathf.Min(_windowRect.width, maxWidth);
+                _windowRect.height = Mathf.Min(_windowRect.height, maxHeight);
+                _windowRect.x = Mathf.Clamp(_windowRect.x, 0f, Mathf.Max(0f, Screen.width - _windowRect.width));
+                _windowRect.y = Mathf.Clamp(_windowRect.y, 0f, Mathf.Max(0f, Screen.height - _windowRect.height));
+
+                _windowRect = GUI.Window(WindowId, _windowRect, DrawWindow, PluginName + " " + PluginVersion);
+            }
+            finally
+            {
+                GUI.skin = previousSkin;
+            }
         }
 
         private void SetVisible(bool visible)
@@ -144,14 +216,18 @@ namespace AssemblyInspectorMod
                 return;
 
             _visible = visible;
+            _uiCapturingInput = visible;
+
             if (_visible)
             {
                 SaveCursor();
+                ResetGameInputState();
                 ForceCursor();
                 ResolveAssembly();
             }
             else
             {
+                ResetGameInputState();
                 RestoreCursor();
             }
         }
@@ -163,13 +239,43 @@ namespace AssemblyInspectorMod
 
             _savedCursorVisible = Cursor.visible;
             _savedCursorLock = Cursor.lockState;
+
+            try
+            {
+                if (_zCursorType != null)
+                {
+                    _savedZCursorLock = _zCursorLockState?.GetValue(null, null);
+                    _savedZCursorRequested = ReadStaticBool(_zCursorIsRequested);
+                    _savedZCursorVisible = ReadStaticBool(_zCursorIsVisible);
+                    _savedZCursorState = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogDebug("Could not snapshot ZCursor state: " + ex.Message);
+                _savedZCursorState = false;
+            }
+
             _cursorSaved = true;
         }
 
         private void ForceCursor()
         {
-            Cursor.visible = true;
+            try
+            {
+                if (_zCursorType != null)
+                {
+                    _zCursorLockState?.SetValue(null, CursorLockMode.None, null);
+                    _zCursorShow?.Invoke(null, null);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogDebug("Could not apply ZCursor override: " + ex.Message);
+            }
+
             Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
         }
 
         private void RestoreCursor()
@@ -177,9 +283,370 @@ namespace AssemblyInspectorMod
             if (!_cursorSaved)
                 return;
 
-            Cursor.visible = _savedCursorVisible;
-            Cursor.lockState = _savedCursorLock;
+            _uiCapturingInput = false;
+
+            if (!RestoreCurrentSceneCursor())
+            {
+                try
+                {
+                    if (_savedZCursorState && _zCursorType != null)
+                    {
+                        if (_savedZCursorLock != null)
+                            _zCursorLockState?.SetValue(null, _savedZCursorLock, null);
+                        _zCursorSetRequested?.Invoke(null, new object[] { _savedZCursorRequested });
+                        _zCursorSetVisible?.Invoke(null, new object[] { _savedZCursorVisible });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogDebug("Could not restore ZCursor state: " + ex.Message);
+                }
+
+                Cursor.lockState = _savedCursorLock;
+                Cursor.visible = _savedCursorVisible;
+            }
+
+            _savedZCursorState = false;
             _cursorSaved = false;
+        }
+
+        private void ResolveValheimUiIntegration()
+        {
+            _zCursorType = FindLoadedType("ZCursor");
+            if (_zCursorType != null)
+            {
+                BindingFlags flags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+                _zCursorLockState = _zCursorType.GetProperty("LockState", flags);
+                _zCursorIsRequested = _zCursorType.GetProperty("IsRequested", flags);
+                _zCursorIsVisible = _zCursorType.GetProperty("IsVisible", flags);
+                _zCursorShow = _zCursorType.GetMethod("Show", flags, null, Type.EmptyTypes, null);
+                _zCursorSetRequested = _zCursorType.GetMethod("SetRequested", flags, null, new[] { typeof(bool) }, null);
+                _zCursorSetVisible = _zCursorType.GetMethod("SetVisible", flags, null, new[] { typeof(bool) }, null);
+            }
+
+            Type zInput = FindLoadedType("ZInput");
+            if (zInput != null)
+            {
+                _zInputResetAllButtonStates = zInput.GetMethod(
+                    "ResetAllButtonStates",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
+                    null,
+                    Type.EmptyTypes,
+                    null);
+            }
+        }
+
+        private void PatchValheimUiInput()
+        {
+            try
+            {
+                HarmonyMethod cursorPrefix = new HarmonyMethod(
+                    typeof(AssemblyInspector).GetMethod(nameof(CursorOwnerPrefix), BindingFlags.Static | BindingFlags.NonPublic));
+                HarmonyMethod takeInputPostfix = new HarmonyMethod(
+                    typeof(AssemblyInspector).GetMethod(nameof(TakeInputPostfix), BindingFlags.Static | BindingFlags.NonPublic));
+                HarmonyMethod textInputPostfix = new HarmonyMethod(
+                    typeof(AssemblyInspector).GetMethod(nameof(TextInputVisiblePostfix), BindingFlags.Static | BindingFlags.NonPublic));
+                HarmonyMethod mouseDeltaPostfix = new HarmonyMethod(
+                    typeof(AssemblyInspector).GetMethod(nameof(MouseDeltaPostfix), BindingFlags.Static | BindingFlags.NonPublic));
+                HarmonyMethod mouseFloatPostfix = new HarmonyMethod(
+                    typeof(AssemblyInspector).GetMethod(nameof(MouseFloatPostfix), BindingFlags.Static | BindingFlags.NonPublic));
+
+                PatchNamedMethods("GameCamera", "UpdateMouseCapture", cursorPrefix, null);
+                PatchNamedMethods("Menu", "UpdateCursor", cursorPrefix, null);
+                PatchNamedMethods("FejdStartup", "UpdateCursor", cursorPrefix, null);
+
+                PatchNamedMethods("PlayerController", "TakeInput", null, takeInputPostfix, typeof(bool));
+                PatchNamedMethods("Player", "TakeInput", null, takeInputPostfix, typeof(bool));
+                PatchNamedMethods("TextInput", "IsVisible", null, textInputPostfix, typeof(bool));
+                PatchNamedMethods("ZInput", "GetMouseDelta", null, mouseDeltaPostfix, typeof(Vector2));
+                PatchNamedMethods("ZInput", "GetMouseScrollWheel", null, mouseFloatPostfix, typeof(float));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("Could not install Assembly Inspector UI input patches: " + ex);
+            }
+        }
+
+        private void PatchNamedMethods(
+            string typeName,
+            string methodName,
+            HarmonyMethod prefix,
+            HarmonyMethod postfix,
+            Type returnType = null)
+        {
+            Type type = FindLoadedType(typeName);
+            if (type == null)
+            {
+                Logger.LogDebug("UI integration type not found: " + typeName);
+                return;
+            }
+
+            MethodInfo[] methods = type
+                .GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                .Where(method =>
+                    method.Name == methodName &&
+                    (returnType == null || method.ReturnType == returnType))
+                .ToArray();
+
+            foreach (MethodInfo method in methods)
+                _uiHarmony.Patch(method, prefix, postfix);
+
+            if (methods.Length == 0)
+                Logger.LogDebug("UI integration method not found: " + typeName + "." + methodName);
+        }
+
+        [HarmonyPriority(Priority.First)]
+        private static bool CursorOwnerPrefix()
+        {
+            if (!_uiCapturingInput || !Application.isFocused)
+                return true;
+
+            _instance?.ForceCursor();
+            return false;
+        }
+
+        [HarmonyPriority(Priority.Last)]
+        private static void TakeInputPostfix(ref bool __result)
+        {
+            if (_uiCapturingInput)
+                __result = false;
+        }
+
+        [HarmonyPriority(Priority.Last)]
+        private static void TextInputVisiblePostfix(ref bool __result)
+        {
+            if (_uiCapturingInput)
+                __result = true;
+        }
+
+        [HarmonyPriority(Priority.Last)]
+        private static void MouseDeltaPostfix(ref Vector2 __result)
+        {
+            if (_uiCapturingInput)
+                __result = Vector2.zero;
+        }
+
+        [HarmonyPriority(Priority.Last)]
+        private static void MouseFloatPostfix(ref float __result)
+        {
+            if (_uiCapturingInput)
+                __result = 0f;
+        }
+
+        private void ResetGameInputState()
+        {
+            try
+            {
+                _zInputResetAllButtonStates?.Invoke(null, null);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogDebug("Could not reset ZInput button states: " + ex.Message);
+            }
+        }
+
+        private bool RestoreCurrentSceneCursor()
+        {
+            bool handled = false;
+
+            try
+            {
+                object gameCamera = GetStaticInstance("GameCamera");
+                if (IsAliveUnityObject(gameCamera))
+                {
+                    InvokeInstanceMethod(gameCamera, "UpdateMouseCapture");
+                    handled = true;
+
+                    object menu = GetStaticInstance("Menu");
+                    if (IsAliveUnityObject(menu) && InvokeStaticBool("Menu", "IsActive"))
+                        InvokeInstanceMethod(menu, "UpdateCursor");
+
+                    return true;
+                }
+
+                object fejdStartup = GetStaticInstance("FejdStartup");
+                if (IsAliveUnityObject(fejdStartup))
+                {
+                    InvokeInstanceMethod(fejdStartup, "UpdateCursor");
+                    return true;
+                }
+
+                object activeMenu = GetStaticInstance("Menu");
+                if (IsAliveUnityObject(activeMenu) && InvokeStaticBool("Menu", "IsActive"))
+                {
+                    InvokeInstanceMethod(activeMenu, "UpdateCursor");
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogDebug("Could not hand cursor back to Valheim: " + ex.Message);
+            }
+
+            return handled;
+        }
+
+        private static Type FindLoadedType(string fullName)
+        {
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type type = assembly.GetType(fullName, false, false);
+                if (type != null)
+                    return type;
+            }
+
+            return null;
+        }
+
+        private static object GetStaticInstance(string typeName)
+        {
+            Type type = FindLoadedType(typeName);
+            if (type == null)
+                return null;
+
+            BindingFlags flags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+            PropertyInfo property = type.GetProperty("instance", flags);
+            if (property != null)
+                return property.GetValue(null, null);
+
+            FieldInfo field = type.GetField("instance", flags);
+            return field?.GetValue(null);
+        }
+
+        private static bool InvokeStaticBool(string typeName, string methodName)
+        {
+            Type type = FindLoadedType(typeName);
+            MethodInfo method = type?.GetMethod(
+                methodName,
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                Type.EmptyTypes,
+                null);
+
+            return method != null && Convert.ToBoolean(method.Invoke(null, null), CultureInfo.InvariantCulture);
+        }
+
+        private static void InvokeInstanceMethod(object instance, string methodName)
+        {
+            if (instance == null)
+                return;
+
+            MethodInfo method = instance.GetType().GetMethod(
+                methodName,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                Type.EmptyTypes,
+                null);
+
+            method?.Invoke(instance, null);
+        }
+
+        private static bool IsAliveUnityObject(object value)
+        {
+            if (value == null)
+                return false;
+
+            UnityEngine.Object unityObject = value as UnityEngine.Object;
+            return unityObject == null || unityObject;
+        }
+
+        private static bool ReadStaticBool(PropertyInfo property)
+        {
+            return property != null &&
+                   Convert.ToBoolean(property.GetValue(null, null), CultureInfo.InvariantCulture);
+        }
+
+        private void EnsureInspectorSkin()
+        {
+            int fontSize = Mathf.Clamp(_fontSize == null ? 16 : _fontSize.Value, 12, 28);
+            if (_inspectorSkin != null && _skinFontSize == fontSize)
+                return;
+
+            DestroyInspectorSkin();
+
+            _skinFontSize = fontSize;
+            _inspectorSkin = UnityEngine.Object.Instantiate(GUI.skin);
+            _inspectorSkin.hideFlags = HideFlags.HideAndDontSave;
+
+            _windowTexture = MakeTexture(new Color(0.045f, 0.047f, 0.055f, 0.985f));
+            _buttonTexture = MakeTexture(new Color(0.16f, 0.17f, 0.20f, 1f));
+            _buttonHoverTexture = MakeTexture(new Color(0.24f, 0.26f, 0.31f, 1f));
+            _buttonActiveTexture = MakeTexture(new Color(0.10f, 0.40f, 0.72f, 1f));
+            _fieldTexture = MakeTexture(new Color(0.09f, 0.095f, 0.11f, 1f));
+            _fieldFocusedTexture = MakeTexture(new Color(0.13f, 0.14f, 0.17f, 1f));
+
+            Color text = new Color(0.96f, 0.97f, 0.99f, 1f);
+            Color muted = new Color(0.82f, 0.84f, 0.88f, 1f);
+
+            _inspectorSkin.window.fontSize = fontSize + 2;
+            _inspectorSkin.window.fontStyle = FontStyle.Bold;
+            _inspectorSkin.window.normal.textColor = text;
+            _inspectorSkin.window.normal.background = _windowTexture;
+            _inspectorSkin.window.padding = new RectOffset(14, 14, 31, 14);
+
+            _inspectorSkin.label.fontSize = fontSize;
+            _inspectorSkin.label.normal.textColor = text;
+
+            _inspectorSkin.button.fontSize = fontSize;
+            _inspectorSkin.button.normal.textColor = text;
+            _inspectorSkin.button.hover.textColor = Color.white;
+            _inspectorSkin.button.active.textColor = Color.white;
+            _inspectorSkin.button.normal.background = _buttonTexture;
+            _inspectorSkin.button.hover.background = _buttonHoverTexture;
+            _inspectorSkin.button.active.background = _buttonActiveTexture;
+            _inspectorSkin.button.padding = new RectOffset(8, 8, 6, 6);
+
+            _inspectorSkin.textField.fontSize = fontSize;
+            _inspectorSkin.textField.normal.textColor = text;
+            _inspectorSkin.textField.focused.textColor = Color.white;
+            _inspectorSkin.textField.hover.textColor = Color.white;
+            _inspectorSkin.textField.normal.background = _fieldTexture;
+            _inspectorSkin.textField.focused.background = _fieldFocusedTexture;
+            _inspectorSkin.textField.hover.background = _fieldFocusedTexture;
+            _inspectorSkin.textField.padding = new RectOffset(7, 7, 5, 5);
+
+            _inspectorSkin.toggle.fontSize = fontSize;
+            _inspectorSkin.toggle.normal.textColor = muted;
+            _inspectorSkin.toggle.hover.textColor = Color.white;
+            _inspectorSkin.toggle.onNormal.textColor = Color.white;
+            _inspectorSkin.toggle.onHover.textColor = Color.white;
+
+            _inspectorSkin.verticalScrollbar.fixedWidth = 18f;
+            _inspectorSkin.horizontalScrollbar.fixedHeight = 18f;
+        }
+
+        private static Texture2D MakeTexture(Color color)
+        {
+            Texture2D texture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            texture.hideFlags = HideFlags.HideAndDontSave;
+            texture.SetPixel(0, 0, color);
+            texture.Apply(false, true);
+            return texture;
+        }
+
+        private void DestroyInspectorSkin()
+        {
+            DestroyTexture(ref _windowTexture);
+            DestroyTexture(ref _buttonTexture);
+            DestroyTexture(ref _buttonHoverTexture);
+            DestroyTexture(ref _buttonActiveTexture);
+            DestroyTexture(ref _fieldTexture);
+            DestroyTexture(ref _fieldFocusedTexture);
+
+            if (_inspectorSkin != null)
+            {
+                UnityEngine.Object.Destroy(_inspectorSkin);
+                _inspectorSkin = null;
+            }
+        }
+
+        private static void DestroyTexture(ref Texture2D texture)
+        {
+            if (texture == null)
+                return;
+
+            UnityEngine.Object.Destroy(texture);
+            texture = null;
         }
 
         private void DrawWindow(int id)
@@ -222,7 +689,7 @@ namespace AssemblyInspectorMod
 
         private void DrawTypesColumn()
         {
-            GUILayout.BeginVertical(GUILayout.Width(315f));
+            GUILayout.BeginVertical(GUILayout.Width(360f));
 
             GUILayout.Label("Classes");
             string nextSearch = GUILayout.TextField(_typeSearch ?? string.Empty);
@@ -243,7 +710,7 @@ namespace AssemblyInspectorMod
 
                 shown++;
                 string label = ReferenceEquals(type, _selectedType) ? "> " + DisplayTypeName(type) : DisplayTypeName(type);
-                if (GUILayout.Button(label, GUILayout.Height(28f)))
+                if (GUILayout.Button(label, GUILayout.Height(36f)))
                     SelectType(type);
             }
 
@@ -255,7 +722,7 @@ namespace AssemblyInspectorMod
 
         private void DrawMembersColumn()
         {
-            GUILayout.BeginVertical(GUILayout.Width(485f));
+            GUILayout.BeginVertical(GUILayout.Width(560f));
 
             if (_selectedType == null)
             {
@@ -328,7 +795,7 @@ namespace AssemblyInspectorMod
                 if (ReferenceEquals(method, _selectedMethod))
                     label = "> " + label;
 
-                if (GUILayout.Button(label, GUILayout.Height(34f)))
+                if (GUILayout.Button(label, GUILayout.Height(42f)))
                     SelectMethod(method);
             }
         }
@@ -348,7 +815,7 @@ namespace AssemblyInspectorMod
                 if (ReferenceEquals(property, _selectedProperty))
                     label = "> " + label;
 
-                if (GUILayout.Button(label, GUILayout.Height(32f)))
+                if (GUILayout.Button(label, GUILayout.Height(40f)))
                     SelectProperty(property);
             }
         }
@@ -364,7 +831,7 @@ namespace AssemblyInspectorMod
                 if (ReferenceEquals(field, _selectedField))
                     label = "> " + label;
 
-                if (GUILayout.Button(label, GUILayout.Height(32f)))
+                if (GUILayout.Button(label, GUILayout.Height(40f)))
                     SelectField(field);
             }
         }
