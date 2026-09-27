@@ -17,7 +17,7 @@ namespace AssemblyInspectorMod
     {
         public const string PluginGuid = "claire.valheim.assemblyinspector";
         public const string PluginName = "Assembly Inspector";
-        public const string PluginVersion = "1.1.0";
+        public const string PluginVersion = "1.1.1";
         private const string HarmonyId = PluginGuid + ".live-overrides";
         private const string UiHarmonyId = PluginGuid + ".ui-input";
         private const int WindowId = 845112;
@@ -37,8 +37,8 @@ namespace AssemblyInspectorMod
         private static readonly Dictionary<MethodBase, object> RuntimeOverrides =
             new Dictionary<MethodBase, object>();
 
-        private readonly Dictionary<MethodInfo, DynamicMethod> _livePostfixes =
-            new Dictionary<MethodInfo, DynamicMethod>();
+        private readonly HashSet<MethodInfo> _livePatchedMethods =
+            new HashSet<MethodInfo>();
 
         private ConfigEntry<KeyCode> _toggleKey;
         private ConfigEntry<string> _assemblyName;
@@ -1231,11 +1231,17 @@ namespace AssemblyInspectorMod
 
             try
             {
-                if (!_livePostfixes.ContainsKey(method))
+                if (!_livePatchedMethods.Contains(method))
                 {
-                    DynamicMethod postfix = BuildDynamicPostfix(method);
-                    _harmony.Patch(method, postfix: new HarmonyMethod(postfix));
-                    _livePostfixes[method] = postfix;
+                    MethodInfo factory = typeof(AssemblyInspector).GetMethod(
+                        nameof(LivePostfixFactory),
+                        BindingFlags.Static | BindingFlags.NonPublic);
+
+                    if (factory == null)
+                        throw new MissingMethodException(typeof(AssemblyInspector).FullName, nameof(LivePostfixFactory));
+
+                    _harmony.Patch(method, postfix: new HarmonyMethod(factory));
+                    _livePatchedMethods.Add(method);
                 }
 
                 lock (OverrideLock)
@@ -1255,7 +1261,7 @@ namespace AssemblyInspectorMod
             try
             {
                 _harmony.Unpatch(method, HarmonyPatchType.Postfix, HarmonyId);
-                _livePostfixes.Remove(method);
+                _livePatchedMethods.Remove(method);
                 lock (OverrideLock)
                     RuntimeOverrides.Remove(method);
                 _status = "Removed live override from " + FormatMethodShort(method) + ".";
@@ -1277,11 +1283,20 @@ namespace AssemblyInspectorMod
                 Logger.LogWarning("Could not unpatch all Assembly Inspector overrides: " + ex.Message);
             }
 
-            _livePostfixes.Clear();
+            _livePatchedMethods.Clear();
             lock (OverrideLock)
                 RuntimeOverrides.Clear();
 
             _status = "Cleared all live return overrides.";
+        }
+
+        private static DynamicMethod LivePostfixFactory(MethodBase originalMethod)
+        {
+            MethodInfo target = originalMethod as MethodInfo;
+            if (target == null)
+                throw new ArgumentException("Assembly Inspector live overrides require a MethodInfo target.", nameof(originalMethod));
+
+            return BuildDynamicPostfix(target);
         }
 
         private static DynamicMethod BuildDynamicPostfix(MethodInfo target)
