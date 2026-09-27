@@ -170,14 +170,18 @@ jobs:
                   MethodInfo setter = overrides.GetType().GetMethod("set_Item");
                   setter.Invoke(overrides, new object[] { target, true });
 
-                  Harmony harmony = new Harmony("claire.valheim.assemblyinspector.ci-live-test");
-                  harmony.Patch(target, postfix: new HarmonyMethod(factory));
+                  Patch patch = new Patch(
+                      new HarmonyMethod(factory),
+                      0,
+                      "claire.valheim.assemblyinspector.ci-live-test");
 
-                  bool result = (bool)target.Invoke(null, null);
-                  harmony.UnpatchSelf();
+                  MethodInfo resolvedPostfix = patch.GetMethod(target);
+                  object[] postfixArgs = new object[] { target, false };
+                  resolvedPostfix.Invoke(null, postfixArgs);
 
+                  bool result = (bool)postfixArgs[1];
                   if (!result)
-                      throw new Exception("Live override smoke test failed: false was not forced to true.");
+                      throw new Exception("Live override smoke test failed: dynamic postfix did not force false to true.");
 
                   Console.WriteLine("Live Harmony override smoke test passed.");
                   return 0;
