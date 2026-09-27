@@ -579,7 +579,6 @@ namespace AssemblyInspectorMod
             Color muted = new Color(0.82f, 0.84f, 0.88f, 1f);
 
             _inspectorSkin.window.fontSize = fontSize + 2;
-            _inspectorSkin.window.fontStyle = FontStyle.Bold;
             _inspectorSkin.window.normal.textColor = text;
             _inspectorSkin.window.normal.background = _windowTexture;
             _inspectorSkin.window.padding = new RectOffset(14, 14, 31, 14);
