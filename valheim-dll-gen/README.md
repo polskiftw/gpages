@@ -23,6 +23,8 @@ The browser sends that token directly to `api.github.com` to:
 - verify access to the DLL Generator workflow
 - call the workflow-dispatch endpoint
 
+GitHub's REST API supports browser CORS requests from any origin, including authenticated requests using the `Authorization` header. Current GitHub.com workflow-dispatch responses may include the newly-created run ID and URL; the page accepts that response as well as the older no-content success response.
+
 The token is never committed to the repository and is never sent to a third-party relay.
 
 By default the UI stores it in `sessionStorage`. If **Remember token on this device** is selected, it is moved to `localStorage`. The UI also has a button to delete both copies.

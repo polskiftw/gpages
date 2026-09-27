@@ -67,7 +67,7 @@
   const REPO = "gpages";
   const WORKFLOW = "valheim-dll-gen.yml";
   const REF = "main";
-  const API_VERSION = "2022-11-28";
+  const API_VERSION = "2026-03-10";
   const MAX_SOURCE_BYTES = 32 * 1024;
   const SESSION_KEY = "valheimDllGen.githubToken.session";
   const LOCAL_KEY = "valheimDllGen.githubToken.local";
@@ -312,8 +312,23 @@
         }
       );
 
-      if (response.status !== 204) {
+      let runUrl = "";
+
+      if (response.status === 200) {
+        const dispatch = await response.json();
+        runUrl = dispatch && dispatch.html_url ? dispatch.html_url : "";
+      } else if (response.status !== 204) {
         throw new Error(await githubError(response));
+      }
+
+      if (runUrl) {
+        const runLink = document.createElement("a");
+        runLink.className = "download secondary";
+        runLink.href = runUrl;
+        runLink.target = "_blank";
+        runLink.rel = "noopener noreferrer";
+        runLink.textContent = "Open GitHub Actions run";
+        result.replaceChildren(runLink);
       }
 
       setStatus(status, "GitHub accepted build " + jobId + ". Waiting for the compiled result…");
