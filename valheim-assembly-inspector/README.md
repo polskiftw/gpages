@@ -1,5 +1,7 @@
 # Assembly Inspector
 
+Current plugin version: **1.0.0**.
+
 A BepInEx 5 + Harmony Valheim development/debug tool for browsing the live `assembly_valheim` managed assembly and forcing selected scalar method/property return values.
 
 ## What it does
