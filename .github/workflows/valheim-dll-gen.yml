@@ -1,0 +1,357 @@
+name: Valheim DLL Generator
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'valheim-dll-gen/**'
+      - '.github/workflows/valheim-dll-gen.yml'
+  workflow_dispatch:
+  repository_dispatch:
+    types:
+      - valheim-dll-gen
+
+permissions:
+  contents: write
+
+concurrency:
+  group: valheim-dll-gen
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 12
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare request
+        shell: pwsh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_ID: ${{ github.run_id }}
+          EXPECTED_PASSWORD: ${{ secrets.VALHEIM_DLL_GEN_PASSWORD }}
+          SUBMITTED_PASSWORD: ${{ github.event.client_payload.password }}
+          REQUEST_JOB_ID: ${{ github.event.client_payload.job_id }}
+          REQUEST_MOD_NAME: ${{ github.event.client_payload.mod_name }}
+          REQUEST_SOURCE_B64: ${{ github.event.client_payload.source_b64 }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $work = Join-Path $env:RUNNER_TEMP 'valheim-dll-gen'
+          $publish = Join-Path $env:GITHUB_WORKSPACE 'valheim\dll-gen\builds'
+          New-Item -ItemType Directory -Force -Path $work | Out-Null
+          New-Item -ItemType Directory -Force -Path $publish | Out-Null
+
+          if ($env:EVENT_NAME -ne 'repository_dispatch') {
+            $jobId = "selftest-$env:RUN_ID"
+            $modName = 'ValheimDllGenSmokeTest'
+            $assemblyName = 'ValheimDllGenSmokeTest'
+            $sourcePath = Join-Path $work 'GeneratedMod.cs'
+
+            @'
+          using BepInEx;
+          using HarmonyLib;
+
+          [BepInPlugin("claire.valheim.dllgen.smoketest", "Valheim DLL Generator Smoke Test", "1.0.0")]
+          public sealed class ValheimDllGenSmokeTest : BaseUnityPlugin
+          {
+              private void Awake()
+              {
+                  Logger.LogInfo(typeof(Player).FullName);
+                  Logger.LogInfo(typeof(Harmony).FullName);
+              }
+          }
+          '@ | Set-Content -Path $sourcePath -Encoding UTF8
+
+            "MODE=selftest" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "AUTHORIZED=true" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "PUBLISH_RESULT=false" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "JOB_ID=$jobId" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "MOD_NAME=$modName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "ASSEMBLY_NAME=$assemblyName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "WORK_DIR=$work" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "SOURCE_PATH=$sourcePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            Write-Host 'Prepared local compiler self-test.'
+            exit 0
+          }
+
+          if ([string]::IsNullOrWhiteSpace($env:EXPECTED_PASSWORD)) {
+            throw 'Repository secret VALHEIM_DLL_GEN_PASSWORD is not configured.'
+          }
+
+          $jobId = ($env:REQUEST_JOB_ID ?? '').Trim()
+          $modName = ($env:REQUEST_MOD_NAME ?? '').Trim()
+
+          if ($jobId -notmatch '^[a-z0-9][a-z0-9_-]{7,63}$') {
+            throw 'Invalid job_id. Expected 8-64 lowercase letters, digits, underscores, or hyphens.'
+          }
+
+          if ($modName -notmatch '^[A-Za-z][A-Za-z0-9 ._-]{0,63}$') {
+            throw 'Invalid mod_name. Use 1-64 ordinary letters, digits, spaces, dots, underscores, or hyphens, starting with a letter.'
+          }
+
+          $assemblyName = [regex]::Replace($modName, '[^A-Za-z0-9_.-]', '_')
+          $jobDir = Join-Path $publish $jobId
+          New-Item -ItemType Directory -Force -Path $jobDir | Out-Null
+
+          "MODE=dispatch" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PUBLISH_RESULT=true" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "JOB_ID=$jobId" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "MOD_NAME=$modName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "ASSEMBLY_NAME=$assemblyName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "WORK_DIR=$work" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "JOB_DIR=$jobDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+          if ($env:SUBMITTED_PASSWORD -cne $env:EXPECTED_PASSWORD) {
+            "AUTHORIZED=false" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+            $result = [ordered]@{
+              version = 1
+              job_id = $jobId
+              state = 'unauthorized'
+              message = 'Password rejected.'
+              finished_at = [DateTimeOffset]::UtcNow.ToString('o')
+            }
+            $result | ConvertTo-Json -Depth 4 | Set-Content -Path (Join-Path $jobDir 'result.json') -Encoding UTF8
+            Write-Host 'Request rejected.'
+            exit 0
+          }
+
+          "AUTHORIZED=true" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+          if ([string]::IsNullOrWhiteSpace($env:REQUEST_SOURCE_B64)) {
+            throw 'source_b64 is empty.'
+          }
+
+          try {
+            $sourceBytes = [Convert]::FromBase64String($env:REQUEST_SOURCE_B64)
+          }
+          catch {
+            throw 'source_b64 is not valid Base64.'
+          }
+
+          if ($sourceBytes.Length -gt 40960) {
+            throw "Decoded source exceeds the 40 KiB limit ($($sourceBytes.Length) bytes)."
+          }
+
+          $strictUtf8 = [System.Text.UTF8Encoding]::new($false, $true)
+          try {
+            $null = $strictUtf8.GetString($sourceBytes)
+          }
+          catch {
+            throw 'Decoded source is not valid UTF-8.'
+          }
+
+          $sourcePath = Join-Path $work 'GeneratedMod.cs'
+          [IO.File]::WriteAllBytes($sourcePath, $sourceBytes)
+          "SOURCE_PATH=$sourcePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+          Write-Host "Accepted build job $jobId for '$modName'."
+
+      - name: Prepare compile references
+        if: env.AUTHORIZED == 'true'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $lib = Join-Path $env:WORK_DIR 'lib'
+          New-Item -ItemType Directory -Force -Path $lib | Out-Null
+
+          $bepUrl = 'https://thunderstore.io/package/download/denikson/BepInExPack_Valheim/5.4.2350/'
+          $bepZip = Join-Path $env:RUNNER_TEMP 'bepinex.zip'
+          $bepExtract = Join-Path $env:RUNNER_TEMP 'bepinex'
+
+          $downloaded = $false
+          for ($attempt = 1; $attempt -le 4; $attempt++) {
+            try {
+              Invoke-WebRequest -Uri $bepUrl -OutFile $bepZip
+              $downloaded = $true
+              break
+            }
+            catch {
+              if ($attempt -eq 4) { throw }
+              Start-Sleep -Seconds (3 * $attempt)
+            }
+          }
+          if (-not $downloaded) { throw 'Could not download BepInEx pack.' }
+
+          Expand-Archive -Path $bepZip -DestinationPath $bepExtract
+          $bep = Get-ChildItem -Path $bepExtract -Recurse -File -Filter 'BepInEx.dll' | Select-Object -First 1
+          $harmony = Get-ChildItem -Path $bepExtract -Recurse -File -Filter '0Harmony.dll' | Select-Object -First 1
+          if (-not $bep) { throw 'Could not find BepInEx.dll.' }
+          if (-not $harmony) { throw 'Could not find 0Harmony.dll.' }
+
+          # Same pinned current Valheim Managed snapshot used by the other Valheim builds.
+          $managedAssetId = 574482997
+          $managedExpectedSha256 = 'b81c940eb8d1d751b3a5b12d1e9dbc9309fa508014e2d22c1a5065212c1234ed'
+          $managedZip = Join-Path $env:RUNNER_TEMP 'valheim-managed.zip'
+          $managedExtract = Join-Path $env:RUNNER_TEMP 'valheim-managed'
+          $managedAssetUrl = "https://api.github.com/repos/polskiftw/gpages/releases/assets/$managedAssetId"
+          $headers = @{
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            Accept = 'application/octet-stream'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+
+          Invoke-WebRequest -Uri $managedAssetUrl -Headers $headers -OutFile $managedZip
+          $actual = (Get-FileHash $managedZip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $managedExpectedSha256) {
+            throw "Managed.zip SHA256 mismatch. Expected $managedExpectedSha256, got $actual"
+          }
+
+          Expand-Archive -Path $managedZip -DestinationPath $managedExtract
+          $assemblyValheim = Get-ChildItem -Path $managedExtract -Recurse -File -Filter 'assembly_valheim.dll' | Select-Object -First 1
+          if (-not $assemblyValheim) { throw 'Pinned Managed snapshot does not contain assembly_valheim.dll.' }
+
+          $managedDir = $assemblyValheim.Directory.FullName
+          Copy-Item -Force (Join-Path $managedDir '*.dll') $lib
+          Copy-Item -Force $bep.FullName (Join-Path $lib 'BepInEx.dll')
+          Copy-Item -Force $harmony.FullName (Join-Path $lib '0Harmony.dll')
+
+          $refs = Get-ChildItem -Path $lib -File -Filter '*.dll' | Sort-Object Name | ForEach-Object {
+            $include = [System.Security.SecurityElement]::Escape([IO.Path]::GetFileNameWithoutExtension($_.Name))
+            $hint = [System.Security.SecurityElement]::Escape($_.FullName)
+            "    <Reference Include=`"$include`"><HintPath>$hint</HintPath><Private>false</Private></Reference>"
+          }
+
+          $projectPath = Join-Path $env:WORK_DIR 'GeneratedMod.csproj'
+          @"
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net472</TargetFramework>
+              <LangVersion>latest</LangVersion>
+              <Nullable>disable</Nullable>
+              <AssemblyName>$env:ASSEMBLY_NAME</AssemblyName>
+              <RootNamespace>GeneratedValheimMod</RootNamespace>
+              <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+              <Deterministic>true</Deterministic>
+              <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+            </PropertyGroup>
+            <ItemGroup>
+              <Compile Include="$env:SOURCE_PATH" />
+          $($refs -join [Environment]::NewLine)
+            </ItemGroup>
+          </Project>
+          "@ | Set-Content -Path $projectPath -Encoding UTF8
+
+          "PROJECT_PATH=$projectPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Prepared $($refs.Count) compile references."
+
+      - name: Compile submitted mod
+        if: env.AUTHORIZED == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $logPath = Join-Path $env:WORK_DIR 'build.txt'
+
+          & dotnet build $env:PROJECT_PATH -c Release --nologo 2>&1 |
+            Tee-Object -FilePath $logPath |
+            Write-Host
+
+          $exitCode = $LASTEXITCODE
+          "BUILD_EXIT_CODE=$exitCode" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "BUILD_LOG=$logPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+          if ($exitCode -eq 0) {
+            $dll = Get-ChildItem -Path $env:WORK_DIR -Recurse -File -Filter "$env:ASSEMBLY_NAME.dll" |
+              Where-Object { $_.FullName -match '\\bin\\Release\\' } |
+              Select-Object -First 1
+            if (-not $dll) {
+              "BUILD_EXIT_CODE=99" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+              Add-Content -Path $logPath -Value 'Build reported success but output DLL was not found.'
+            }
+            else {
+              "BUILT_DLL=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            }
+          }
+
+          exit 0
+
+      - name: Verify compiler self-test
+        if: env.MODE == 'selftest' && env.AUTHORIZED == 'true'
+        shell: pwsh
+        run: |
+          if ($env:BUILD_EXIT_CODE -ne '0') {
+            Get-Content $env:BUILD_LOG
+            throw "Valheim DLL Generator self-test failed with exit code $env:BUILD_EXIT_CODE."
+          }
+          if (-not (Test-Path $env:BUILT_DLL)) {
+            throw 'Self-test DLL was not produced.'
+          }
+          Get-FileHash $env:BUILT_DLL -Algorithm SHA256
+          Write-Host 'Valheim DLL Generator compiler self-test passed.'
+
+      - name: Package public build result
+        if: env.MODE == 'dispatch' && env.AUTHORIZED == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          if ($env:BUILD_EXIT_CODE -eq '0' -and (Test-Path $env:BUILT_DLL)) {
+            $dllName = "$env:ASSEMBLY_NAME.dll"
+            $destDll = Join-Path $env:JOB_DIR $dllName
+            Copy-Item -Force $env:BUILT_DLL $destDll
+
+            $hash = (Get-FileHash $destDll -Algorithm SHA256).Hash.ToLowerInvariant()
+            $size = (Get-Item $destDll).Length
+            $result = [ordered]@{
+              version = 1
+              job_id = $env:JOB_ID
+              state = 'success'
+              mod_name = $env:MOD_NAME
+              dll = $dllName
+              size = $size
+              sha256 = $hash
+              finished_at = [DateTimeOffset]::UtcNow.ToString('o')
+            }
+          }
+          else {
+            Copy-Item -Force $env:BUILD_LOG (Join-Path $env:JOB_DIR 'build.txt')
+            $result = [ordered]@{
+              version = 1
+              job_id = $env:JOB_ID
+              state = 'failed'
+              mod_name = $env:MOD_NAME
+              message = 'Compilation failed.'
+              log = 'build.txt'
+              finished_at = [DateTimeOffset]::UtcNow.ToString('o')
+            }
+          }
+
+          $result | ConvertTo-Json -Depth 4 | Set-Content -Path (Join-Path $env:JOB_DIR 'result.json') -Encoding UTF8
+
+      - name: Publish build result to Pages
+        if: env.MODE == 'dispatch' && env.PUBLISH_RESULT == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+
+          git add -- "valheim/dll-gen/builds/$env:JOB_ID"
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host 'Build result already published.'
+            exit 0
+          }
+
+          git commit -m "Publish Valheim DLL build $env:JOB_ID"
+
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            git push
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+
+            if ($attempt -eq 3) {
+              throw 'Could not publish build result after three attempts.'
+            }
+
+            git pull --rebase origin main
+            Start-Sleep -Seconds (2 * $attempt)
+          }
