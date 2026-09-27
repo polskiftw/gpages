@@ -124,6 +124,8 @@ jobs:
                 <HintPath>HARMONY_PATH</HintPath>
                 <Private>true</Private>
               </Reference>
+              <PackageReference Include="MonoMod.RuntimeDetour" Version="22.1.29.1" />
+              <PackageReference Include="MonoMod.Utils" Version="22.1.29.1" />
             </ItemGroup>
           </Project>
           '@.Replace('HARMONY_PATH', (Join-Path $env:GITHUB_WORKSPACE 'valheim-assembly-inspector\lib\0Harmony.dll')) |
