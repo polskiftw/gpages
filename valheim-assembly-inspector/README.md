@@ -1,6 +1,6 @@
 # Assembly Inspector
 
-Current plugin version: **1.0.0**.
+Current plugin version: **1.1.1**.
 
 A BepInEx 5 + Harmony Valheim development/debug tool for browsing the live `assembly_valheim` managed assembly and forcing selected scalar method/property return values.
 
@@ -50,6 +50,8 @@ That is deliberately the default because it preserves side effects in the origin
 
 Every live override can be removed individually, and **Clear all live overrides** removes all patches owned by Assembly Inspector.
 
+Version 1.1.1 routes generated typed `DynamicMethod` postfixes through Harmony's patch-factory mechanism instead of registering a dynamic method directly. CI smoke-tests the factory contract and a generated bool postfix that changes `false` to `true`.
+
 ## Generate a standalone override mod
 
 For supported scalar return types, the selected member also has:
@@ -73,7 +75,7 @@ The assembly name field is editable if you want to inspect another already-loade
 
 ## Safety / scope
 
-Version 1.0 is deliberately focused on **return-value inspection and override**. It does not provide arbitrary method invocation or arbitrary memory/field editing.
+Assembly Inspector is deliberately focused on **return-value inspection and override**. It does not provide arbitrary method invocation or arbitrary memory/field editing.
 
 Live return forcing is limited to scalar values that can be converted safely in the inspector UI.
 
