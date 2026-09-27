@@ -1,6 +1,6 @@
 # Assembly Inspector
 
-Current plugin version: **1.2.0**.
+Current plugin version: **1.2.1**.
 
 A BepInEx 5 + Harmony Valheim development/debug tool for browsing the live `assembly_valheim` managed assembly and forcing selected scalar method/property return values.
 
@@ -72,6 +72,18 @@ Copy live bundle (3)
 ```
 
 The generated bundle uses one shared reflection resolver plus one small typed postfix per override, keeping the source compact enough for the repository's browser DLL Generator workflow.
+
+Version 1.2.1 gives each bundle a deterministic content-derived identity. The sorted target methods, exact parameter/return type identities, and forced values are hashed with SHA-256; the first 16 lowercase hex characters become the bundle suffix.
+
+For example:
+
+```text
+PluginGuid: claire.valheim.generated.livebundle.a83f21d4c4e51290
+Class:      AssemblyInspectorLiveBundle_a83f21d4c4e51290
+Name:       Assembly Inspector Bundle a83f21d4c4e51290
+```
+
+The same exact bundle exports with the same suffix. Changing a target or forced value produces a different suffix, allowing multiple generated bundle DLLs to coexist without sharing one BepInEx plugin GUID.
 
 Generated code finds each target class and exact overloaded method by reflection, so the target Valheim class itself does not need to be public.
 
