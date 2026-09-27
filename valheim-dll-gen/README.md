@@ -1,50 +1,55 @@
 # Valheim DLL Generator
 
-This folder documents the GitHub-side backend for the browser-based Valheim mod compiler.
+A browser-to-GitHub Valheim mod compiler.
 
-The compiler is implemented by:
+There are only two moving parts:
 
-- `.github/workflows/valheim-dll-gen.yml`
-- the Pages frontend at `valheim/dll-gen/`
-- a small external relay endpoint that will be added/configured separately
+1. the static Pages frontend at `valheim/dll-gen/`
+2. the GitHub Actions compiler at `.github/workflows/valheim-dll-gen.yml`
 
-## Repository secret
+There is **no relay endpoint and no build-password repository secret**.
 
-Create this repository Actions secret before connecting the endpoint:
+## Browser authentication
 
-```text
-VALHEIM_DLL_GEN_PASSWORD
-```
+The Pages UI asks the user for a **fine-grained GitHub personal access token**.
 
-Its value is the password the web form must submit.
+For this personal tool, the token should be restricted to:
 
-The secret never goes into GitHub Pages JavaScript. The workflow receives the submitted password in a dispatch payload and compares it against the secret inside the Actions runner.
+- repository access: only `polskiftw/gpages`
+- repository permission: **Actions — Read and write**
 
-## Dispatch contract
+The browser sends that token directly to `api.github.com` to:
 
-The relay should create a GitHub `repository_dispatch` event with:
+- verify access to the DLL Generator workflow
+- call the workflow-dispatch endpoint
 
-```text
-event_type: valheim-dll-gen
-```
+The token is never committed to the repository and is never sent to a third-party relay.
 
-and this `client_payload` shape:
+By default the UI stores it in `sessionStorage`. If **Remember token on this device** is selected, it is moved to `localStorage`. The UI also has a button to delete both copies.
+
+## Workflow-dispatch contract
+
+The page starts `valheim-dll-gen.yml` with:
 
 ```json
 {
-  "job_id": "32-lowercase-hex-or-similar",
-  "mod_name": "ForceCoolThing",
-  "password": "the text entered by the user",
-  "source_b64": "UTF-8 C# source encoded as Base64"
+  "ref": "main",
+  "inputs": {
+    "job_id": "client-generated-lowercase-id",
+    "mod_name": "ForceCoolThing",
+    "source_b64": "UTF-8 C# source encoded as Base64"
+  }
 }
 ```
 
-Constraints enforced by the workflow:
+Constraints enforced by both the page and workflow:
 
 - `job_id`: 8-64 lowercase letters, digits, `_`, or `-`
 - `mod_name`: 1-64 ordinary letters/digits/spaces/dots/underscores/hyphens, beginning with a letter
-- decoded source: valid UTF-8, maximum 40 KiB
-- the caller cannot submit a project file, build script, package list, or workflow
+- decoded source: valid UTF-8, maximum **32 KiB**
+- the caller cannot submit a project file, build script, package list, workflow, or MSBuild options
+
+The workflow reads the potentially large Base64 source from GitHub's event JSON file rather than passing it through a Windows environment variable.
 
 ## Build model
 
@@ -56,9 +61,9 @@ The workflow creates its own fixed `net472` project and references:
 
 Only the submitted C# file is compiled.
 
-The submitted source is never committed to the repository.
+The submitted source itself is never committed to the repository.
 
-## Public result protocol
+## Result protocol
 
 A request with job ID `abc12345` publishes:
 
@@ -66,26 +71,30 @@ A request with job ID `abc12345` publishes:
 valheim/dll-gen/builds/abc12345/result.json
 ```
 
-Possible states:
+Successful jobs also publish the compiled DLL:
 
 ```text
-success
-failed
-unauthorized
+valheim/dll-gen/builds/abc12345/ForceCoolThing.dll
 ```
 
-Successful jobs also publish the compiled DLL. Failed jobs publish `build.txt` containing compiler output.
+Failed compiles publish:
 
-The Pages frontend can poll:
+```text
+valheim/dll-gen/builds/abc12345/build.txt
+```
+
+The Pages frontend polls:
 
 ```text
 https://polskiftw.github.io/gpages/valheim/dll-gen/builds/<job_id>/result.json
 ```
 
-until it exists.
+until the result has been published.
+
+Because `gpages` is public, published DLLs and compiler logs are public.
 
 ## Self-test
 
-Pushes that modify this folder or its workflow run a local smoke test instead of expecting an external request. The smoke test compiles a tiny BepInEx/Harmony plugin that directly references Valheim's `Player` type.
+Pushes that modify this folder or its workflow run a smoke test instead of a user build. A manual workflow run with all inputs left blank does the same thing.
 
-That gives the compiler scaffold a real CI check even before the relay endpoint exists.
+The smoke test compiles a tiny BepInEx/Harmony plugin that directly references Valheim's `Player` type. This verifies the complete compiler/reference scaffold without creating a public build-result folder.
