@@ -108,13 +108,13 @@ jobs:
           $ErrorActionPreference = 'Stop'
 
           $test = Join-Path $env:RUNNER_TEMP 'assembly-inspector-live-test'
-          $out = Join-Path $test 'bin\Release\net472'
+          $out = Join-Path $test 'bin\Release\net8.0'
           New-Item -ItemType Directory -Force -Path $test | Out-Null
 
           @'
           <Project Sdk="Microsoft.NET.Sdk">
             <PropertyGroup>
-              <TargetFramework>net472</TargetFramework>
+              <TargetFramework>net8.0</TargetFramework>
               <OutputType>Exe</OutputType>
               <LangVersion>latest</LangVersion>
               <AssemblyName>AssemblyInspectorLiveSmokeTest</AssemblyName>
@@ -193,7 +193,7 @@ jobs:
           Get-ChildItem -Path '.\valheim-assembly-inspector\lib' -File -Filter '*.dll' |
             ForEach-Object { Copy-Item -Force $_.FullName $out }
 
-          & (Join-Path $out 'AssemblyInspectorLiveSmokeTest.exe')
+          dotnet (Join-Path $out 'AssemblyInspectorLiveSmokeTest.dll')
           if ($LASTEXITCODE -ne 0) {
             throw "Live Harmony override smoke test exited with code $LASTEXITCODE."
           }
