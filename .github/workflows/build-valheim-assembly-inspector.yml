@@ -102,6 +102,102 @@ jobs:
           if (-not (Test-Path $dll)) { throw "Build output missing: $dll" }
           Get-FileHash $dll -Algorithm SHA256
 
+      - name: Smoke-test live Harmony override
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $test = Join-Path $env:RUNNER_TEMP 'assembly-inspector-live-test'
+          $out = Join-Path $test 'bin\Release\net472'
+          New-Item -ItemType Directory -Force -Path $test | Out-Null
+
+          @'
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net472</TargetFramework>
+              <OutputType>Exe</OutputType>
+              <LangVersion>latest</LangVersion>
+              <AssemblyName>AssemblyInspectorLiveSmokeTest</AssemblyName>
+            </PropertyGroup>
+            <ItemGroup>
+              <Reference Include="0Harmony">
+                <HintPath>HARMONY_PATH</HintPath>
+                <Private>true</Private>
+              </Reference>
+            </ItemGroup>
+          </Project>
+          '@.Replace('HARMONY_PATH', (Join-Path $env:GITHUB_WORKSPACE 'valheim-assembly-inspector\lib\0Harmony.dll')) |
+            Set-Content -Path (Join-Path $test 'SmokeTest.csproj') -Encoding UTF8
+
+          @'
+          using HarmonyLib;
+          using System;
+          using System.IO;
+          using System.Reflection;
+          using System.Runtime.CompilerServices;
+
+          internal static class Program
+          {
+              [MethodImpl(MethodImplOptions.NoInlining)]
+              public static bool OriginalBool()
+              {
+                  return false;
+              }
+
+              public static int Main()
+              {
+                  MethodInfo target = typeof(Program).GetMethod(
+                      nameof(OriginalBool),
+                      BindingFlags.Public | BindingFlags.Static);
+
+                  Assembly plugin = Assembly.LoadFrom(
+                      Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "AssemblyInspector.dll"));
+                  Type inspector = plugin.GetType(
+                      "AssemblyInspectorMod.AssemblyInspector",
+                      throwOnError: true);
+
+                  MethodInfo factory = inspector.GetMethod(
+                      "LivePostfixFactory",
+                      BindingFlags.NonPublic | BindingFlags.Static);
+                  FieldInfo overridesField = inspector.GetField(
+                      "RuntimeOverrides",
+                      BindingFlags.NonPublic | BindingFlags.Static);
+
+                  if (factory == null || overridesField == null)
+                      throw new Exception("Assembly Inspector live override internals were not found.");
+
+                  object overrides = overridesField.GetValue(null);
+                  MethodInfo setter = overrides.GetType().GetMethod("set_Item");
+                  setter.Invoke(overrides, new object[] { target, true });
+
+                  Harmony harmony = new Harmony("claire.valheim.assemblyinspector.ci-live-test");
+                  harmony.Patch(target, postfix: new HarmonyMethod(factory));
+
+                  bool result = (bool)target.Invoke(null, null);
+                  harmony.UnpatchSelf();
+
+                  if (!result)
+                      throw new Exception("Live override smoke test failed: false was not forced to true.");
+
+                  Console.WriteLine("Live Harmony override smoke test passed.");
+                  return 0;
+              }
+          }
+          '@ | Set-Content -Path (Join-Path $test 'Program.cs') -Encoding UTF8
+
+          dotnet build (Join-Path $test 'SmokeTest.csproj') -c Release --nologo
+
+          Copy-Item -Force '.\valheim-assembly-inspector\bin\Release\net472\AssemblyInspector.dll' $out
+          Get-ChildItem -Path (Join-Path $env:RUNNER_TEMP 'bepinex') -Recurse -File -Filter '*.dll' |
+            ForEach-Object { Copy-Item -Force $_.FullName $out }
+          Get-ChildItem -Path '.\valheim-assembly-inspector\lib' -File -Filter '*.dll' |
+            ForEach-Object { Copy-Item -Force $_.FullName $out }
+
+          & (Join-Path $out 'AssemblyInspectorLiveSmokeTest.exe')
+          if ($LASTEXITCODE -ne 0) {
+            throw "Live Harmony override smoke test exited with code $LASTEXITCODE."
+          }
+
       - name: Publish Assembly Inspector
         shell: pwsh
         run: |
