@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'valheim-ward-hit-sound/**'
+      - 'valheim-gear-inspector/**'
       - 'valheim-hammer-everything/**'
       - 'valheim-jotunn-compat/**'
       - '.github/workflows/build-valheim.yml'
@@ -32,6 +33,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $projects = @(
             (Join-Path $env:GITHUB_WORKSPACE 'valheim-ward-hit-sound'),
+            (Join-Path $env:GITHUB_WORKSPACE 'valheim-gear-inspector'),
             (Join-Path $env:GITHUB_WORKSPACE 'valheim-hammer-everything'),
             (Join-Path $env:GITHUB_WORKSPACE 'valheim-jotunn-compat')
           )
@@ -145,6 +147,22 @@ jobs:
             }
           }
 
+          # Gear Inspector uses Unity IMGUI/Input directly. Give it the exact
+          # Unity assemblies from the same pinned Valheim Managed snapshot.
+          $gearLib = Join-Path $env:GITHUB_WORKSPACE 'valheim-gear-inspector\lib'
+          foreach ($unityAssembly in @(
+            'UnityEngine.dll',
+            'UnityEngine.CoreModule.dll',
+            'UnityEngine.IMGUIModule.dll',
+            'UnityEngine.InputLegacyModule.dll'
+          )) {
+            $unitySource = Join-Path $managedDir $unityAssembly
+            if (-not (Test-Path $unitySource)) {
+              throw "Managed.zip is missing Gear Inspector build reference $unityAssembly"
+            }
+            Copy-Item -Force $unitySource (Join-Path $gearLib $unityAssembly)
+          }
+
           "VALHEIM_MANAGED=$managedDir" |
             Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host "Pinned Valheim managed refs: $managedDir"
@@ -231,6 +249,10 @@ jobs:
       - name: Build Ward Hit Sound Toggle
         shell: pwsh
         run: dotnet build .\valheim-ward-hit-sound\WardHitSoundToggle.csproj -c Release
+
+      - name: Build Gear Inspector
+        shell: pwsh
+        run: dotnet build .\valheim-gear-inspector\GearInspector.csproj -c Release
 
       - name: Build Hammer Everything
         shell: pwsh
@@ -369,6 +391,7 @@ jobs:
         run: |
           $files = @(
             '.\valheim-ward-hit-sound\bin\Release\net472\WardHitSoundToggle.dll',
+            '.\valheim-gear-inspector\bin\Release\net472\GearInspector.dll',
             '.\valheim-hammer-everything\bin\Release\net472\HammerEverything.dll',
             '.\valheim-jotunn-compat\bin\Release\package\BepInEx\plugins\JotunnCompat\Jotunn.dll',
             '.\valheim-jotunn-compat\bin\Release\JotunnCompat.zip'
@@ -388,15 +411,17 @@ jobs:
           git pull --rebase origin main
 
           New-Item -ItemType Directory -Force -Path '.\valheim\jotunn-compat' | Out-Null
+          New-Item -ItemType Directory -Force -Path '.\valheim\gear-inspector' | Out-Null
 
           Copy-Item -Force '.\valheim-ward-hit-sound\bin\Release\net472\WardHitSoundToggle.dll' '.\valheim\ward-hit-sound\WardHitSoundToggle.dll'
+          Copy-Item -Force '.\valheim-gear-inspector\bin\Release\net472\GearInspector.dll' '.\valheim\gear-inspector\GearInspector.dll'
           Copy-Item -Force '.\valheim-hammer-everything\bin\Release\net472\HammerEverything.dll' '.\valheim\hammer-everything\HammerEverything.dll'
           Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\package\BepInEx\plugins\JotunnCompat\Jotunn.dll' '.\valheim\jotunn-compat\Jotunn.dll'
           git rm -f --ignore-unmatch "valheim/jotunn-compat/JotunnCompat.Preloader.dll"
           Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\JotunnCompat.zip' '.\valheim\jotunn-compat\JotunnCompat.zip'
 
           git rm -f --ignore-unmatch "valheim/jotunn-compat/JotunnCompat.FastPath.dll"
-          git add -- "valheim/ward-hit-sound/WardHitSoundToggle.dll" "valheim/hammer-everything/HammerEverything.dll" "valheim/jotunn-compat/Jotunn.dll" "valheim/jotunn-compat/JotunnCompat.zip"
+          git add -- "valheim/ward-hit-sound/WardHitSoundToggle.dll" "valheim/gear-inspector/GearInspector.dll" "valheim/hammer-everything/HammerEverything.dll" "valheim/jotunn-compat/Jotunn.dll" "valheim/jotunn-compat/JotunnCompat.zip"
 
           git diff --cached --quiet
           if ($LASTEXITCODE -eq 0) {
