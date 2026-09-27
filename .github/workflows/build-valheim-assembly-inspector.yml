@@ -191,12 +191,31 @@ jobs:
                       throw new Exception("BuildGeneratedLiveBundle was not found.");
 
                   string bundleSource = (string)bundleGenerator.Invoke(null, null);
+                  string bundleSourceAgain = (string)bundleGenerator.Invoke(null, null);
+
                   if (string.IsNullOrWhiteSpace(bundleSource) ||
                       !bundleSource.Contains("Postfix_0") ||
-                      !bundleSource.Contains("__result = true;"))
+                      !bundleSource.Contains("__result = true;") ||
+                      !bundleSource.Contains("PluginGuid = \\"claire.valheim.generated.livebundle.") ||
+                      !bundleSource.Contains("AssemblyInspectorLiveBundle_") ||
+                      bundleSource.Contains("PluginGuid = \\"claire.valheim.generated.livebundle\\";"))
                   {
-                      throw new Exception("Generated live bundle did not contain the active bool override.");
+                      throw new Exception("Generated live bundle did not contain the expected unique identity and active bool override.");
                   }
+
+                  if (!string.Equals(bundleSource, bundleSourceAgain, StringComparison.Ordinal))
+                      throw new Exception("Identical live override sets did not generate a deterministic bundle identity.");
+
+                  setter.Invoke(overrides, new object[] { target, false });
+                  string changedBundleSource = (string)bundleGenerator.Invoke(null, null);
+
+                  if (string.Equals(bundleSource, changedBundleSource, StringComparison.Ordinal) ||
+                      !changedBundleSource.Contains("__result = false;"))
+                  {
+                      throw new Exception("Changing a live override did not change the generated bundle identity/source.");
+                  }
+
+                  setter.Invoke(overrides, new object[] { target, true });
 
                   File.WriteAllText(
                       Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "GeneratedLiveBundle.cs"),
