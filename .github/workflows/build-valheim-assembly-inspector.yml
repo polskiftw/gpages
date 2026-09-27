@@ -119,23 +119,15 @@ jobs:
               <LangVersion>latest</LangVersion>
               <AssemblyName>AssemblyInspectorLiveSmokeTest</AssemblyName>
             </PropertyGroup>
-            <ItemGroup>
-              <Reference Include="0Harmony">
-                <HintPath>HARMONY_PATH</HintPath>
-                <Private>true</Private>
-              </Reference>
-              <PackageReference Include="MonoMod.RuntimeDetour" Version="22.1.29.1" />
-              <PackageReference Include="MonoMod.Utils" Version="22.1.29.1" />
-            </ItemGroup>
+
           </Project>
-          '@.Replace('HARMONY_PATH', (Join-Path $env:GITHUB_WORKSPACE 'valheim-assembly-inspector\lib\0Harmony.dll')) |
-            Set-Content -Path (Join-Path $test 'SmokeTest.csproj') -Encoding UTF8
+          '@ | Set-Content -Path (Join-Path $test 'SmokeTest.csproj') -Encoding UTF8
 
           @'
-          using HarmonyLib;
           using System;
           using System.IO;
           using System.Reflection;
+          using System.Reflection.Emit;
           using System.Runtime.CompilerServices;
 
           internal static class Program
@@ -172,12 +164,19 @@ jobs:
                   MethodInfo setter = overrides.GetType().GetMethod("set_Item");
                   setter.Invoke(overrides, new object[] { target, true });
 
-                  Patch patch = new Patch(
-                      new HarmonyMethod(factory),
-                      0,
-                      "claire.valheim.assemblyinspector.ci-live-test");
+                  ParameterInfo[] factoryParameters = factory.GetParameters();
+                  if (!factory.IsStatic ||
+                      factory.ReturnType != typeof(DynamicMethod) ||
+                      factoryParameters.Length != 1 ||
+                      factoryParameters[0].ParameterType != typeof(MethodBase))
+                  {
+                      throw new Exception("LivePostfixFactory no longer matches Harmony's patch-factory contract.");
+                  }
 
-                  MethodInfo resolvedPostfix = patch.GetMethod(target);
+                  DynamicMethod resolvedPostfix = (DynamicMethod)factory.Invoke(
+                      null,
+                      new object[] { target });
+
                   object[] postfixArgs = new object[] { target, false };
                   resolvedPostfix.Invoke(null, postfixArgs);
 
