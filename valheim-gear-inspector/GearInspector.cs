@@ -234,7 +234,7 @@ namespace GearInspectorMod
             GUILayout.Label("Equipable items");
 
             int visibleCount = 0;
-            _itemScroll = GUILayout.BeginScrollView(_itemScroll, GUI.skin.box);
+            _itemScroll = GUILayout.BeginScrollView(_itemScroll);
 
             foreach (GearEntry entry in _entries)
             {
@@ -277,7 +277,7 @@ namespace GearInspectorMod
                 return;
             }
 
-            _detailScroll = GUILayout.BeginScrollView(_detailScroll, GUI.skin.box);
+            _detailScroll = GUILayout.BeginScrollView(_detailScroll);
 
             GUILayout.Label(_selected.DisplayName);
             GUILayout.Space(4f);
