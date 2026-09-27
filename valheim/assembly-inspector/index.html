@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2f2f7">
+<title>Assembly Inspector — gpages</title>
+<style>
+:root{color-scheme:light dark;--bg:#f2f2f7;--card:#fff;--text:#111;--muted:#6e6e73;--border:rgba(60,60,67,.18);--accent:#007aff;--button:#007aff;--buttonText:#fff}
+@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#f5f5f7;--muted:#98989d;--border:rgba(84,84,88,.65);--accent:#0a84ff;--button:#0a84ff;--buttonText:#fff}}
+*{box-sizing:border-box}body{margin:0;padding:max(28px,env(safe-area-inset-top)) 16px max(28px,env(safe-area-inset-bottom));background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}main{width:min(100%,680px);margin:0 auto}.back{display:inline-block;color:var(--accent);text-decoration:none;margin:0 0 18px}h1{font-size:32px;margin:4px 0 8px;letter-spacing:-.7px}.sub{color:var(--muted);margin:0 0 22px;line-height:1.45}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;margin-bottom:14px}.download{display:block;width:100%;text-align:center;text-decoration:none;background:var(--button);color:var(--buttonText);font-weight:700;border-radius:14px;padding:14px 16px;margin:4px 0 12px}.note{font-size:13px;color:var(--muted);line-height:1.45;margin:0}.title{font-size:17px;font-weight:700;margin:0 0 8px}.steps{margin:0;padding-left:22px;line-height:1.6}.meta{font-size:14px;color:var(--muted);line-height:1.55;margin:0}.meta strong{color:var(--text)}code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}
+</style>
+</head>
+<body><main>
+<a class="back" href="../">‹ Valheim</a>
+<h1>Assembly Inspector</h1>
+<p class="sub">Browse Valheim's live <code>assembly_valheim</code> classes and return types, experiment with forced scalar return values, and generate standalone Harmony override mods directly from the method you found.</p>
+
+<div class="card">
+  <a class="download" href="AssemblyInspector.dll">Download AssemblyInspector.dll</a>
+  <p class="note">BepInEx 5 + Harmony. Default hotkey: F9.</p>
+</div>
+
+<div class="card">
+  <div class="title">The CoolThing workflow</div>
+  <p class="meta">Find <code>CoolThing</code>, select <code>IsAllowed() -&gt; bool</code>, then click <strong>Force TRUE live</strong>. The original method still executes, but every caller receives <code>true</code>. If you like the result, <strong>Copy postfix mod</strong> gives you complete standalone BepInEx/Harmony source for that exact method.</p>
+</div>
+
+<div class="card">
+  <div class="title">Browse</div>
+  <p class="meta">Search classes, methods, properties, and fields. Filter methods/properties by return type. See full parameter lists, visibility, static/virtual/abstract status, generic arity, metadata token, property getter targets, field types, and static field values.</p>
+</div>
+
+<div class="card">
+  <div class="title">Two generated override styles</div>
+  <p class="meta"><strong>Postfix:</strong> runs the original method, then replaces its result. This is the safer default because original side effects still happen.<br><br><strong>Hard override:</strong> supplies the forced result and skips the original method entirely.</p>
+</div>
+
+<div class="card">
+  <div class="title">Supported live values</div>
+  <p class="meta">Booleans, strings, chars, enums, decimal values, and primitive numeric return types can be forced live. Complex object-returning methods are still inspectable, but version 1.0 does not synthesize arbitrary replacement objects.</p>
+</div>
+
+<div class="card">
+  <div class="title">Install</div>
+  <ol class="steps">
+    <li>Install BepInEx 5 for Valheim.</li>
+    <li>Download <code>AssemblyInspector.dll</code>.</li>
+    <li>Put it in <code>Valheim/BepInEx/plugins/</code>.</li>
+    <li>Enter a world and press <code>F9</code>.</li>
+  </ol>
+</div>
+
+<div class="card">
+  <p class="meta"><strong>Version:</strong> 1.0.0<br><strong>Default assembly:</strong> assembly_valheim<br><strong>Default key:</strong> F9<br><strong>Harmony:</strong> required (included with the normal BepInEx Valheim pack)<br><strong>Jotunn:</strong> not required</p>
+</div>
+</main></body>
+</html>
