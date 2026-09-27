@@ -196,9 +196,9 @@ jobs:
                   if (string.IsNullOrWhiteSpace(bundleSource) ||
                       !bundleSource.Contains("Postfix_0") ||
                       !bundleSource.Contains("__result = true;") ||
-                      !bundleSource.Contains("PluginGuid = \\"claire.valheim.generated.livebundle.") ||
+                      !bundleSource.Contains("PluginGuid = \"claire.valheim.generated.livebundle.") ||
                       !bundleSource.Contains("AssemblyInspectorLiveBundle_") ||
-                      bundleSource.Contains("PluginGuid = \\"claire.valheim.generated.livebundle\\";"))
+                      bundleSource.Contains("PluginGuid = \"claire.valheim.generated.livebundle\";"))
                   {
                       throw new Exception("Generated live bundle did not contain the expected unique identity and active bool override.");
                   }
