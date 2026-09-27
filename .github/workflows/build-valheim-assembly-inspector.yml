@@ -184,7 +184,26 @@ jobs:
                   if (!result)
                       throw new Exception("Live override smoke test failed: dynamic postfix did not force false to true.");
 
+                  MethodInfo bundleGenerator = inspector.GetMethod(
+                      "BuildGeneratedLiveBundle",
+                      BindingFlags.NonPublic | BindingFlags.Static);
+                  if (bundleGenerator == null)
+                      throw new Exception("BuildGeneratedLiveBundle was not found.");
+
+                  string bundleSource = (string)bundleGenerator.Invoke(null, null);
+                  if (string.IsNullOrWhiteSpace(bundleSource) ||
+                      !bundleSource.Contains("Postfix_0") ||
+                      !bundleSource.Contains("__result = true;"))
+                  {
+                      throw new Exception("Generated live bundle did not contain the active bool override.");
+                  }
+
+                  File.WriteAllText(
+                      Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "GeneratedLiveBundle.cs"),
+                      bundleSource);
+
                   Console.WriteLine("Live Harmony override smoke test passed.");
+                  Console.WriteLine("Generated live bundle source smoke test passed.");
                   return 0;
               }
           }
@@ -202,6 +221,45 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Live Harmony override smoke test exited with code $LASTEXITCODE."
           }
+
+          $generatedSource = Join-Path $out 'GeneratedLiveBundle.cs'
+          if (-not (Test-Path $generatedSource)) {
+            throw 'Generated live bundle source was not produced by the smoke test.'
+          }
+
+          $generatedProject = Join-Path $test 'generated-bundle'
+          New-Item -ItemType Directory -Force -Path $generatedProject | Out-Null
+
+          $refs = Get-ChildItem -Path '.\valheim-assembly-inspector\lib' -File -Filter '*.dll' |
+            Sort-Object Name |
+            ForEach-Object {
+              $include = [System.Security.SecurityElement]::Escape([IO.Path]::GetFileNameWithoutExtension($_.Name))
+              $hint = [System.Security.SecurityElement]::Escape($_.FullName)
+              "    <Reference Include=`"$include`"><HintPath>$hint</HintPath><Private>false</Private></Reference>"
+            }
+
+          $generatedProjectFile = Join-Path $generatedProject 'GeneratedLiveBundle.csproj'
+          @"
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net472</TargetFramework>
+              <LangVersion>latest</LangVersion>
+              <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+              <AssemblyName>GeneratedLiveBundleSmokeTest</AssemblyName>
+            </PropertyGroup>
+            <ItemGroup>
+              <Compile Include="$generatedSource" />
+          $($refs -join [Environment]::NewLine)
+            </ItemGroup>
+          </Project>
+          "@ | Set-Content -Path $generatedProjectFile -Encoding UTF8
+
+          dotnet build $generatedProjectFile -c Release --nologo
+          if ($LASTEXITCODE -ne 0) {
+            throw "Generated live bundle source failed to compile with code $LASTEXITCODE."
+          }
+
+          Write-Host 'Generated live bundle compiled successfully.'
 
       - name: Publish Assembly Inspector
         shell: pwsh
