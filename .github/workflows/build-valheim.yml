@@ -254,28 +254,6 @@ jobs:
         shell: pwsh
         run: dotnet build .\valheim-gear-inspector\GearInspector.csproj -c Release
 
-      - name: Publish Gear Inspector artifact
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin main
-
-          New-Item -ItemType Directory -Force -Path '.\valheim\gear-inspector' | Out-Null
-          Copy-Item -Force '.\valheim-gear-inspector\bin\Release\net472\GearInspector.dll' '.\valheim\gear-inspector\GearInspector.dll'
-
-          git add -- "valheim/gear-inspector/GearInspector.dll"
-          git diff --cached --quiet
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host 'Published Gear Inspector artifact is already current.'
-          }
-          else {
-            git commit -m "Publish Gear Inspector artifact"
-            git push
-          }
-
       - name: Build Hammer Everything
         shell: pwsh
         run: dotnet build .\valheim-hammer-everything\HammerEverything.csproj -c Release
