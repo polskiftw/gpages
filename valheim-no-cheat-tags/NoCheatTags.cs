@@ -3,7 +3,6 @@ using HarmonyLib;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -15,7 +14,7 @@ namespace NoCheatTagsMod
     {
         public const string PluginGuid = "claire.valheim.nocheattags";
         public const string PluginName = "No Cheat Tags";
-        public const string PluginVersion = "1.2.0";
+        public const string PluginVersion = "1.3.0";
 
         private const BindingFlags Declared =
             BindingFlags.Instance | BindingFlags.Static |
@@ -40,13 +39,14 @@ namespace NoCheatTagsMod
         private Type _playerProfileType;
         private Type _playerStatType;
         private Type _gameType;
-        private Type _playerType;
 
         private FieldInfo _itemCheatedField;
         private FieldInfo _itemDropItemDataField;
         private FieldInfo _characterDropCheatedField;
-        private MethodInfo _inventoryGetAllItems;
-        private FieldInfo[] _inventoryEnumerableFields = new FieldInfo[0];
+        private FieldInfo _inventoryItemsField;
+
+        private static FieldInfo s_itemCheatedField;
+        private static FieldInfo s_characterDropCheatedField;
 
         private FieldInfo _profileUsedCheatsField;
         private FieldInfo _profilePlayerStatsField;
@@ -56,11 +56,6 @@ namespace NoCheatTagsMod
         private FieldInfo _gameInstanceField;
         private PropertyInfo _gameInstanceProperty;
         private MethodInfo _gameGetPlayerProfileMethod;
-
-        private FieldInfo _localPlayerField;
-        private PropertyInfo _localPlayerProperty;
-        private MethodInfo _playerGetInventoryMethod;
-        private readonly Stopwatch _liveSweepTimer = Stopwatch.StartNew();
 
         private bool _haveZdoHashes;
         private int _zdoCheatedHash;
@@ -88,6 +83,8 @@ namespace NoCheatTagsMod
                     "Native cheat bypass is forced in memory only; this plugin does not invoke the vanilla bypass command or write its saved bypasscheatchecks key.");
                 Logger.LogInfo(
                     "PlayerProfile.m_usedCheats is suppressed/cleared and PlayerStatType.Cheats is held at zero; known command history is left alone.");
+                Logger.LogInfo(
+                    "Item cheat cleanup is event-driven: vanilla m_cheated writes are forced false and inventories are checked once when loaded; no periodic polling is used.");
             }
             catch (Exception ex)
             {
@@ -103,16 +100,8 @@ namespace NoCheatTagsMod
             }
         }
 
-        private void Update()
-        {
-            if (_liveSweepTimer.ElapsedMilliseconds < 500)
-                return;
-
-            _liveSweepTimer.Restart();
-            SweepLiveState();
-        }
-
         private void OnDestroy()
+        {        private void OnDestroy()
         {
             try
             {
@@ -143,7 +132,6 @@ namespace NoCheatTagsMod
             _playerProfileType = FindType("PlayerProfile");
             _playerStatType = FindType("PlayerStatType");
             _gameType = FindType("Game");
-            _playerType = FindType("Player");
 
             if (_itemDataType == null)
                 throw new MissingMemberException("Could not resolve Valheim ItemData.m_cheated.");
@@ -153,16 +141,7 @@ namespace NoCheatTagsMod
                 throw new MissingFieldException(_itemDataType.FullName, "m_cheated");
 
             if (_inventoryType != null)
-            {
-                _inventoryGetAllItems = FindMethodInHierarchy(
-                    _inventoryType,
-                    "GetAllItems",
-                    Type.EmptyTypes);
-
-                _inventoryEnumerableFields = GetAllInstanceFields(_inventoryType)
-                    .Where(field => typeof(IEnumerable).IsAssignableFrom(field.FieldType))
-                    .ToArray();
-            }
+                _inventoryItemsField = FindField(_inventoryType, "m_inventory");
 
             if (_itemDropType != null)
                 _itemDropItemDataField = FindField(_itemDropType, "m_itemData");
@@ -170,15 +149,20 @@ namespace NoCheatTagsMod
             if (_characterDropType != null)
                 _characterDropCheatedField = FindField(_characterDropType, "m_cheated");
 
+            s_itemCheatedField = _itemCheatedField;
+            s_characterDropCheatedField = _characterDropCheatedField;
+
             ResolveProfileHistoryContracts();
             ResolveGameProfileAccess();
-            ResolveLivePlayerAccess();
             ResolveZdoHashes();
 
+            if (_inventoryItemsField == null)
+                Logger.LogWarning("Inventory.m_inventory was not found; event-boundary inventory cleanup is unavailable.");
+
             Logger.LogInfo(
-                "Resolved item data type: " + _itemDataType.FullName +
-                "; Inventory.GetAllItems(): " + (_inventoryGetAllItems != null ? "yes" : "no") +
-                "; enumerable inventory field fallback(s): " + _inventoryEnumerableFields.Length + ".");
+                "Resolved current Valheim cheat fields: " +
+                _itemDataType.FullName + ".m_cheated" +
+                (_characterDropCheatedField != null ? " and CharacterDrop.m_cheated." : "."));
         }
 
 
@@ -255,32 +239,8 @@ namespace NoCheatTagsMod
         }
 
 
-        private void ResolveLivePlayerAccess()
-        {
-            if (_playerType == null)
-            {
-                Logger.LogWarning("Player type was not found; periodic live-inventory sweeping is unavailable.");
-                return;
-            }
-
-            _localPlayerField = _playerType.GetField(
-                "m_localPlayer",
-                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-
-            _localPlayerProperty = _playerType.GetProperty(
-                "m_localPlayer",
-                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-
-            _playerGetInventoryMethod = FindMethodInHierarchy(
-                _playerType,
-                "GetInventory",
-                Type.EmptyTypes);
-
-            if (_playerGetInventoryMethod == null)
-                Logger.LogWarning("Player.GetInventory() was not found; periodic live-inventory sweeping is unavailable.");
-        }
-
         private void ResolveZdoHashes()
+        {        private void ResolveZdoHashes()
         {
             if (_zdoVarsType == null)
                 return;
@@ -306,9 +266,9 @@ namespace NoCheatTagsMod
             PatchConsoleCheatHistoryWrites();
             PatchEveryItemCheatedCheck();
             PatchEveryCheatedBoolArgument();
-            PatchItemDataLifecycle();
-            PatchInventoryLifecycle();
-            PatchCharacterDropFallbacks();
+            PatchCheatFieldWriters();
+            PatchSerializationBoundaries();
+            PatchInventoryIngress();
             PatchWorldCheatFlags();
         }
 
@@ -507,120 +467,148 @@ namespace NoCheatTagsMod
             }
         }
 
-        private void PatchItemDataLifecycle()
+        private void PatchCheatFieldWriters()
         {
-            if (_itemDataType == null)
+            // Verified against the current Valheim 1.0.16 decompile. These are the
+            // vanilla methods that directly store ItemData.m_cheated or
+            // CharacterDrop.m_cheated. The transpiler changes only those exact
+            // field stores, replacing the value with false.
+            PatchCheatFieldStores(_itemDataType, "Load");
+            PatchCheatFieldStores(_inventoryType, "AddItem");
+            PatchCheatFieldStores(_itemDropType, "OnCreateNew");
+            PatchCheatFieldStores(_characterDropType, "DropItems");
+            PatchCheatFieldStores(FindType("Character"), "OnDeath");
+            PatchCheatFieldStores(FindType("Piece"), "DropResources");
+            PatchCheatFieldStores(FindType("Container"), "AddDefaultItems");
+            PatchCheatFieldStores(FindType("ZDOMan"), "ConvertInventories");
+        }
+
+        private void PatchCheatFieldStores(Type type, string methodName)
+        {
+            if (type == null)
                 return;
 
-            foreach (MethodInfo method in SafeMethods(_itemDataType))
+            foreach (MethodInfo method in SafeMethods(type))
             {
-                if (method.IsAbstract || method.ContainsGenericParameters)
+                if (method.IsAbstract ||
+                    method.ContainsGenericParameters ||
+                    !string.Equals(method.Name, methodName, StringComparison.Ordinal))
+                {
                     continue;
+                }
 
-                if (string.Equals(method.Name, "Load", StringComparison.Ordinal))
+                PatchWithTranspiler(
+                    method,
+                    HarmonyMethod(nameof(ForceCheatFieldWritesFalseTranspiler)),
+                    type.FullName + "." + method.Name + " cheat-field stores -> false");
+            }
+        }
+
+        private void PatchSerializationBoundaries()
+        {
+            if (_itemDataType != null)
+            {
+                foreach (MethodInfo method in SafeMethods(_itemDataType))
                 {
-                    Patch(
-                        method,
-                        prefix: null,
-                        postfix: HarmonyMethod(
-                            method.IsStatic
-                                ? nameof(ScrubArgumentsPostfix)
-                                : nameof(ScrubInstanceAndArgumentsPostfix)),
-                        "ItemData.Load scrub");
+                    if (method.IsAbstract || method.ContainsGenericParameters)
+                        continue;
+
+                    if (string.Equals(method.Name, "Save", StringComparison.Ordinal))
+                    {
+                        Patch(
+                            method,
+                            prefix: HarmonyMethod(
+                                method.IsStatic
+                                    ? nameof(ScrubArgumentsPrefix)
+                                    : nameof(ScrubInstanceAndArgumentsPrefix)),
+                            postfix: null,
+                            "ItemData.Save clean-before-serialize");
+                    }
+                    else if (string.Equals(method.Name, "GetTooltip", StringComparison.Ordinal))
+                    {
+                        Patch(
+                            method,
+                            prefix: HarmonyMethod(
+                                method.IsStatic
+                                    ? nameof(ScrubArgumentsPrefix)
+                                    : nameof(ScrubInstanceAndArgumentsPrefix)),
+                            postfix: null,
+                            "ItemData.GetTooltip clean-on-inspect");
+                    }
                 }
-                else if (string.Equals(method.Name, "Save", StringComparison.Ordinal))
+            }
+
+            if (_inventoryType != null)
+            {
+                foreach (MethodInfo method in SafeMethods(_inventoryType))
                 {
-                    Patch(
-                        method,
-                        prefix: HarmonyMethod(
-                            method.IsStatic
-                                ? nameof(ScrubArgumentsPrefix)
-                                : nameof(ScrubInstanceAndArgumentsPrefix)),
-                        postfix: null,
-                        "ItemData.Save scrub");
+                    if (method.IsAbstract || method.ContainsGenericParameters || method.IsStatic)
+                        continue;
+
+                    if (string.Equals(method.Name, "Load", StringComparison.Ordinal))
+                    {
+                        Patch(
+                            method,
+                            prefix: null,
+                            postfix: HarmonyMethod(nameof(ScrubInventoryLoadPostfix)),
+                            "Inventory.Load final one-shot cleanup");
+                    }
+                    else if (string.Equals(method.Name, "Save", StringComparison.Ordinal) ||
+                             string.Equals(method.Name, "OldSave", StringComparison.Ordinal))
+                    {
+                        Patch(
+                            method,
+                            prefix: HarmonyMethod(nameof(ScrubInventoryPrefix)),
+                            postfix: null,
+                            "Inventory save clean-before-serialize");
+                    }
                 }
-                else if (string.Equals(method.Name, "GetTooltip", StringComparison.Ordinal))
+            }
+
+            if (_itemDropType != null)
+            {
+                foreach (MethodInfo method in SafeMethods(_itemDropType))
                 {
-                    Patch(
-                        method,
-                        prefix: HarmonyMethod(
-                            method.IsStatic
-                                ? nameof(ScrubArgumentsPrefix)
-                                : nameof(ScrubInstanceAndArgumentsPrefix)),
-                        postfix: null,
-                        "ItemData.GetTooltip scrub");
+                    if (method.IsAbstract || method.ContainsGenericParameters)
+                        continue;
+
+                    if (string.Equals(method.Name, "SaveToZDO", StringComparison.Ordinal) ||
+                        string.Equals(method.Name, "DropItem", StringComparison.Ordinal))
+                    {
+                        Patch(
+                            method,
+                            prefix: HarmonyMethod(nameof(ScrubArgumentsPrefix)),
+                            postfix: null,
+                            "ItemDrop." + method.Name + " clean item input");
+                    }
                 }
             }
         }
 
-        private void PatchInventoryLifecycle()
+        private void PatchInventoryIngress()
         {
             if (_inventoryType == null)
                 return;
 
             foreach (MethodInfo method in SafeMethods(_inventoryType))
             {
-                if (method.IsAbstract || method.ContainsGenericParameters || method.IsStatic)
+                if (method.IsAbstract ||
+                    method.ContainsGenericParameters ||
+                    !string.Equals(method.Name, "AddItem", StringComparison.Ordinal))
+                {
                     continue;
+                }
 
-                if (string.Equals(method.Name, "Load", StringComparison.Ordinal))
-                {
-                    Patch(
-                        method,
-                        prefix: null,
-                        postfix: HarmonyMethod(nameof(ScrubInventoryPostfix)),
-                        "Inventory.Load scrub");
-                }
-                else if (string.Equals(method.Name, "Save", StringComparison.Ordinal))
-                {
-                    Patch(
-                        method,
-                        prefix: HarmonyMethod(nameof(ScrubInventoryPrefix)),
-                        postfix: null,
-                        "Inventory.Save scrub");
-                }
-                else if (string.Equals(method.Name, "AddItem", StringComparison.Ordinal))
-                {
-                    Patch(
-                        method,
-                        prefix: HarmonyMethod(nameof(ScrubArgumentsPrefix)),
-                        postfix: HarmonyMethod(nameof(ScrubInventoryPostfix)),
-                        "Inventory.AddItem scrub");
-                }
-            }
-        }
-
-        private void PatchCharacterDropFallbacks()
-        {
-            if (_characterDropType == null)
-                return;
-
-            foreach (MethodInfo method in SafeMethods(_characterDropType))
-            {
-                if (method.IsAbstract || method.ContainsGenericParameters || method.IsStatic)
-                    continue;
-
-                if (string.Equals(method.Name, "DropItems", StringComparison.Ordinal))
-                {
-                    Patch(
-                        method,
-                        prefix: HarmonyMethod(nameof(ScrubInstanceAndArgumentsPrefix)),
-                        postfix: HarmonyMethod(nameof(ScrubInstancePostfix)),
-                        "CharacterDrop.DropItems scrub");
-                }
-                else if (string.Equals(method.Name, "Awake", StringComparison.Ordinal) ||
-                         string.Equals(method.Name, "Start", StringComparison.Ordinal))
-                {
-                    Patch(
-                        method,
-                        prefix: null,
-                        postfix: HarmonyMethod(nameof(ScrubInstancePostfix)),
-                        "CharacterDrop lifecycle scrub");
-                }
+                Patch(
+                    method,
+                    prefix: HarmonyMethod(nameof(ScrubArgumentsPrefix)),
+                    postfix: null,
+                    "Inventory.AddItem clean incoming ItemData");
             }
         }
 
         private void PatchWorldCheatFlags()
+        {        private void PatchWorldCheatFlags()
         {
             if (!_haveZdoHashes || _zdoType == null)
             {
@@ -775,6 +763,44 @@ namespace NoCheatTagsMod
             }
         }
 
+        private static IEnumerable<CodeInstruction> ForceCheatFieldWritesFalseTranspiler(
+            IEnumerable<CodeInstruction> instructions)
+        {
+            foreach (CodeInstruction instruction in instructions)
+            {
+                FieldInfo writtenField = instruction.operand as FieldInfo;
+                bool targetStore =
+                    instruction.opcode == OpCodes.Stfld &&
+                    (SameField(writtenField, s_itemCheatedField) ||
+                     SameField(writtenField, s_characterDropCheatedField));
+
+                if (!targetStore)
+                {
+                    yield return instruction;
+                    continue;
+                }
+
+                // stfld consumes [instance, value]. Throw away the calculated value,
+                // push false, then perform the original store. Move any branch labels
+                // / exception-block markers to the first replacement instruction.
+                CodeInstruction popValue = new CodeInstruction(OpCodes.Pop);
+                if (instruction.labels != null)
+                {
+                    popValue.labels.AddRange(instruction.labels);
+                    instruction.labels.Clear();
+                }
+                if (instruction.blocks != null)
+                {
+                    popValue.blocks.AddRange(instruction.blocks);
+                    instruction.blocks.Clear();
+                }
+
+                yield return popValue;
+                yield return new CodeInstruction(OpCodes.Ldc_I4_0);
+                yield return instruction;
+            }
+        }
+
         private static bool SameField(FieldInfo left, FieldInfo right)
         {
             if (left == null || right == null)
@@ -853,9 +879,19 @@ namespace NoCheatTagsMod
             Instance?.ScrubInventory(__instance);
         }
 
-        private static void ScrubInventoryPostfix(object __instance)
+        private static void ScrubInventoryLoadPostfix(object __instance)
         {
-            Instance?.ScrubInventory(__instance);
+            NoCheatTags plugin = Instance;
+            if (plugin == null)
+                return;
+
+            int cleaned = plugin.ScrubInventory(__instance);
+            if (cleaned > 0)
+            {
+                plugin.Logger.LogInfo(
+                    "Inventory.Load removed " + cleaned +
+                    " pre-existing cheated item tag" + (cleaned == 1 ? "." : "s."));
+            }
         }
 
         private static void ZdoSetBoolPrefix(int __0, ref bool __1)
@@ -877,39 +913,8 @@ namespace NoCheatTagsMod
 
 
 
-        private void SweepLiveState()
-        {
-            ScrubActiveProfile();
-
-            if (_playerType == null || _playerGetInventoryMethod == null)
-                return;
-
-            try
-            {
-                object player = null;
-
-                if (_localPlayerField != null)
-                    player = _localPlayerField.GetValue(null);
-
-                if (player == null && _localPlayerProperty != null)
-                    player = _localPlayerProperty.GetValue(null, null);
-
-                if (player == null)
-                    return;
-
-                object inventory = _playerGetInventoryMethod.Invoke(player, null);
-                int cleaned = ScrubInventory(inventory);
-
-                if (cleaned > 0)
-                    Logger.LogInfo("Cleaned " + cleaned + " existing cheated inventory item" + (cleaned == 1 ? "." : "s."));
-            }
-            catch (Exception ex)
-            {
-                Logger.LogDebug("Live inventory sweep skipped: " + ex.GetType().Name + ": " + ex.Message);
-            }
-        }
-
         private void ScrubActiveProfile()
+        {        private void ScrubActiveProfile()
         {
             if (_gameType == null || _gameGetPlayerProfileMethod == null)
                 return;
@@ -1041,61 +1046,27 @@ namespace NoCheatTagsMod
 
         private int ScrubInventory(object inventory)
         {
-            if (inventory == null || _itemDataType == null || _itemCheatedField == null)
+            if (inventory == null ||
+                _inventoryItemsField == null ||
+                _itemDataType == null ||
+                _itemCheatedField == null)
+            {
                 return 0;
+            }
 
             int cleaned = 0;
-            var seen = new HashSet<object>(ReferenceEqualityComparer.Instance);
 
             try
             {
-                if (_inventoryGetAllItems != null)
-                {
-                    object result = _inventoryGetAllItems.Invoke(inventory, null);
-                    cleaned += ScrubItemEnumerable(result as IEnumerable, seen);
-                }
+                IEnumerable items = _inventoryItemsField.GetValue(inventory) as IEnumerable;
+                if (items == null)
+                    return 0;
 
-                foreach (FieldInfo field in _inventoryEnumerableFields)
+                foreach (object item in items)
                 {
-                    object value;
-                    try
-                    {
-                        value = field.GetValue(inventory);
-                    }
-                    catch
-                    {
+                    if (item == null || !_itemDataType.IsAssignableFrom(item.GetType()))
                         continue;
-                    }
 
-                    cleaned += ScrubItemEnumerable(value as IEnumerable, seen);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.LogDebug("Inventory scrub skipped: " + ex.GetType().Name + ": " + ex.Message);
-            }
-
-            return cleaned;
-        }
-
-        private int ScrubItemEnumerable(IEnumerable items, HashSet<object> seen)
-        {
-            if (items == null)
-                return 0;
-
-            int cleaned = 0;
-
-            foreach (object item in items)
-            {
-                if (item == null ||
-                    !_itemDataType.IsAssignableFrom(item.GetType()) ||
-                    !seen.Add(item))
-                {
-                    continue;
-                }
-
-                try
-                {
                     object current = _itemCheatedField.GetValue(item);
                     if (current is bool cheated && cheated)
                     {
@@ -1103,10 +1074,10 @@ namespace NoCheatTagsMod
                         cleaned++;
                     }
                 }
-                catch (Exception ex)
-                {
-                    Logger.LogDebug("Item cheat scrub skipped: " + ex.GetType().Name + ": " + ex.Message);
-                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogDebug("Inventory cleanup skipped: " + ex.GetType().Name + ": " + ex.Message);
             }
 
             return cleaned;
@@ -1153,42 +1124,7 @@ namespace NoCheatTagsMod
         }
 
 
-        private static MethodInfo FindMethodInHierarchy(Type type, string name, Type[] parameterTypes)
-        {
-            for (Type current = type; current != null; current = current.BaseType)
-            {
-                MethodInfo method = current.GetMethod(
-                    name,
-                    BindingFlags.Instance | BindingFlags.Static |
-                    BindingFlags.Public | BindingFlags.NonPublic |
-                    BindingFlags.DeclaredOnly,
-                    binder: null,
-                    types: parameterTypes,
-                    modifiers: null);
-
-                if (method != null)
-                    return method;
-            }
-
-            return null;
-        }
-
-        private static FieldInfo[] GetAllInstanceFields(Type type)
-        {
-            var fields = new List<FieldInfo>();
-
-            for (Type current = type; current != null; current = current.BaseType)
-            {
-                fields.AddRange(current.GetFields(
-                    BindingFlags.Instance |
-                    BindingFlags.Public | BindingFlags.NonPublic |
-                    BindingFlags.DeclaredOnly));
-            }
-
-            return fields.ToArray();
-        }
-
-        private static bool HasField(Type type, string fieldName, Type fieldType)
+        private static bool HasField(Type type, string fieldName, Type fieldType)        private static bool HasField(Type type, string fieldName, Type fieldType)
         {
             FieldInfo field = FindField(type, fieldName);
             return field != null && field.FieldType == fieldType;
@@ -1252,22 +1188,7 @@ namespace NoCheatTagsMod
         }
 
 
-        private sealed class ReferenceEqualityComparer : IEqualityComparer<object>
-        {
-            internal static readonly ReferenceEqualityComparer Instance = new ReferenceEqualityComparer();
-
-            public new bool Equals(object x, object y)
-            {
-                return ReferenceEquals(x, y);
-            }
-
-            public int GetHashCode(object obj)
-            {
-                return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj);
-            }
-        }
-
-        private static NoCheatTags Instance { get; set; }
+        private static NoCheatTags Instance { get; set; }        private static NoCheatTags Instance { get; set; }
 
         private void OnEnable()
         {
