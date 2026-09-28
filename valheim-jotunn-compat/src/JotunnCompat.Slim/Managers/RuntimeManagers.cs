@@ -639,22 +639,6 @@ namespace Jotunn.Managers
             PieceManager.Instance.RefreshCategories();
         }
 
-        [HarmonyPatch(typeof(Hud), "UpdateBuild")]
-        [HarmonyPrefix]
-        [HarmonyPriority(Priority.Low)]
-        private static void HudUpdateBuildPrefix()
-        {
-            PieceManager.Instance.RefreshCategoriesIfNeeded();
-        }
-
-        [HarmonyPatch(typeof(Hud), "LateUpdate")]
-        [HarmonyPostfix]
-        [HarmonyPriority(Priority.Low)]
-        private static void HudLateUpdatePostfix()
-        {
-            PieceManager.Instance.RefreshCategoriesIfNeeded();
-        }
-
         [HarmonyPatch(typeof(PieceTable), nameof(PieceTable.UpdateAvailable))]
         [HarmonyPrefix]
         private static void PieceTableUpdateAvailablePrefix(
