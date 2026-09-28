@@ -101,7 +101,6 @@ namespace NoCheatTagsMod
         }
 
         private void OnDestroy()
-        {        private void OnDestroy()
         {
             try
             {
@@ -240,7 +239,6 @@ namespace NoCheatTagsMod
 
 
         private void ResolveZdoHashes()
-        {        private void ResolveZdoHashes()
         {
             if (_zdoVarsType == null)
                 return;
@@ -608,7 +606,6 @@ namespace NoCheatTagsMod
         }
 
         private void PatchWorldCheatFlags()
-        {        private void PatchWorldCheatFlags()
         {
             if (!_haveZdoHashes || _zdoType == null)
             {
@@ -914,7 +911,6 @@ namespace NoCheatTagsMod
 
 
         private void ScrubActiveProfile()
-        {        private void ScrubActiveProfile()
         {
             if (_gameType == null || _gameGetPlayerProfileMethod == null)
                 return;
@@ -1124,7 +1120,7 @@ namespace NoCheatTagsMod
         }
 
 
-        private static bool HasField(Type type, string fieldName, Type fieldType)        private static bool HasField(Type type, string fieldName, Type fieldType)
+        private static bool HasField(Type type, string fieldName, Type fieldType)
         {
             FieldInfo field = FindField(type, fieldName);
             return field != null && field.FieldType == fieldType;
@@ -1188,7 +1184,7 @@ namespace NoCheatTagsMod
         }
 
 
-        private static NoCheatTags Instance { get; set; }        private static NoCheatTags Instance { get; set; }
+        private static NoCheatTags Instance { get; set; }
 
         private void OnEnable()
         {
