@@ -1,0 +1,124 @@
+name: Decompile Refreshed Valheim Debug Asset
+run-name: Valheim decompile ${{ inputs.job_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: Draft release ID containing ValheimDebug.tar.gz
+        required: true
+        type: string
+      job_id:
+        description: Unique local request ID
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  decompile:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install ILSpy command line
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet tool install --global ilspycmd
+          ilspycmd --version
+
+      - name: Download ValheimDebug.tar.gz from draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/$env:RELEASE_ID" -Headers $headers
+          if (-not $release.draft) { throw 'Input release must remain a draft.' }
+          $asset = $release.assets | Where-Object { $_.name -eq 'ValheimDebug.tar.gz' } | Select-Object -First 1
+          if (-not $asset) { throw 'ValheimDebug.tar.gz was not found on the requested draft release.' }
+          $downloadHeaders = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = 'application/octet-stream'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+          Invoke-WebRequest -Uri $asset.url -Headers $downloadHeaders -OutFile ValheimDebug.tar.gz
+          if ((Get-Item ValheimDebug.tar.gz).Length -le 0) { throw 'Downloaded ValheimDebug.tar.gz is empty.' }
+
+      - name: Extract debug archive
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path extracted | Out-Null
+          tar -xzf ValheimDebug.tar.gz -C extracted
+
+      - name: Discover Valheim assembly
+        id: discover
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $target = Get-ChildItem extracted -Recurse -File -Filter 'assembly_valheim.dll' | Select-Object -First 1
+          if (-not $target) { throw 'Could not find assembly_valheim.dll in ValheimDebug.tar.gz.' }
+          "assembly=$($target.FullName)" >> $env:GITHUB_OUTPUT
+          "refs=$($target.Directory.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Decompile Valheim
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path Result | Out-Null
+          ilspycmd '${{ steps.discover.outputs.assembly }}' -o Result -p -r '${{ steps.discover.outputs.refs }}' --disable-updatecheck --no-dead-code
+          if (-not (Get-ChildItem Result -Recurse -File | Select-Object -First 1)) { throw 'ILSpy produced no Valheim source.' }
+
+      - name: Audit decompiler diagnostics
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $patterns = @('Unknown result type','got Unknown','DecompilerException','Could not decompile','Error near IL')
+          $files = Get-ChildItem Result -Recurse -File -Filter '*.cs'
+          $bad = @()
+          if ($files) { $bad = Select-String -Path $files.FullName -Pattern $patterns -SimpleMatch }
+          if ($bad.Count -gt 0) {
+            $bad | Select-Object -First 100 | ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber): $($_.Line.Trim())" }
+            throw "Decompiler audit failed with $($bad.Count) suspicious diagnostics."
+          }
+
+      - name: Package decompile
+        shell: pwsh
+        env:
+          JOB_ID: ${{ inputs.job_id }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $name = "ValheimDecomp-$env:JOB_ID.tar.gz"
+          tar -czf $name -C Result .
+          if ((Get-Item $name).Length -le 0) { throw 'Decompile archive is empty.' }
+
+      - name: Upload decompile to draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+          JOB_ID: ${{ inputs.job_id }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $name = "ValheimDecomp-$env:JOB_ID.tar.gz"
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+          $escaped = [System.Uri]::EscapeDataString($name)
+          Invoke-RestMethod -Method Post -Uri "https://uploads.github.com/repos/$env:GITHUB_REPOSITORY/releases/$env:RELEASE_ID/assets?name=$escaped" -Headers $headers -ContentType 'application/gzip' -InFile $name | Out-Null
