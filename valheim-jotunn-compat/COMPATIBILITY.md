@@ -139,6 +139,21 @@ The same CI run compiles the slim runtime against the SHA-256-pinned unpublished
 
 The exact-game contract check and slim compilation are currently passing.
 
+### Live localization regression
+
+The first live-game pass exposed a rapid repeated reload of Valheim's complete
+localization-file set during startup. The slim localization path differed from
+upstream Jotunn by reapplying translations through the global
+`Localization.instance` instead of the exact `SetupLanguage` instance and
+language being processed.
+
+The generic runtime now mirrors upstream Jotunn's setup semantics more closely:
+English fallback translations are applied first, the selected language is
+applied second, already-loaded words are not repeatedly rewritten during normal
+registration, and translation application is protected against synchronous
+re-entry. This remains target-independent runtime behavior. A new live test is
+required to confirm that the startup reload loop is gone.
+
 ### Remaining validation
 
 ValheimRAFT now passes static binary/API compatibility. The next validation is live Valheim testing with official Jotunn absent and the slim replacement installed, checking at minimum:
