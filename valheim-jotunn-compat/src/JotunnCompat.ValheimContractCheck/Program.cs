@@ -77,7 +77,7 @@ try
     RequireUniqueMethod(modules, "Hud", "OnLeftClickCategory");
 
     RequireMethod(modules, "Localization", "AddWord", "System.String", "System.String");
-    RequireUniqueMethod(modules, "Localization", "SetupLanguage");
+    RequireMethod(modules, "Localization", "SetupLanguage", "System.String");
 
     // Current-game private/version-sensitive bridges used by generic Jotunn APIs.
     RequireField(modules, "ZNet", "m_adminList", isStatic: false);
