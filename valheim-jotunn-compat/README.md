@@ -26,6 +26,17 @@ The slim runtime implements the Jotunn-facing managers and entities needed by cu
 
 Production runtime code is generic. Canary mods may drive coverage and tests, but their names or special cases are forbidden in the runtime.
 
+### Upstream runtime parity backports
+
+The compatibility assembly still exposes the validated Jotunn 2.30.1 identity, but the generic runtime now also carries the relevant Jotunn 2.30.2 behavioral fixes:
+
+- legacy build-menu category refresh/tab handling for custom piece categories
+- safe usage-tag lookup while filtering custom build-menu categories
+- ambiguous prefab-name precedence that keeps legacy vanilla assets from being shadowed by newer Deep North assets
+- same-name Hammer UI prefab avoidance in asset lookup
+
+These are generic Jotunn behaviors, not ValheimRAFT-specific patches.
+
 ## Exact Valheim runtime validation
 
 CI compiles and validates the slim runtime against a pinned `Managed.zip` from the current Valheim installation.
