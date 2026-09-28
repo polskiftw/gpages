@@ -9,6 +9,7 @@ using Jotunn.Entities;
 using Jotunn.Utils;
 using SoftReferenceableAssets;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
 
 namespace Jotunn.Managers
@@ -26,6 +27,12 @@ namespace Jotunn.Managers
             PrefabContainer = new GameObject("Prefabs");
             PrefabContainer.transform.SetParent(Main.RootObject.transform);
             PrefabContainer.SetActive(false);
+
+            // Match Jotunn's cache lifetime. Unity objects from the previous
+            // scene become stale after a scene transition; keeping them cached
+            // can make later vanilla-prefab lookups return destroyed/null
+            // objects even though the new scene has the real prefab loaded.
+            SceneManager.sceneUnloaded += _ => Cache.Clear();
         }
 
         internal bool Contains(string name) => prefabs.ContainsKey(name);
@@ -93,7 +100,10 @@ namespace Jotunn.Managers
 
         public void RemovePrefab(string name) => prefabs.Remove(name);
 
-        internal void InvokeVanilla() => OnVanillaPrefabsAvailable?.Invoke();
+        internal void InvokeVanilla() =>
+            RuntimeEventHelpers.InvokeSafely(
+                OnVanillaPrefabsAvailable,
+                nameof(OnVanillaPrefabsAvailable));
 
         internal void RegisterAll(ZNetScene scene)
         {
@@ -146,9 +156,11 @@ namespace Jotunn.Managers
 
         public static class Cache
         {
-            private static readonly Dictionary<Type, Dictionary<string, Object>> cache = new Dictionary<Type, Dictionary<string, Object>>();
+            private static readonly Dictionary<Type, Dictionary<string, Object>> cache =
+                new Dictionary<Type, Dictionary<string, Object>>();
 
-            public static T GetPrefab<T>(string name) where T : Object => (T)GetPrefab(typeof(T), name);
+            public static T GetPrefab<T>(string name) where T : Object =>
+                (T)GetPrefab(typeof(T), name);
 
             internal static Object GetPrefab(Type type, string name)
             {
@@ -161,28 +173,223 @@ namespace Jotunn.Managers
                         {
                             soft.Load();
                             var asset = soft.Asset;
-                            if (asset && type.IsAssignableFrom(asset.GetType())) return asset;
-                            if (asset is GameObject go)
+                            if (asset && type.IsAssignableFrom(asset.GetType()))
                             {
-                                var comp = go.GetComponent(type);
-                                if (comp) return comp;
+                                return asset;
+                            }
+
+                            if (asset is GameObject go &&
+                                TryFindAssetInSelfOrChildComponents(
+                                    go,
+                                    type,
+                                    out var nested))
+                            {
+                                return nested;
                             }
                         }
                     }
                 }
-                catch { }
+                catch
+                {
+                    // Fall through to the in-memory Unity object cache.
+                }
 
                 if (!cache.TryGetValue(type, out var map))
                 {
-                    map = new Dictionary<string, Object>();
-                    foreach (var obj in Resources.FindObjectsOfTypeAll(type))
-                        if (obj) map[obj.name] = obj;
+                    map = BuildMap(type);
                     cache[type] = map;
                 }
-                return map.TryGetValue(name, out var found) ? found : null;
+
+                return map.TryGetValue(name, out var found) && found
+                    ? found
+                    : null;
+            }
+
+            private static Dictionary<string, Object> BuildMap(Type type)
+            {
+                var map = new Dictionary<string, Object>();
+                foreach (var obj in Resources.FindObjectsOfTypeAll(type))
+                {
+                    if (!obj)
+                    {
+                        continue;
+                    }
+
+                    map[obj.name] = FindBestAsset(map, obj, obj.name);
+                }
+
+                return map;
+            }
+
+            private static Object FindBestAsset(
+                IDictionary<string, Object> map,
+                Object candidate,
+                string name)
+            {
+                if (!map.TryGetValue(name, out var cached) || !cached)
+                {
+                    return candidate;
+                }
+
+                // Jotunn prefers the live ObjectDB root for this special name.
+                if (name == "_NetScene" &&
+                    cached is GameObject cachedGo &&
+                    candidate is GameObject candidateGo &&
+                    !cachedGo.activeInHierarchy &&
+                    candidateGo.activeInHierarchy)
+                {
+                    return candidate;
+                }
+
+                if (cached is Material cachedMaterial &&
+                    candidate is Material candidateMaterial)
+                {
+                    var cachedShader =
+                        cachedMaterial.shader?.name ?? string.Empty;
+                    var candidateShader =
+                        candidateMaterial.shader?.name ?? string.Empty;
+
+                    if (cachedShader == "Hidden/InternalErrorShader" &&
+                        candidateShader != "Hidden/InternalErrorShader")
+                    {
+                        return candidate;
+                    }
+
+                    if (cachedShader != "Hidden/InternalErrorShader" &&
+                        candidateShader == "Hidden/InternalErrorShader")
+                    {
+                        return cached;
+                    }
+                }
+
+                var cachedHasParent = GetParent(cached);
+                var candidateHasParent = GetParent(candidate);
+
+                if (!cachedHasParent && candidateHasParent)
+                {
+                    // Parentless objects are much more likely to be the real
+                    // prefab rather than a scene child with the same name.
+                    return cached;
+                }
+
+                if (cachedHasParent && !candidateHasParent)
+                {
+                    return candidate;
+                }
+
+                return candidate;
+            }
+
+            private static Transform GetParent(Object obj)
+            {
+                return obj is GameObject go
+                    ? go.transform.parent
+                    : null;
+            }
+
+            private static bool TryFindAssetInSelfOrChildComponents(
+                GameObject root,
+                Type type,
+                out Object asset)
+            {
+                if (!root)
+                {
+                    asset = null;
+                    return false;
+                }
+
+                if (typeof(Component).IsAssignableFrom(type))
+                {
+                    var component = root.GetComponent(type);
+                    if (component)
+                    {
+                        asset = component;
+                        return true;
+                    }
+                }
+
+                foreach (var component in root.GetComponents<Component>())
+                {
+                    if (!component || component is Transform)
+                    {
+                        continue;
+                    }
+
+                    var componentType = component.GetType();
+
+                    foreach (var field in componentType.GetFields(
+                                 BindingFlags.Instance |
+                                 BindingFlags.Public |
+                                 BindingFlags.NonPublic))
+                    {
+                        if (!type.IsAssignableFrom(field.FieldType))
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            if (field.GetValue(component) is Object value &&
+                                value)
+                            {
+                                asset = value;
+                                return true;
+                            }
+                        }
+                        catch
+                        {
+                            // Ignore inaccessible/unsafe component members.
+                        }
+                    }
+
+                    foreach (var property in componentType.GetProperties(
+                                 BindingFlags.Instance |
+                                 BindingFlags.Public |
+                                 BindingFlags.NonPublic))
+                    {
+                        if (!property.CanRead ||
+                            property.GetIndexParameters().Length != 0 ||
+                            !type.IsAssignableFrom(property.PropertyType))
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            if (property.GetValue(component, null)
+                                    is Object value &&
+                                value)
+                            {
+                                asset = value;
+                                return true;
+                            }
+                        }
+                        catch
+                        {
+                            // Ignore getters which are unsafe at cache time.
+                        }
+                    }
+                }
+
+                foreach (Transform child in root.transform)
+                {
+                    if (TryFindAssetInSelfOrChildComponents(
+                            child.gameObject,
+                            type,
+                            out asset))
+                    {
+                        return true;
+                    }
+                }
+
+                asset = null;
+                return false;
             }
 
             internal static void Clear() => cache.Clear();
+
+            internal static void Clear<T>() where T : Object =>
+                cache.Remove(typeof(T));
         }
     }
 
@@ -503,7 +710,20 @@ namespace Jotunn.Managers
                     db.m_StatusEffects.Add(effect.StatusEffect);
         }
 
-        internal void InvokeRegistered() => OnItemsRegistered?.Invoke();
+        internal void InvokeRegistered()
+        {
+            // Upstream Jotunn only fires this world-runtime event in the main
+            // scene. Firing it while FejdStartup is constructing the menu
+            // ObjectDB causes mods to query world-only vanilla data too early.
+            if (SceneManager.GetActiveScene().name != "main")
+            {
+                return;
+            }
+
+            RuntimeEventHelpers.InvokeSafely(
+                OnItemsRegistered,
+                nameof(OnItemsRegistered));
+        }
     }
 
     public sealed class LocalizationManager
@@ -592,6 +812,11 @@ namespace Jotunn.Managers
         [HarmonyPrefix]
         private static void ObjectDBAwakePrefix(ObjectDB __instance)
         {
+            if (SceneManager.GetActiveScene().name != "main")
+            {
+                return;
+            }
+
             ItemManager.Instance.Register(__instance);
             PieceManager.Instance.Register(__instance);
         }
@@ -838,5 +1063,33 @@ namespace Jotunn.Managers
 
         internal static void MinimapDataLoaded() =>
             MinimapManager.InvokeVanillaMapDataLoaded();
+    }
+
+    internal static class RuntimeEventHelpers
+    {
+        internal static void InvokeSafely(
+            Action handlers,
+            string eventName)
+        {
+            if (handlers == null)
+            {
+                return;
+            }
+
+            foreach (Action handler in handlers.GetInvocationList())
+            {
+                try
+                {
+                    handler();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(
+                        "Exception in " + eventName + " subscriber " +
+                        handler.Method.DeclaringType?.FullName + "." +
+                        handler.Method.Name + ": " + ex);
+                }
+            }
+        }
     }
 }
