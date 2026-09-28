@@ -50,7 +50,7 @@ jobs:
           Copy-Item -Force $harmony.FullName (Join-Path $lib '0Harmony.dll')
 
           # Resolve the current private Valheim Managed snapshot by draft/asset name.
-          $managedZip = Join-Path $env:RUNNER_TEMP 'valheim-managed.zip'
+          $managedZip = Join-Path $env:RUNNER_TEMP 'ValheimDebug.tar.gz'
           $managedExtract = Join-Path $env:RUNNER_TEMP 'valheim-managed'
           $apiHeaders = @{
             Authorization = "Bearer $env:GITHUB_TOKEN"
@@ -65,11 +65,11 @@ jobs:
           if (-not $managedRelease) { throw 'Could not find draft release "valheim managed binaries".' }
 
           $managedAsset = $managedRelease.assets |
-            Where-Object { $_.name -eq 'Managed.zip' } |
+            Where-Object { $_.name -eq 'ValheimDebug.tar.gz' } |
             Select-Object -First 1
-          if (-not $managedAsset) { throw 'Draft release "valheim managed binaries" does not contain Managed.zip.' }
+          if (-not $managedAsset) { throw 'Draft release "valheim managed binaries" does not contain ValheimDebug.tar.gz.' }
           if (-not $managedAsset.digest -or -not $managedAsset.digest.StartsWith('sha256:')) {
-            throw 'Managed.zip does not expose a SHA-256 digest through the GitHub release API.'
+            throw 'ValheimDebug.tar.gz does not expose a SHA-256 digest through the GitHub release API.'
           }
 
           $managedExpectedSha256 = $managedAsset.digest.Substring(7).ToLowerInvariant()
@@ -79,10 +79,11 @@ jobs:
 
           $actual = (Get-FileHash $managedZip -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($actual -ne $managedExpectedSha256) {
-            throw "Managed.zip SHA256 mismatch. Expected $managedExpectedSha256, got $actual"
+            throw "ValheimDebug.tar.gz SHA256 mismatch. Expected $managedExpectedSha256, got $actual"
           }
 
-          Expand-Archive -Path $managedZip -DestinationPath $managedExtract
+          New-Item -ItemType Directory -Path $managedExtract -Force | Out-Null
+          tar -xzf $managedZip -C $managedExtract
           $assemblyValheim = Get-ChildItem -Path $managedExtract -Recurse -File -Filter 'assembly_valheim.dll' | Select-Object -First 1
           if (-not $assemblyValheim) { throw 'Current Managed snapshot does not contain assembly_valheim.dll' }
           $managedDir = $assemblyValheim.Directory.FullName
@@ -108,7 +109,7 @@ jobs:
           }
 
           Write-Host "Current assembly_valheim: $($assemblyValheim.FullName)"
-          Write-Host "Managed.zip SHA256: $actual"
+          Write-Host "ValheimDebug.tar.gz SHA256: $actual"
 
       - name: Build Assembly Inspector
         shell: pwsh
