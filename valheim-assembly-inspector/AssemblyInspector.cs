@@ -17,7 +17,7 @@ namespace AssemblyInspectorMod
     {
         public const string PluginGuid = "claire.valheim.assemblyinspector";
         public const string PluginName = "Assembly Inspector";
-        public const string PluginVersion = "1.4.0";
+        public const string PluginVersion = "1.5.0";
         private const string HarmonyId = PluginGuid + ".live-overrides";
         private const string UiHarmonyId = PluginGuid + ".ui-input";
         private const int WindowId = 845112;
@@ -53,7 +53,13 @@ namespace AssemblyInspectorMod
         private Assembly _targetAssembly;
         private List<Type> _types = new List<Type>();
         private readonly List<GlobalMemberEntry> _globalMembers = new List<GlobalMemberEntry>();
-        private const int MaxGlobalSearchResults = 300;
+        private readonly List<GlobalMemberEntry> _globalSearchResults = new List<GlobalMemberEntry>();
+        private const int MaxGlobalSearchResults = 200;
+        private const float GlobalSearchDebounceSeconds = 0.12f;
+        private string _globalSearchAppliedQuery = string.Empty;
+        private int _globalSearchMatchCount;
+        private bool _globalSearchDirty;
+        private float _globalSearchChangedAt;
 
         private Type _selectedType;
         private MethodInfo _selectedMethod;
@@ -71,6 +77,13 @@ namespace AssemblyInspectorMod
         private string _fieldMutationValueText = string.Empty;
         private string _fieldMutationLastFieldKey = string.Empty;
         private bool _fieldMutationPostfix;
+
+        private string _fieldEditorHookSearch = string.Empty;
+        private MethodInfo _fieldEditorHookMethod;
+        private string _fieldEditorValueText = string.Empty;
+        private bool _fieldEditorPostfix;
+        private Vector2 _fieldEditorHookScroll;
+
         private string _status = "Open in game after Valheim has loaded its managed assemblies.";
 
         private bool _visible;
@@ -747,13 +760,13 @@ namespace AssemblyInspectorMod
             if (!string.Equals(nextGlobalSearch, _globalSearch, StringComparison.Ordinal))
             {
                 _globalSearch = nextGlobalSearch;
-                _globalSearchScroll = Vector2.zero;
+                MarkGlobalSearchDirty();
             }
 
             if (!string.IsNullOrWhiteSpace(_globalSearch) && GUILayout.Button("Clear", GUILayout.Width(64f)))
             {
                 _globalSearch = string.Empty;
-                _globalSearchScroll = Vector2.zero;
+                ClearGlobalSearchCache();
             }
             GUILayout.EndHorizontal();
             GUILayout.Label("Search all classes at once. Terms match class/member/signature/type/parameters. Filters: method:, field:, property:, class:, name:, type:, param:");
@@ -777,6 +790,19 @@ namespace AssemblyInspectorMod
             GUILayout.BeginVertical(GUILayout.Width(360f));
 
             GUILayout.Label("Classes");
+
+            if (!string.IsNullOrWhiteSpace(_globalSearch))
+            {
+                GUILayout.Label("Global search is active.");
+                GUILayout.Label("The 1,000+ class button list is paused while searching so IMGUI does not rebuild it every frame.");
+                if (_selectedType != null)
+                    GUILayout.Label("Selected: " + DisplayTypeName(_selectedType));
+                GUILayout.FlexibleSpace();
+                GUILayout.Label(_types.Count + " classes indexed.");
+                GUILayout.EndVertical();
+                return;
+            }
+
             string nextSearch = GUILayout.TextField(_typeSearch ?? string.Empty);
             if (!string.Equals(nextSearch, _typeSearch, StringComparison.Ordinal))
             {
@@ -876,33 +902,83 @@ namespace AssemblyInspectorMod
         private void DrawGlobalSearchResults(string query)
         {
             GUILayout.Label("Global members");
-            GUILayout.Label("Searching " + _globalMembers.Count + " declared methods/properties/fields.");
+            GUILayout.Label("Indexed " + _globalMembers.Count + " declared methods/properties/fields.");
 
-            int matches = 0;
-            int shown = 0;
+            if (_globalSearchDirty ||
+                !string.Equals(_globalSearchAppliedQuery, query, StringComparison.Ordinal))
+            {
+                float elapsed = Time.realtimeSinceStartup - _globalSearchChangedAt;
+                if (elapsed < GlobalSearchDebounceSeconds)
+                {
+                    GUILayout.Label("Waiting for typing to pause before searching...");
+                    GUILayout.Label("Search is debounced so a partial query does not rescan the assembly every frame.");
+                    return;
+                }
+
+                RebuildGlobalSearchResults(query);
+            }
 
             _globalSearchScroll = GUILayout.BeginScrollView(_globalSearchScroll);
-            foreach (GlobalMemberEntry entry in _globalMembers)
+            foreach (GlobalMemberEntry entry in _globalSearchResults)
             {
-                if (!MatchesGlobalSearch(entry, query))
-                    continue;
-
-                matches++;
-                if (shown >= MaxGlobalSearchResults)
-                    continue;
-
                 string label = IsGlobalEntrySelected(entry) ? "> " + entry.Label : entry.Label;
                 if (GUILayout.Button(label, GUILayout.Height(42f)))
                     SelectGlobalMember(entry);
-
-                shown++;
             }
             GUILayout.EndScrollView();
 
-            if (matches > MaxGlobalSearchResults)
-                GUILayout.Label("Showing first " + MaxGlobalSearchResults + " / " + matches + " matches. Add another term or filter to narrow it.");
+            if (_globalSearchMatchCount > MaxGlobalSearchResults)
+            {
+                GUILayout.Label("Showing first " + MaxGlobalSearchResults + " / " +
+                    _globalSearchMatchCount + " matches. Add another term or filter to narrow it.");
+            }
             else
-                GUILayout.Label("Showing " + matches + " match" + (matches == 1 ? "." : "es."));
+            {
+                GUILayout.Label("Showing " + _globalSearchMatchCount + " match" +
+                    (_globalSearchMatchCount == 1 ? "." : "es."));
+            }
+        }
+
+        private void MarkGlobalSearchDirty()
+        {
+            _globalSearchDirty = true;
+            _globalSearchChangedAt = Time.realtimeSinceStartup;
+            _globalSearchAppliedQuery = string.Empty;
+            _globalSearchMatchCount = 0;
+            _globalSearchResults.Clear();
+            _globalSearchScroll = Vector2.zero;
+        }
+
+        private void ClearGlobalSearchCache()
+        {
+            _globalSearchDirty = false;
+            _globalSearchAppliedQuery = string.Empty;
+            _globalSearchMatchCount = 0;
+            _globalSearchResults.Clear();
+            _globalSearchScroll = Vector2.zero;
+        }
+
+        private void RebuildGlobalSearchResults(string query)
+        {
+            string[] tokens = (query ?? string.Empty)
+                .Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+
+            _globalSearchResults.Clear();
+            int matches = 0;
+
+            foreach (GlobalMemberEntry entry in _globalMembers)
+            {
+                if (!MatchesGlobalSearch(entry, tokens))
+                    continue;
+
+                matches++;
+                if (_globalSearchResults.Count < MaxGlobalSearchResults)
+                    _globalSearchResults.Add(entry);
+            }
+
+            _globalSearchMatchCount = matches;
+            _globalSearchAppliedQuery = query;
+            _globalSearchDirty = false;
         }
 
         private bool IsGlobalEntrySelected(GlobalMemberEntry entry)
@@ -1277,7 +1353,7 @@ namespace AssemblyInspectorMod
             if (!string.Equals(_fieldMutationLastFieldKey, fieldKey, StringComparison.Ordinal))
             {
                 _fieldMutationLastFieldKey = fieldKey;
-                _fieldMutationValueText = DefaultOverrideText(target.Field.FieldType);
+                _fieldMutationValueText = DefaultFieldMutationText(target.Field.FieldType);
             }
 
             DetailLine("Resolved field", (target.Field.DeclaringType == null ? string.Empty : target.Field.DeclaringType.FullName) +
@@ -1394,6 +1470,275 @@ namespace AssemblyInspectorMod
                     FriendlyType(field.FieldType) + " " + field.DeclaringType.FullName + "." + field.Name;
                 _status = "Field declaration copied.";
             }
+
+            GUILayout.Space(14f);
+            GUILayout.Label("Create mutation patch");
+
+            string reason;
+            if (!CanMutateField(field, out reason))
+            {
+                GUILayout.Label("Automatic mutation unavailable: " + reason);
+                return;
+            }
+
+            if (field.IsStatic)
+            {
+                GUILayout.Label("This is a static field. Pick any patchable method on " +
+                    FriendlyType(field.DeclaringType) + " to decide when the field is forced.");
+            }
+            else
+            {
+                GUILayout.Label("This is an instance field. Pick an instance method on " +
+                    FriendlyType(field.DeclaringType) +
+                    "; whenever that method runs, the field on that same object can be forced.");
+            }
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Value:", GUILayout.Width(58f));
+            _fieldEditorValueText = GUILayout.TextField(_fieldEditorValueText ?? string.Empty);
+            GUILayout.EndHorizontal();
+
+            _fieldEditorPostfix = GUILayout.Toggle(
+                _fieldEditorPostfix,
+                "Run after the hook method (postfix). Off = mutate before it runs (prefix).");
+
+            GUILayout.Space(5f);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Hook:", GUILayout.Width(58f));
+            _fieldEditorHookSearch = GUILayout.TextField(_fieldEditorHookSearch ?? string.Empty);
+            GUILayout.EndHorizontal();
+
+            MethodInfo[] hookMethods = GetFieldHookMethods(field);
+            string hookSearch = (_fieldEditorHookSearch ?? string.Empty).Trim();
+            int matchingHooks = 0;
+            int shownHooks = 0;
+
+            _fieldEditorHookScroll = GUILayout.BeginScrollView(
+                _fieldEditorHookScroll,
+                GUILayout.Height(190f));
+
+            foreach (MethodInfo method in hookMethods)
+            {
+                string methodText = FormatMethodShort(method);
+                if (hookSearch.Length != 0 &&
+                    !ContainsIgnoreCase(method.Name, hookSearch) &&
+                    !ContainsIgnoreCase(methodText, hookSearch))
+                {
+                    continue;
+                }
+
+                matchingHooks++;
+                if (shownHooks >= 60)
+                    continue;
+
+                string label = ReferenceEquals(method, _fieldEditorHookMethod)
+                    ? "> " + methodText
+                    : methodText;
+
+                if (GUILayout.Button(label, GUILayout.Height(34f)))
+                {
+                    _fieldEditorHookMethod = method;
+                    _status = "Field hook selected: " + FormatMethodShort(method) + ".";
+                }
+
+                shownHooks++;
+            }
+
+            GUILayout.EndScrollView();
+
+            if (matchingHooks > 60)
+                GUILayout.Label("Showing first 60 / " + matchingHooks + " hook methods. Type above to narrow it.");
+            else
+                GUILayout.Label("Showing " + matchingHooks + " hook method" + (matchingHooks == 1 ? "." : "s."));
+
+            if (_fieldEditorHookMethod == null)
+            {
+                GUILayout.Label("Select a hook method above, then Apply live or copy the standalone patch.");
+                return;
+            }
+
+            DetailLine("Selected hook", FormatMethodShort(_fieldEditorHookMethod));
+            string targetPath = field.IsStatic ? "static." + field.Name : "this." + field.Name;
+            DetailLine("Mutation target", targetPath);
+
+            FieldMutationPatch patch;
+            if (!TryCreateFieldMutationPatch(
+                    field,
+                    _fieldEditorHookMethod,
+                    _fieldEditorPostfix,
+                    out patch,
+                    out reason))
+            {
+                GUILayout.Label("Cannot use this hook: " + reason);
+                return;
+            }
+
+            FieldMutationPatch active = GetCurrentFieldMutation(_fieldEditorHookMethod, patch);
+            if (active != null)
+                GUILayout.Label("LIVE FIELD MUTATION ACTIVE: " + FormatValue(active.Value));
+
+            GUILayout.BeginHorizontal();
+
+            if (GUILayout.Button("Apply live"))
+            {
+                object value;
+                string error;
+                if (TryParseScalarValue(field.FieldType, _fieldEditorValueText, out value, out error))
+                {
+                    patch.Value = value;
+                    ApplyLiveFieldMutation(patch);
+                }
+                else
+                {
+                    _status = error;
+                }
+            }
+
+            if (GUILayout.Button("Copy field-mutation mod"))
+            {
+                object value;
+                string error;
+                if (TryParseScalarValue(field.FieldType, _fieldEditorValueText, out value, out error))
+                {
+                    patch.Value = value;
+                    GUIUtility.systemCopyBuffer = BuildGeneratedFieldMutationMod(patch);
+                    _status = "Field mutation mod copied.";
+                }
+                else
+                {
+                    _status = error;
+                }
+            }
+
+            if (GUILayout.Button("Open hook method"))
+            {
+                MethodInfo hook = _fieldEditorHookMethod;
+                string valueText = _fieldEditorValueText;
+                bool postfix = _fieldEditorPostfix;
+                string mutationTarget = targetPath;
+
+                SelectType(hook.DeclaringType);
+                _tab = MemberTab.Methods;
+                SelectMethod(hook);
+                _fieldMutationTargetText = mutationTarget;
+                _fieldMutationValueText = valueText;
+                _fieldMutationPostfix = postfix;
+                _status = "Opened hook method with " + mutationTarget + " prefilled.";
+            }
+
+            if (active != null && GUILayout.Button("Remove live"))
+                RemoveLiveFieldMutation(_fieldEditorHookMethod, patch);
+
+            GUILayout.EndHorizontal();
+        }
+
+        private static bool CanMutateField(FieldInfo field, out string reason)
+        {
+            if (field == null)
+            {
+                reason = "no field selected";
+                return false;
+            }
+
+            if (field.IsLiteral || field.IsInitOnly)
+            {
+                reason = "constant/readonly fields are not writable";
+                return false;
+            }
+
+            if (!CanGenerateScalarPatch(field.FieldType))
+            {
+                reason = "automatic field mutation is limited to scalar field types";
+                return false;
+            }
+
+            if (field.DeclaringType == null)
+            {
+                reason = "field has no declaring type";
+                return false;
+            }
+
+            reason = string.Empty;
+            return true;
+        }
+
+        private static MethodInfo[] GetFieldHookMethods(FieldInfo field)
+        {
+            if (field == null || field.DeclaringType == null)
+                return new MethodInfo[0];
+
+            return field.DeclaringType
+                .GetMethods(DeclaredMembers)
+                .Where(method =>
+                    !method.IsAbstract &&
+                    !method.ContainsGenericParameters &&
+                    !method.IsSpecialName &&
+                    (field.IsStatic || !method.IsStatic))
+                .OrderBy(method => method.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(method => method.GetParameters().Length)
+                .ToArray();
+        }
+
+        private static bool TryCreateFieldMutationPatch(
+            FieldInfo field,
+            MethodInfo method,
+            bool postfix,
+            out FieldMutationPatch patch,
+            out string error)
+        {
+            patch = null;
+
+            string reason;
+            if (!CanMutateField(field, out reason))
+            {
+                error = reason;
+                return false;
+            }
+
+            if (method == null)
+            {
+                error = "select a hook method";
+                return false;
+            }
+
+            if (method.IsAbstract || method.ContainsGenericParameters)
+            {
+                error = "abstract/open-generic methods cannot be patched";
+                return false;
+            }
+
+            if (!field.IsStatic && method.IsStatic)
+            {
+                error = "an instance field needs an instance hook method";
+                return false;
+            }
+
+            if (method.DeclaringType == null ||
+                field.DeclaringType == null ||
+                !field.DeclaringType.IsAssignableFrom(method.DeclaringType) &&
+                !method.DeclaringType.IsAssignableFrom(field.DeclaringType))
+            {
+                error = "hook method does not belong to the field's object type";
+                return false;
+            }
+
+            patch = new FieldMutationPatch
+            {
+                Method = method,
+                SourceKind = field.IsStatic
+                    ? FieldMutationSourceKind.Static
+                    : FieldMutationSourceKind.Instance,
+                ArgumentIndex = -1,
+                Field = field,
+                Value = null,
+                Postfix = postfix,
+                TargetPath = field.IsStatic
+                    ? "static." + field.Name
+                    : "this." + field.Name
+            };
+
+            error = string.Empty;
+            return true;
         }
 
         private void DetailLine(string label, string value)
@@ -1436,6 +1781,15 @@ namespace AssemblyInspectorMod
                 .ToList();
 
             BuildGlobalMemberIndex();
+            if (!string.IsNullOrWhiteSpace(_globalSearch))
+            {
+                _globalSearchDirty = true;
+                _globalSearchChangedAt = 0f;
+                _globalSearchAppliedQuery = string.Empty;
+                _globalSearchResults.Clear();
+                _globalSearchMatchCount = 0;
+            }
+
             _status = "Loaded " + _types.Count + " classes and " + _globalMembers.Count +
                 " searchable members from " + _targetAssembly.GetName().Name + ".";
         }
@@ -1548,11 +1902,8 @@ namespace AssemblyInspectorMod
             });
         }
 
-        private static bool MatchesGlobalSearch(GlobalMemberEntry entry, string query)
+        private static bool MatchesGlobalSearch(GlobalMemberEntry entry, string[] tokens)
         {
-            string[] tokens = (query ?? string.Empty)
-                .Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-
             foreach (string rawToken in tokens)
             {
                 int colon = rawToken.IndexOf(':');
@@ -1650,6 +2001,16 @@ namespace AssemblyInspectorMod
             _fieldMutationValueText = string.Empty;
             _fieldMutationLastFieldKey = string.Empty;
             _fieldMutationPostfix = false;
+            ResetFieldEditorState();
+        }
+
+        private void ResetFieldEditorState()
+        {
+            _fieldEditorHookSearch = string.Empty;
+            _fieldEditorHookMethod = null;
+            _fieldEditorValueText = string.Empty;
+            _fieldEditorPostfix = false;
+            _fieldEditorHookScroll = Vector2.zero;
         }
 
         private void SelectMethod(MethodInfo method)
@@ -1662,6 +2023,7 @@ namespace AssemblyInspectorMod
             _fieldMutationValueText = string.Empty;
             _fieldMutationLastFieldKey = string.Empty;
             _fieldMutationPostfix = false;
+            ResetFieldEditorState();
             _detailScroll = Vector2.zero;
         }
 
@@ -1675,6 +2037,7 @@ namespace AssemblyInspectorMod
             _fieldMutationValueText = string.Empty;
             _fieldMutationLastFieldKey = string.Empty;
             _fieldMutationPostfix = false;
+            ResetFieldEditorState();
             _detailScroll = Vector2.zero;
 
             if (_selectedMethod == null)
@@ -1691,6 +2054,8 @@ namespace AssemblyInspectorMod
             _fieldMutationValueText = string.Empty;
             _fieldMutationLastFieldKey = string.Empty;
             _fieldMutationPostfix = false;
+            ResetFieldEditorState();
+            _fieldEditorValueText = DefaultFieldMutationText(field == null ? null : field.FieldType);
             _detailScroll = Vector2.zero;
         }
 
@@ -2463,7 +2828,7 @@ namespace AssemblyInspectorMod
             int dot = raw.IndexOf('.');
             if (dot <= 0 || dot == raw.Length - 1 || raw.IndexOf('.', dot + 1) >= 0)
             {
-                error = "enter one-level path such as this.m_cheated or item.m_cheated";
+                error = "enter one-level path such as this.m_cheated, item.m_cheated, or static.someFlag";
                 return false;
             }
 
@@ -2472,6 +2837,7 @@ namespace AssemblyInspectorMod
             Type sourceType;
             FieldMutationSourceKind sourceKind;
             int argumentIndex = -1;
+            bool explicitStatic = false;
 
             if (string.Equals(owner, "this", StringComparison.Ordinal))
             {
@@ -2483,6 +2849,12 @@ namespace AssemblyInspectorMod
 
                 sourceType = method.DeclaringType;
                 sourceKind = FieldMutationSourceKind.Instance;
+            }
+            else if (string.Equals(owner, "static", StringComparison.OrdinalIgnoreCase))
+            {
+                sourceType = method.DeclaringType;
+                sourceKind = FieldMutationSourceKind.Static;
+                explicitStatic = true;
             }
             else
             {
@@ -2511,7 +2883,7 @@ namespace AssemblyInspectorMod
 
                 if (argumentIndex < 0)
                 {
-                    error = "left side must be this, a parameter name, or argN";
+                    error = "left side must be this, static, a parameter name, or argN";
                     return false;
                 }
 
@@ -2529,6 +2901,12 @@ namespace AssemblyInspectorMod
             if (field == null)
             {
                 error = "field '" + fieldName + "' was not found on " + FriendlyType(sourceType);
+                return false;
+            }
+
+            if (explicitStatic && !field.IsStatic)
+            {
+                error = "static." + fieldName + " resolved to an instance field";
                 return false;
             }
 
@@ -2686,6 +3064,13 @@ namespace AssemblyInspectorMod
                    (type.IsPrimitive || type.IsEnum || type == typeof(string) || type == typeof(decimal));
         }
 
+        private static string DefaultFieldMutationText(Type type)
+        {
+            if (type == typeof(bool))
+                return "false";
+            return DefaultOverrideText(type);
+        }
+
         private static string DefaultOverrideText(Type type)
         {
             if (type == typeof(bool))
@@ -2756,6 +3141,13 @@ namespace AssemblyInspectorMod
 
             patch.Value = value;
             patch.Postfix = postfix;
+            return BuildGeneratedFieldMutationMod(patch);
+        }
+
+        private static string BuildGeneratedFieldMutationMod(FieldMutationPatch patch)
+        {
+            if (patch == null || patch.Method == null || patch.Field == null)
+                throw new ArgumentException("Field mutation patch is incomplete.", nameof(patch));
 
             return BuildGeneratedPatchSource(
                 new List<KeyValuePair<MethodInfo, object>>(),
