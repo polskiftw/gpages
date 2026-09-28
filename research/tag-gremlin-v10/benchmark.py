@@ -7,7 +7,7 @@ from typing import Dict, List, Tuple, Set, Optional
 
 K=40
 ROOT='abcdefghijklmnopqrstuvwxyz0123456789'
-NEXT='abcdefghijklmnopqrstuvwxyz0123456789.-'
+NEXT='abcdefghijklmnopqrstuvwxyz0123456789.'
 MAX_SUB=4
 
 COLORS='black white red blue green pink purple orange yellow brown gray silver gold blonde cyan teal violet'.split()
@@ -25,27 +25,44 @@ FRANCH='academy chronicles project girls world legends fantasy quest club story 
 TRANS='akari ayame chihaya kaede koharu kotone madoka makoto megumi nanami nozomi sayaka shiori takumi tomoe tsukasa yuriko'.split()
 ABBR='ai cg oc pov rpg fps npc vr ui hd 2d 3d sfw nsfw'.split()
 
+# The target site uses period as its space/word-boundary character (red.hair),
+# not as generic punctuation.  `boundary` is therefore the probability that a
+# generated conceptual multiword tag uses the explicit period separator rather
+# than collapsing into a lexical compound.  Archetypes vary this rate, but in
+# all ordinary linguistic worlds an explicit boundary is the dominant form.
 ARCHETYPES={
-    'balanced': dict(ling=0.72, proper=0.13, weird=0.05, short=0.05, punct=0.05, compound=0.48, reuse=0.72, skew=1.10),
-    'linguistic':dict(ling=0.84, proper=0.08, weird=0.02, short=0.03, punct=0.03, compound=0.60, reuse=0.88, skew=1.18),
-    'names':dict(ling=0.52, proper=0.28, weird=0.06, short=0.06, punct=0.08, compound=0.42, reuse=0.60, skew=1.02),
-    'weird':dict(ling=0.50, proper=0.12, weird=0.18, short=0.10, punct=0.10, compound=0.35, reuse=0.42, skew=0.93),
-    'shortheavy':dict(ling=0.60, proper=0.12, weird=0.06, short=0.17, punct=0.05, compound=0.38, reuse=0.62, skew=1.07),
-    'compound':dict(ling=0.75, proper=0.08, weird=0.03, short=0.03, punct=0.11, compound=0.78, reuse=0.83, skew=1.13),
+    'balanced': dict(ling=0.72, proper=0.13, weird=0.05, short=0.05, boundary=0.82, compound=0.48, reuse=0.72, skew=1.10),
+    'linguistic':dict(ling=0.84, proper=0.08, weird=0.02, short=0.03, boundary=0.90, compound=0.60, reuse=0.88, skew=1.18),
+    'names':dict(ling=0.52, proper=0.28, weird=0.06, short=0.06, boundary=0.78, compound=0.42, reuse=0.60, skew=1.02),
+    'weird':dict(ling=0.50, proper=0.12, weird=0.18, short=0.10, boundary=0.62, compound=0.35, reuse=0.42, skew=0.93),
+    'shortheavy':dict(ling=0.60, proper=0.12, weird=0.06, short=0.17, boundary=0.80, compound=0.38, reuse=0.62, skew=1.07),
+    'compound':dict(ling=0.75, proper=0.08, weird=0.03, short=0.03, boundary=0.94, compound=0.78, reuse=0.83, skew=1.13),
 }
 
 def clean(s:str)->str:
-    s=''.join(ch for ch in s.lower() if ch.isalnum() or ch in '.-')
-    while s and s[0] in '.-': s=s[1:]
-    return s or 'aa'
+    # Canonical site-shaped spelling: only alnum and '.', with '.' representing
+    # a real token boundary.  Empty words (leading/trailing/repeated periods)
+    # are not valid synthetic tags.
+    raw=''.join(ch for ch in s.lower() if ch.isalnum() or ch=='.')
+    parts=[''.join(ch for ch in p if ch.isalnum()) for p in raw.split('.')]
+    parts=[p for p in parts if p]
+    return '.'.join(parts) or 'aa'
+
+def join_words(a:str,b:str,r:random.Random,cfg)->str:
+    sep='.' if r.random()<cfg['boundary'] else ''
+    return clean(a+sep+b)
 
 def rand_weird(r:random.Random)->str:
-    n=r.randint(3,13)
+    # Weird identifiers remain mostly opaque strings.  When they contain a
+    # period, generate it as a separator between two chunks rather than as a
+    # random character inserted inside one chunk.
     alpha='abcdefghijklmnopqrstuvwxyz0123456789'
-    s=''.join(r.choice(alpha) for _ in range(n))
-    if n>5 and r.random()<.25:
-        i=r.randint(1,n-2); s=s[:i]+r.choice('.-')+s[i:]
-    return s
+    if r.random()<.04:
+        a=''.join(r.choice(alpha) for _ in range(r.randint(2,6)))
+        b=''.join(r.choice(alpha) for _ in range(r.randint(2,6)))
+        return clean(a+'.'+b)
+    n=r.randint(3,13)
+    return ''.join(r.choice(alpha) for _ in range(n))
 
 def make_linguistic(r:random.Random, cfg)->str:
     pools=[COLORS,BODY,LOOK,CLOTH,POSE,OBJ,SCENE,CAM,EXPR,MORPH]
@@ -53,18 +70,16 @@ def make_linguistic(r:random.Random, cfg)->str:
     if r.random()<cfg['compound']:
         b=r.choice(r.choice(pools))
         if b==a: b=r.choice(MORPH)
-        sep=r.choices(['','-','.'],[.72,.20,.08])[0] if r.random()<cfg['punct']*2.5 else ''
-        if r.random()<.35: return clean(a+sep+b)
-        return clean(b+sep+a)
-    if r.random()<.18: a=r.choice(MORPH)+a
+        if r.random()<.35: return join_words(a,b,r,cfg)
+        return join_words(b,a,r,cfg)
+    if r.random()<.18: a=join_words(r.choice(MORPH),a,r,cfg)
     return clean(a)
 
 def make_proper(r:random.Random,cfg)->str:
     a=r.choice(NAMES+TRANS)
     if r.random()<.6:
         b=r.choice(FRANCH+NAMES+MORPH)
-        sep=r.choice(['','-','.']) if r.random()<cfg['punct']*3 else ''
-        return clean(a+sep+b)
+        return join_words(a,b,r,cfg)
     return a
 
 def make_short(r):
@@ -79,4 +94,6 @@ def mutate(base:str,r:random.Random)->str:
     if mode==2: return clean(base+str(r.randint(1,999)))
     if mode==3 and len(base)>3:
         i=r.randint(1,len(base)-1); return clean(base[:i]+r.choice('aeiouy')+base[i:])
-    return clean(base+r.choice(['-','.'])+r.choice(MORPH+NAMES))
+    # Mutation can add another conceptual word, so a period is appropriate
+    # here even when the base already contains earlier boundaries.
+    return clean(base+'.'+r.choice(MORPH+NAMES))

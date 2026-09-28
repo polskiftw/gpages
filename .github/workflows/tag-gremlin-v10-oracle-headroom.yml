@@ -1,0 +1,65 @@
+name: Tag Gremlin direct-certificate oracle headroom
+
+# The oracle matrix was launched from PR run 32430067858. Retain it as a
+# manual-only reproducibility workflow after launch so later PR commits do not
+# repeat the full matrix.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  oracle-headroom-10k:
+    timeout-minutes: 120
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { archetype: balanced,   seed: 95001 }
+          - { archetype: linguistic, seed: 95101 }
+          - { archetype: names,      seed: 95201 }
+          - { archetype: weird,      seed: 95301 }
+          - { archetype: shortheavy, seed: 95401 }
+          - { archetype: compound,   seed: 95501 }
+    defaults:
+      run:
+        working-directory: research/tag-gremlin-v10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build grammar-corrected period-only simulator
+        run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
+
+      - name: Compile direct-certificate oracle harness
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_dynamic_oracle.cpp -o period_dynamic_oracle
+
+      - name: Generate exact-prevalence 10k oracle world
+        run: |
+          set -euo pipefail
+          python3 period_quota_worldgen.py \
+            --target-total 10000 \
+            --target-dotted 6939 \
+            --seed-base ${{ matrix.seed }} \
+            --archetype ${{ matrix.archetype }} \
+            --shard-n 10000 \
+            --max-shards 80 \
+            --out world.tsv | tee oracle-world-${{ matrix.archetype }}.txt
+          grep -q 'total=10000 dotted=6939 plain=3061 dotted_fraction=0.693900' oracle-world-${{ matrix.archetype }}.txt
+
+      - name: Compare frozen scheduler with omniscient direct-certificate oracle
+        run: |
+          set -euo pipefail
+          ./period_dynamic_oracle world.tsv | tee oracle-${{ matrix.archetype }}.txt
+          grep -q 'ORACLE_REF' oracle-${{ matrix.archetype }}.txt
+          test "$(grep -c 'complete=1' oracle-${{ matrix.archetype }}.txt)" -ge 13
+
+      - name: Upload oracle result
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-period-oracle-headroom-${{ matrix.archetype }}
+          path: |
+            research/tag-gremlin-v10/oracle-world-${{ matrix.archetype }}.txt
+            research/tag-gremlin-v10/oracle-${{ matrix.archetype }}.txt
+          if-no-files-found: error

@@ -1,0 +1,64 @@
+name: Tag Gremlin layered xy risk training
+
+# Expensive matrix: manual reproduction only after the initial research launch.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  layered-risk-10k:
+    timeout-minutes: 120
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { archetype: balanced,   seed: 97001 }
+          - { archetype: linguistic, seed: 97101 }
+          - { archetype: names,      seed: 97201 }
+          - { archetype: weird,      seed: 97301 }
+          - { archetype: shortheavy, seed: 97401 }
+          - { archetype: compound,   seed: 97501 }
+    defaults:
+      run:
+        working-directory: research/tag-gremlin-v10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build grammar-corrected period-only simulator
+        run: python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
+
+      - name: Compile layered risk harness
+        run: g++ -O3 -std=c++20 -march=x86-64-v3 period_risk_certificate.cpp -o period_risk_certificate
+
+      - name: Generate fresh exact-prevalence 10k training world
+        run: |
+          set -euo pipefail
+          python3 period_quota_worldgen.py \
+            --target-total 10000 \
+            --target-dotted 6939 \
+            --seed-base ${{ matrix.seed }} \
+            --archetype ${{ matrix.archetype }} \
+            --shard-n 10000 \
+            --max-shards 80 \
+            --out world.tsv | tee layer-world-${{ matrix.archetype }}.txt
+          grep -q 'total=10000 dotted=6939 plain=3061 dotted_fraction=0.693900' layer-world-${{ matrix.archetype }}.txt
+
+      - name: Compare layered xy risk policies
+        run: |
+          set -euo pipefail
+          ./period_risk_certificate world.tsv | tee layer-${{ matrix.archetype }}.txt
+          grep -q 'RISK_REF policy=cov8_s4' layer-${{ matrix.archetype }}.txt
+          grep -q 'RISK policy=layer_23468' layer-${{ matrix.archetype }}.txt
+          test "$(grep -c 'complete=1' layer-${{ matrix.archetype }}.txt)" -ge 20
+
+      - name: Upload layered risk result
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-period-layered-risk-${{ matrix.archetype }}
+          path: |
+            research/tag-gremlin-v10/layer-world-${{ matrix.archetype }}.txt
+            research/tag-gremlin-v10/layer-${{ matrix.archetype }}.txt
+          if-no-files-found: error

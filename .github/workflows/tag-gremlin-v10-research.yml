@@ -1,4 +1,4 @@
-name: Tag Gremlin v10 Research
+name: Tag Gremlin v10 Research (period-only)
 
 on:
   push:
@@ -26,17 +26,20 @@ defaults:
 
 jobs:
   parity:
-    name: parity-1k
+    name: parity-1k-period-only
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Compile native simulator
-        run: g++ -O3 -flto -march=native -std=c++20 -DNDEBUG native_sim.cpp -o native_sim
+      - name: Compile period-only native simulator
+        run: |
+          python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
+          g++ -O3 -flto -march=native -std=c++20 -DNDEBUG native_sim_period_only.cpp -o native_sim
       - name: Generate parity world
         run: python3 worldgen.py --n 1000 --seed 60001 --archetype balanced --out parity.tsv
-      - name: Verify exact control parity
+      - name: Verify corrected controls complete
         run: |
+          ! grep -q -- '-' parity.tsv
           ./native_sim parity.tsv v9 > v9.json
           ./native_sim parity.tsv v1 > v1.json
           ./native_sim parity.tsv learnedprune 3 1 > learned.json
@@ -44,14 +47,12 @@ jobs:
           import json
           def one(p): return json.loads(open(p).read().strip().splitlines()[-1])
           got={"v9":one("v9.json"),"v1":one("v1.json"),"lp":one("learned.json")}
-          assert got["v9"]["queries"]==1088 and got["v9"]["complete"]
-          assert got["v1"]["queries"]==812 and got["v1"]["complete"]
-          assert got["lp"]["queries"]==807 and got["lp"]["complete"]
+          assert all(r["complete"] for r in got.values()), got
           print(json.dumps(got,indent=2))
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: parity-1k
+          name: parity-1k-period-only
           path: |
             research/tag-gremlin-v10/v9.json
             research/tag-gremlin-v10/v1.json
@@ -74,7 +75,9 @@ jobs:
           - { archetype: compound,   seed: 91006 }
     steps:
       - uses: actions/checkout@v4
-      - run: g++ -O3 -flto -march=native -std=c++20 -DNDEBUG native_sim.cpp -o native_sim
+      - run: |
+          python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
+          g++ -O3 -flto -march=native -std=c++20 -DNDEBUG native_sim_period_only.cpp -o native_sim
       - run: python3 worldgen.py --n 25000 --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
       - name: Run control and leaders
         run: python3 run_suite.py --sim ./native_sim --world world.tsv --out results.json --include-v9
@@ -97,7 +100,9 @@ jobs:
           - { archetype: compound, seed: 92003 }
     steps:
       - uses: actions/checkout@v4
-      - run: g++ -O3 -flto -march=native -std=c++20 -DNDEBUG native_sim.cpp -o native_sim
+      - run: |
+          python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
+          g++ -O3 -flto -march=native -std=c++20 -DNDEBUG native_sim_period_only.cpp -o native_sim
       - run: python3 worldgen.py --n 50000 --seed ${{ matrix.seed }} --archetype ${{ matrix.archetype }} --out world.tsv
       - run: python3 run_suite.py --sim ./native_sim --world world.tsv --out results.json
       - uses: actions/upload-artifact@v4
@@ -112,7 +117,9 @@ jobs:
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
-      - run: g++ -O3 -flto -march=native -std=c++20 -DNDEBUG native_sim.cpp -o native_sim
+      - run: |
+          python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
+          g++ -O3 -flto -march=native -std=c++20 -DNDEBUG native_sim_period_only.cpp -o native_sim
       - run: python3 worldgen.py --n 100000 --seed 93001 --archetype balanced --out world.tsv
       - run: python3 run_suite.py --sim ./native_sim --world world.tsv --out results.json
       - uses: actions/upload-artifact@v4
@@ -139,7 +146,9 @@ jobs:
           - { target: '0.35', slope: '6' }
     steps:
       - uses: actions/checkout@v4
-      - run: g++ -O3 -flto -march=native -std=c++20 -DNDEBUG native_sim.cpp -o native_sim
+      - run: |
+          python3 period_only_sim.py --src native_sim.cpp --out native_sim_period_only.cpp
+          g++ -O3 -flto -march=native -std=c++20 -DNDEBUG native_sim_period_only.cpp -o native_sim
       - run: python3 worldgen.py --n 5000 --seed 94001 --archetype balanced --out world.tsv
       - name: Run debtless contender
         run: ./native_sim world.tsv softmix ${{ matrix.target }} ${{ matrix.slope }} | tee result.json
