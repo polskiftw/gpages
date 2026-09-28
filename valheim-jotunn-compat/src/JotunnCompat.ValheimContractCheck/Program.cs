@@ -64,6 +64,10 @@ try
     RequireMethod(modules, "DungeonGenerator", "SetupAvailableRooms");
 
     RequireMethod(modules, "Game", "Start");
+    RequireMethod(modules, "Player", "SetPlaceMode", "PieceTable");
+    RequireMethod(modules, "Hud", "Awake");
+    RequireMethod(modules, "Hud", "UpdateBuild");
+    RequireMethod(modules, "Hud", "LateUpdate");
     RequireMethod(modules, "Localization", "AddWord", "System.String", "System.String");
     RequireUniqueMethod(modules, "Localization", "SetupLanguage");
 
@@ -131,7 +135,7 @@ try
 
     Console.WriteLine("Valheim runtime contract check passed.");
     Console.WriteLine($"  Managed assemblies scanned: {modules.Count}");
-    Console.WriteLine("  Reflection/Harmony targets checked: 42");
+    Console.WriteLine("  Reflection/Harmony targets checked: 46");
     return 0;
 }
 finally
