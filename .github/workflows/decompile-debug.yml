@@ -199,6 +199,66 @@ jobs:
 
           $lines | Set-Content -Encoding UTF8 'Result/DECOMP_INFO.txt'
 
+      - name: Rebuild persistent Valheim debug bundle with decompiled source
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+          JOB_ID: ${{ inputs.job_id }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $decompDestination = Join-Path (Resolve-Path extracted) 'Decomp'
+          if (Test-Path $decompDestination) {
+            Remove-Item $decompDestination -Recurse -Force
+          }
+          Copy-Item Result $decompDestination -Recurse -Force
+
+          $bundle = 'ValheimDebug.next-' + $env:JOB_ID + '.tar.gz'
+          tar -czf $bundle -C extracted .
+          if ($LASTEXITCODE -ne 0) { throw 'Could not rebuild ValheimDebug.tar.gz with decompiled source.' }
+
+          $bundleInfo = Get-Item $bundle
+          if ($bundleInfo.Length -le 0) { throw 'Rebuilt ValheimDebug.tar.gz is empty.' }
+          if ($bundleInfo.Length -ge 2GB) { throw 'Rebuilt ValheimDebug.tar.gz is too large for a GitHub release asset.' }
+          Write-Host ("Complete Valheim debug bundle: {0:N1} MiB" -f ($bundleInfo.Length / 1MB))
+
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/$env:RELEASE_ID" -Headers $headers
+          if (-not $release.draft) { throw 'Debug release must remain a draft.' }
+
+          $oldAsset = $release.assets | Where-Object { $_.name -eq 'ValheimDebug.tar.gz' } | Select-Object -First 1
+          if (-not $oldAsset) { throw 'ValheimDebug.tar.gz disappeared before it could be upgraded.' }
+
+          # Upload under a temporary name first so the original asset remains intact
+          # unless the complete replacement has successfully reached GitHub.
+          $temporaryAssetName = 'ValheimDebug.next-' + $env:JOB_ID + '.tar.gz'
+          $escapedTemporaryName = [System.Uri]::EscapeDataString($temporaryAssetName)
+          $newAsset = Invoke-RestMethod -Method Post -Uri "https://uploads.github.com/repos/$env:GITHUB_REPOSITORY/releases/$env:RELEASE_ID/assets?name=$escapedTemporaryName" -Headers $headers -ContentType 'application/gzip' -InFile $bundle
+
+          if (-not $newAsset.id) { throw 'GitHub did not return an asset ID for the complete debug bundle.' }
+
+          # Only after the replacement upload is safe do we remove the raw-only asset,
+          # then rename the new asset into its permanent stable name.
+          Invoke-RestMethod -Method Delete -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/assets/$($oldAsset.id)" -Headers $headers
+
+          $renameBody = @{
+            name = 'ValheimDebug.tar.gz'
+            label = 'Complete Valheim debug bundle with decompiled source'
+          } | ConvertTo-Json
+
+          $renamed = Invoke-RestMethod -Method Patch -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/assets/$($newAsset.id)" -Headers $headers -ContentType 'application/json' -Body $renameBody
+          if ($renamed.name -ne 'ValheimDebug.tar.gz') {
+            throw 'Complete debug bundle uploaded, but GitHub did not apply the permanent asset name.'
+          }
+
+          Write-Host 'ValheimDebug.tar.gz now contains both fresh debug files and Decomp/.'
+
       - name: Package decompile
         shell: pwsh
         env:
