@@ -122,7 +122,7 @@ jobs:
           $manifest += '=== MATCHES ==='
           $manifest += $matches | ForEach-Object {
             $relative = $_.Path.Substring($root.Length).TrimStart('\','/')
-            "$relative:$($_.LineNumber): $($_.Line.Trim())"
+            "${relative}:$($_.LineNumber): $($_.Line.Trim())"
           }
           $manifest | Set-Content -Encoding UTF8 audit/manifest.txt
 
