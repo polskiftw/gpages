@@ -14,7 +14,7 @@ namespace NoCheatTagsMod
     {
         public const string PluginGuid = "claire.valheim.nocheattags";
         public const string PluginName = "No Cheat Tags";
-        public const string PluginVersion = "1.3.1";
+        public const string PluginVersion = "1.3.2";
 
         private const BindingFlags Declared =
             BindingFlags.Instance | BindingFlags.Static |
@@ -86,7 +86,7 @@ namespace NoCheatTagsMod
                 Logger.LogInfo(
                     "Item cheat cleanup is event-driven: vanilla m_cheated writes are forced false and inventories are checked once when loaded; no periodic polling is used.");
                 Logger.LogInfo(
-                    "ItemData resolver used exact nested-type lookup first (ItemDrop+ItemData), avoiding partial assembly type-enumeration issues on Mono.");
+                    "ItemData resolver used exact nested-type lookup first (ItemDrop+ItemData).");
             }
             catch (Exception ex)
             {
@@ -116,13 +116,33 @@ namespace NoCheatTagsMod
 
         private void ResolveContracts()
         {
-            _gameAssembly = AppDomain.CurrentDomain.GetAssemblies()
-                .FirstOrDefault(assembly =>
-                    string.Equals(assembly.GetName().Name, "assembly_valheim", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(assembly.GetName().Name, "Assembly-CSharp", StringComparison.OrdinalIgnoreCase));
+            Assembly[] loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+
+            // Valheim 1.0 keeps the actual gameplay classes (ItemDrop, Inventory,
+            // PlayerProfile, etc.) in assembly_valheim.dll. Assembly-CSharp.dll
+            // still exists, but is only a small unrelated/sample assembly. The
+            // previous OR-based FirstOrDefault could therefore bind to
+            // Assembly-CSharp first on Linux/Mono and make every gameplay lookup
+            // fail even though assembly_valheim was loaded.
+            _gameAssembly = loadedAssemblies.FirstOrDefault(assembly =>
+                string.Equals(
+                    assembly.GetName().Name,
+                    "assembly_valheim",
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (_gameAssembly == null)
+            {
+                _gameAssembly = loadedAssemblies.FirstOrDefault(assembly =>
+                    string.Equals(
+                        assembly.GetName().Name,
+                        "Assembly-CSharp",
+                        StringComparison.OrdinalIgnoreCase));
+            }
 
             if (_gameAssembly == null)
                 throw new InvalidOperationException("Valheim gameplay assembly is not loaded.");
+
+            Logger.LogInfo("Selected gameplay assembly: " + _gameAssembly.GetName().Name);
 
             _itemDropType = FindType("ItemDrop");
             _itemDataType = ResolveItemDataType();
