@@ -14,12 +14,12 @@
 <body><main>
 <a class="back" href="../">‹ Valheim</a>
 <h1>Assembly Inspector</h1>
-<p class="sub">Search Valheim's live <code>assembly_valheim</code> across classes, methods, properties, fields, signatures, types, and parameters; experiment with forced scalar return values; and generate standalone Harmony override mods directly from the member you found.</p>
+<p class="sub">Search Valheim's live <code>assembly_valheim</code> across classes, methods, properties, fields, signatures, types, and parameters; experiment with scalar return and argument overrides plus targeted field mutations; and generate standalone Harmony mods directly from the member you found.</p>
 
 <div class="card">
   <a class="download" href="AssemblyInspector.dll">Download AssemblyInspector.dll</a>
   <p class="buildstamp"><strong>Hosted build:</strong> <time id="hosted-build" data-build-id="00cc238bbefd5528f4aed3ea0a0e12959e883a0ed32be5bf850bba5c69eb51d6" datetime="2026-09-28T04:50:52Z">2026-09-28 04:50:52 UTC</time></p>
-  <p class="note">BepInEx 5 + Harmony. Default hotkey: F9. Version <span class="plugin-version">1.4.0</span> adds assembly-wide member search while keeping deterministic content-derived identities for exported live bundles.</p>
+  <p class="note">BepInEx 5 + Harmony. Default hotkey: F9. Version <span class="plugin-version">1.4.0</span> adds scalar argument overrides and prefix/postfix field-mutation patches while keeping deterministic content-derived identities for exported live bundles.</p>
 </div>
 
 <div class="card">
@@ -34,7 +34,12 @@
 
 <div class="card">
   <div class="title">Bundle all active overrides</div>
-  <p class="meta">You can keep multiple live overrides active at once. The top bar shows <strong>Copy live bundle (N)</strong>, where N is the active override count. Clicking it copies one complete BepInEx/Harmony plugin containing every active method and its current forced value. Each distinct override set gets a deterministic ID such as <code>claire.valheim.generated.livebundle.a83f21d4c4e51290</code>; exporting the same set again keeps the same ID. Paste that source into the Valheim DLL Generator to turn the whole experiment into one DLL.</p>
+  <p class="meta">You can keep multiple live patches active at once. The top bar shows <strong>Copy live bundle (N)</strong>, where N counts active return overrides, argument overrides, and field mutations. Clicking it copies one complete BepInEx/Harmony plugin containing the whole experiment. Each distinct patch set gets a deterministic ID such as <code>claire.valheim.generated.livebundle.a83f21d4c4e51290</code>; exporting the same set again keeps the same ID. Paste that source into the Valheim DLL Generator to turn the whole experiment into one DLL.</p>
+</div>
+
+<div class="card">
+  <div class="title">Argument overrides + field mutations</div>
+  <p class="meta"><strong>Arguments:</strong> supported scalar parameters can be replaced in a Harmony prefix before Valheim receives them, such as forcing a <code>cheated</code> argument to <code>false</code>.<br><br><strong>Fields:</strong> enter a one-level target such as <code>this.m_cheated</code>, <code>item.m_cheated</code>, or <code>arg0.m_cheated</code>, choose prefix or postfix timing, and set a writable scalar field. Private fields are written by reflection in generated mods.</p>
 </div>
 
 <div class="card">
@@ -44,7 +49,7 @@
 
 <div class="card">
   <div class="title">Supported live values</div>
-  <p class="meta">Booleans, strings, chars, enums, decimal values, and primitive numeric return types can be forced live. Complex object-returning methods are still inspectable, but Assembly Inspector does not synthesize arbitrary replacement objects.</p>
+  <p class="meta">Booleans, strings, chars, enums, decimal values, and primitive numerics are supported for return forcing, argument overrides, and field writes. Complex object values remain inspectable, but Assembly Inspector does not synthesize arbitrary replacement objects.</p>
 </div>
 
 <div class="card">
