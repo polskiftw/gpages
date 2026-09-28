@@ -14,17 +14,17 @@
 <body><main>
 <a class="back" href="../">‹ Valheim</a>
 <h1>No Cheat Tags</h1>
-<p class="sub">Nuclear Valheim cheat-marker suppression: item flags are scrubbed, cheated arguments are forced false, ItemCheated checks return false, the native bypass is forced in memory, and world-object cheat flags read/write as false.</p>
+<p class="sub">Nuclear Valheim cheat-marker suppression: item flags are scrubbed, cheated arguments and ItemCheated checks are forced clean, the native bypass is forced in memory, character cheat-history markers are suppressed, and world-object cheat flags read/write as false.</p>
 
 <div class="card">
   <a class="download" href="NoCheatTags.dll">Download NoCheatTags.dll</a>
   <p class="buildstamp"><strong>Hosted build:</strong> <time id="hosted-build" data-build-id="4aa704950af5a9cdd941e9ef79a5c715608d0650d3b55f7c34625a3c6d1a18e7" datetime="2026-09-28T07:20:19Z">2026-09-28 07:20:19 UTC</time></p>
-  <p class="note">BepInEx 5 + Harmony. Version <span class="plugin-version">1.0.0</span>.</p>
+  <p class="note">BepInEx 5 + Harmony. Version <span class="plugin-version">1.1.0</span>.</p>
 </div>
 
 <div class="card">
   <div class="title">What it forces</div>
-  <p class="meta"><strong>ItemData.m_cheated:</strong> cleared on load, before save, through inventory load/save/add paths, and before tooltip rendering.<br><strong>cheated arguments:</strong> every boolean parameter literally named <code>cheated</code> in the Valheim gameplay assembly is forced to false.<br><strong>ItemCheated(...):</strong> every bool-returning method with that name returns false.<br><strong>PlayerProfile.s_bypassCheatChecks:</strong> returns true in memory without invoking the vanilla command or writing its saved <code>bypasscheatchecks</code> key.<br><strong>ZDO cheat markers:</strong> <code>s_cheated</code> and the eight queued cheat slots cannot be written true and are read as false.</p>
+  <p class="meta"><strong>ItemData.m_cheated:</strong> cleared on load, before save, through inventory load/save/add paths, and before tooltip rendering.<br><strong>cheated arguments:</strong> every boolean parameter literally named <code>cheated</code> in the Valheim gameplay assembly is forced to false.<br><strong>ItemCheated(...):</strong> every bool-returning method with that name returns false.<br><strong>PlayerProfile.s_bypassCheatChecks:</strong> returns true in memory without invoking the vanilla command or writing its saved <code>bypasscheatchecks</code> key.<br><strong>PlayerProfile.m_usedCheats:</strong> existing values are cleared on profile load/save paths, the vanilla console write is removed from <code>Terminal.ConsoleCommand.RunAction</code>, and the active profile is scrubbed around command execution as a fallback.<br><strong>PlayerStatType.Cheats:</strong> <code>PlayerProfile.IncrementStat</code> ignores this one stat and existing values are reset to zero across the profile's player-stat tracks.<br><strong>ZDO cheat markers:</strong> <code>s_cheated</code> and the eight queued cheat slots cannot be written true and are read as false.</p>
 </div>
 
 <div class="card">
@@ -49,7 +49,7 @@
 </div>
 
 <div class="card">
-  <p class="meta"><strong>Character m_usedCheats:</strong> deliberately not erased<br><strong>Cheats stat:</strong> deliberately not erased<br><strong>Game.isModded:</strong> deliberately not hidden<br><strong>Goal:</strong> eliminate item/object propagation tags without falsifying unrelated history markers</p>
+  <p class="meta"><strong>Character m_usedCheats:</strong> forced/cleaned false<br><strong>PlayerStatType.Cheats:</strong> blocked and reset to zero<br><strong>m_knownCommands:</strong> deliberately left alone; Valheim may still remember the names of console commands that were run<br><strong>Game.isModded:</strong> deliberately not hidden<br><strong>Goal:</strong> eliminate cheat propagation plus the vanilla character cheat flag/counter without pretending BepInEx is not present</p>
 </div>
 </main>
 <script>
