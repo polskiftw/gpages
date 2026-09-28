@@ -3005,20 +3005,20 @@ namespace AssemblyInspectorMod
                 .ToArray();
 
             StringBuilder text = new StringBuilder();
-            text.Append("FindMethod(\\"");
+            text.Append("FindMethod(\"");
             text.Append(EscapeCSharp(method.DeclaringType == null ? string.Empty : method.DeclaringType.FullName));
-            text.Append("\\", \\"");
+            text.Append("\", \"");
             text.Append(EscapeCSharp(method.Name));
-            text.Append("\\", ");
+            text.Append("\", ");
             text.Append(method.GetGenericArguments().Length);
             text.Append(", new string[] { ");
 
             for (int i = 0; i < wanted.Length; i++)
             {
                 if (i != 0) text.Append(", ");
-                text.Append("\\");
+                text.Append("\"");
                 text.Append(EscapeCSharp(wanted[i]));
-                text.Append("\\");
+                text.Append("\"");
             }
 
             text.Append(" })");
@@ -3294,18 +3294,18 @@ namespace AssemblyInspectorMod
                 string name = Enum.GetName(type, value);
                 if (!string.IsNullOrEmpty(name))
                 {
-                    return "Enum.Parse(FindType(\\"" +
+                    return "Enum.Parse(FindType(\"" +
                         EscapeCSharp(type.FullName ?? type.Name) +
-                        "\\"), \\"" +
+                        "\"), \"" +
                         EscapeCSharp(name) +
-                        "\\")";
+                        "\")";
                 }
 
                 Type underlying = Enum.GetUnderlyingType(type);
                 object raw = Convert.ChangeType(value, underlying, CultureInfo.InvariantCulture);
-                return "Enum.ToObject(FindType(\\"" +
+                return "Enum.ToObject(FindType(\"" +
                     EscapeCSharp(type.FullName ?? type.Name) +
-                    "\\"), " +
+                    "\"), " +
                     SourceObjectExpression(underlying, raw) +
                     ")";
             }
