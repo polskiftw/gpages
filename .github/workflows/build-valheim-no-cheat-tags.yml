@@ -1,0 +1,142 @@
+name: Build No Cheat Tags
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'valheim-no-cheat-tags/**'
+      - 'valheim/no-cheat-tags/index.html'
+      - '.github/workflows/build-valheim-no-cheat-tags.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: valheim-no-cheat-tags-main
+  cancel-in-progress: true
+
+jobs:
+  build-and-publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare compile references
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $project = Join-Path $env:GITHUB_WORKSPACE 'valheim-no-cheat-tags'
+          $lib = Join-Path $project 'lib'
+          $stubDir = Join-Path $env:RUNNER_TEMP 'unity-stub'
+          New-Item -ItemType Directory -Force -Path $lib | Out-Null
+          New-Item -ItemType Directory -Force -Path $stubDir | Out-Null
+
+          $url = 'https://thunderstore.io/package/download/denikson/BepInExPack_Valheim/5.4.2351/'
+          $zip = Join-Path $env:RUNNER_TEMP 'bepinex.zip'
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath (Join-Path $env:RUNNER_TEMP 'bepinex')
+
+          $bep = Get-ChildItem -Path (Join-Path $env:RUNNER_TEMP 'bepinex') -Recurse -File -Filter 'BepInEx.dll' | Select-Object -First 1
+          $harmony = Get-ChildItem -Path (Join-Path $env:RUNNER_TEMP 'bepinex') -Recurse -File -Filter '0Harmony.dll' | Select-Object -First 1
+          if (-not $bep) { throw 'Could not find BepInEx.dll' }
+          if (-not $harmony) { throw 'Could not find 0Harmony.dll' }
+
+          @'
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net472</TargetFramework>
+              <AssemblyName>UnityEngine</AssemblyName>
+              <RootNamespace>UnityEngine</RootNamespace>
+              <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+              <Deterministic>true</Deterministic>
+            </PropertyGroup>
+          </Project>
+          '@ | Set-Content -Path (Join-Path $stubDir 'UnityEngineStub.csproj') -Encoding UTF8
+
+          @'
+          namespace UnityEngine
+          {
+              public class Object { }
+              public class Component : Object { }
+              public class Behaviour : Component { }
+              public class MonoBehaviour : Behaviour
+              {
+                  protected bool enabled { get; set; }
+              }
+          }
+          '@ | Set-Content -Path (Join-Path $stubDir 'UnityEngineStub.cs') -Encoding UTF8
+
+          dotnet build (Join-Path $stubDir 'UnityEngineStub.csproj') -c Release --nologo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          Copy-Item -Force $bep.FullName (Join-Path $lib 'BepInEx.dll')
+          Copy-Item -Force $harmony.FullName (Join-Path $lib '0Harmony.dll')
+          Copy-Item -Force (Join-Path $stubDir 'bin\Release\net472\UnityEngine.dll') (Join-Path $lib 'UnityEngine.dll')
+
+      - name: Build No Cheat Tags
+        shell: pwsh
+        run: dotnet build .\valheim-no-cheat-tags\NoCheatTags.csproj -c Release --nologo
+
+      - name: Verify output
+        shell: pwsh
+        run: |
+          $dll = '.\valheim-no-cheat-tags\bin\Release\net472\NoCheatTags.dll'
+          if (-not (Test-Path $dll)) { throw "Build output missing: $dll" }
+          Get-FileHash $dll -Algorithm SHA256
+
+      - name: Publish No Cheat Tags
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+
+          $builtDll = '.\valheim-no-cheat-tags\bin\Release\net472\NoCheatTags.dll'
+          $hostedDir = '.\valheim\no-cheat-tags'
+          $hostedDll = Join-Path $hostedDir 'NoCheatTags.dll'
+          $pagePath = Join-Path $hostedDir 'index.html'
+          New-Item -ItemType Directory -Force -Path $hostedDir | Out-Null
+
+          $builtHash = (Get-FileHash $builtDll -Algorithm SHA256).Hash.ToLowerInvariant()
+          $hostedHash = if (Test-Path $hostedDll) {
+            (Get-FileHash $hostedDll -Algorithm SHA256).Hash.ToLowerInvariant()
+          }
+          else {
+            ''
+          }
+
+          if ($builtHash -ne $hostedHash) {
+            Copy-Item -Force $builtDll $hostedDll
+
+            $page = Get-Content -Raw $pagePath
+            $pattern = '<time id="hosted-build" data-build-id="[^"]*" datetime="[^"]*">.*?</time>'
+            if (-not [regex]::IsMatch($page, $pattern)) {
+              throw "Could not find hosted-build marker in $pagePath"
+            }
+
+            $utcNow = [DateTimeOffset]::UtcNow
+            $isoStamp = $utcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+            $fallbackStamp = $utcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'")
+            $replacement = "<time id=`"hosted-build`" data-build-id=`"$builtHash`" datetime=`"$isoStamp`">$fallbackStamp</time>"
+            $page = [regex]::Replace($page, $pattern, $replacement, 1)
+            Set-Content -Path $pagePath -Value $page -Encoding utf8NoBOM
+
+            Write-Host "Publishing NoCheatTags.dll: $builtHash"
+          }
+          else {
+            Write-Host "NoCheatTags.dll unchanged ($builtHash); preserving hosted timestamp."
+          }
+
+          git add -- 'valheim/no-cheat-tags/NoCheatTags.dll' 'valheim/no-cheat-tags/index.html'
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host 'Published No Cheat Tags artifact is already current.'
+            exit 0
+          }
+
+          git commit -m "Publish No Cheat Tags artifact"
+          git push
