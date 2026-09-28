@@ -188,16 +188,97 @@ namespace Jotunn.Managers
             if (byType != null) return;
             byType = new Dictionary<Type, Dictionary<string, AssetID>>();
             if (!IsReady()) return;
+
+            var pathsByType =
+                new Dictionary<Type, Dictionary<string, string>>();
+
             foreach (var pair in Runtime.GetAllAssetPathsInBundleMappedToAssetID())
             {
-                var file = pair.Key.Split('/').Last();
+                var path = (pair.Key ?? string.Empty).Replace('\\', '/');
+                if (path.Equals(
+                        "Assets/UI/prefabs/radials/elements/Hammer.prefab",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    path.Equals(
+                        "Assets/UI/prefabs/Radial/elements/Hammer.prefab",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    // Prefer the real hammer item over the same-named UI prefab.
+                    continue;
+                }
+
+                var file = path.Split('/').Last();
                 var dot = file.LastIndexOf('.');
                 var name = dot > 0 ? file.Substring(0, dot) : file;
-                var ext = dot > 0 ? file.Substring(dot + 1).ToLowerInvariant() : string.Empty;
-                Type type = ext == "prefab" ? typeof(GameObject) : typeof(Object);
-                if (!byType.TryGetValue(type, out var map)) byType[type] = map = new Dictionary<string, AssetID>();
-                if (!map.ContainsKey(name)) map.Add(name, pair.Value);
+                var ext = dot > 0
+                    ? file.Substring(dot + 1).ToLowerInvariant()
+                    : string.Empty;
+                Type type = ext == "prefab"
+                    ? typeof(GameObject)
+                    : typeof(Object);
+
+                if (!byType.TryGetValue(type, out var map))
+                {
+                    byType[type] = map =
+                        new Dictionary<string, AssetID>();
+                }
+
+                if (!pathsByType.TryGetValue(type, out var paths))
+                {
+                    pathsByType[type] = paths =
+                        new Dictionary<string, string>();
+                }
+
+                if (map.ContainsKey(name) &&
+                    paths.TryGetValue(name, out var oldPath) &&
+                    SkipAmbiguousPath(oldPath, path, ext))
+                {
+                    continue;
+                }
+
+                map[name] = pair.Value;
+                paths[name] = path;
             }
+        }
+
+        private static bool SkipAmbiguousPath(
+            string oldPath,
+            string newPath,
+            string extension)
+        {
+            if (!string.Equals(
+                    extension,
+                    "prefab",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (oldPath.StartsWith(
+                    "Assets/world/Locations",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                // Prefer a later non-location prefab with the same short name.
+                return false;
+            }
+
+            if (newPath.StartsWith(
+                    "Assets/world/Locations",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (oldPath.StartsWith(
+                    "Assets/world/Props/DeepNorth",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                // Current Valheim contains new Deep North assets whose names
+                // collide with older vanilla assets. Jotunn 2.30.2 keeps the
+                // later legacy asset for mock resolution in this case.
+                return false;
+            }
+
+            return true;
         }
 
         public void ResolveMocksOnLoad<T>(SoftReference<T> softReference, Transform parent, Action<T> callback) where T : Object
