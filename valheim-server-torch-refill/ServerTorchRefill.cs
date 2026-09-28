@@ -17,7 +17,7 @@ namespace ServerTorchRefillMod
         public const string PluginName = "Server Torch Refill";
         public const string PluginVersion = "1.0.0";
 
-        protected override ModConfig CreateConfigSingleton(ConfigFile configFile, Logger logger)
+        protected override ModConfig CreateConfigSingleton(ConfigFile configFile, ServersideQoL.Logger logger)
             => new ModConfig(configFile, logger);
 
         protected override void RegisterProcessors(IProcessorCollection processors)
@@ -35,7 +35,7 @@ namespace ServerTorchRefillMod
         public ConfigEntry<bool> IncludeAllFireplaces { get; }
         public ConfigEntry<string> LightingNameTokens { get; }
 
-        public ModConfig(ConfigFile cfg, Logger logger) : base(cfg, logger)
+        public ModConfig(ConfigFile cfg, ServersideQoL.Logger logger) : base(cfg, logger)
         {
             Enabled = BindEx(
                 cfg,
