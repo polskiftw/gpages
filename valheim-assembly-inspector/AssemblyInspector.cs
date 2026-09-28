@@ -17,7 +17,7 @@ namespace AssemblyInspectorMod
     {
         public const string PluginGuid = "claire.valheim.assemblyinspector";
         public const string PluginName = "Assembly Inspector";
-        public const string PluginVersion = "1.3.0";
+        public const string PluginVersion = "1.4.0";
         private const string HarmonyId = PluginGuid + ".live-overrides";
         private const string UiHarmonyId = PluginGuid + ".ui-input";
         private const int WindowId = 845112;
@@ -36,6 +36,10 @@ namespace AssemblyInspectorMod
         private static readonly object OverrideLock = new object();
         private static readonly Dictionary<MethodBase, object> RuntimeOverrides =
             new Dictionary<MethodBase, object>();
+        private static readonly Dictionary<MethodBase, Dictionary<int, object>> RuntimeArgumentOverrides =
+            new Dictionary<MethodBase, Dictionary<int, object>>();
+        private static readonly Dictionary<MethodBase, List<FieldMutationPatch>> RuntimeFieldMutations =
+            new Dictionary<MethodBase, List<FieldMutationPatch>>();
 
         private readonly HashSet<MethodInfo> _livePatchedMethods =
             new HashSet<MethodInfo>();
@@ -61,6 +65,12 @@ namespace AssemblyInspectorMod
         private string _returnSearch = string.Empty;
         private string _globalSearch = string.Empty;
         private string _overrideText = string.Empty;
+        private readonly Dictionary<string, string> _argumentOverrideTexts =
+            new Dictionary<string, string>(StringComparer.Ordinal);
+        private string _fieldMutationTargetText = string.Empty;
+        private string _fieldMutationValueText = string.Empty;
+        private string _fieldMutationLastFieldKey = string.Empty;
+        private bool _fieldMutationPostfix;
         private string _status = "Open in game after Valheim has loaded its managed assemblies.";
 
         private bool _visible;
@@ -105,6 +115,31 @@ namespace AssemblyInspectorMod
             Methods,
             Properties,
             Fields
+        }
+
+        private enum FieldMutationSourceKind
+        {
+            Instance,
+            Argument,
+            Static
+        }
+
+        private sealed class ArgumentOverrideSnapshot
+        {
+            public MethodInfo Method;
+            public int ArgumentIndex;
+            public object Value;
+        }
+
+        private sealed class FieldMutationPatch
+        {
+            public MethodInfo Method;
+            public FieldMutationSourceKind SourceKind;
+            public int ArgumentIndex;
+            public FieldInfo Field;
+            public object Value;
+            public bool Postfix;
+            public string TargetPath;
         }
 
         private sealed class GlobalMemberEntry
@@ -685,17 +720,17 @@ namespace AssemblyInspectorMod
             {
                 if (liveOverrideCount == 0)
                 {
-                    _status = "No live overrides are active yet.";
+                    _status = "No live patches are active yet.";
                 }
                 else
                 {
                     GUIUtility.systemCopyBuffer = BuildGeneratedLiveBundle();
-                    _status = "Copied one postfix mod containing " + liveOverrideCount + " live override" +
-                        (liveOverrideCount == 1 ? "." : "s.");
+                    _status = "Copied one standalone mod containing " + liveOverrideCount + " live patch" +
+                        (liveOverrideCount == 1 ? "." : "es.");
                 }
             }
 
-            if (GUILayout.Button("Clear all live overrides", GUILayout.Width(165f)))
+            if (GUILayout.Button("Clear all live patches", GUILayout.Width(165f)))
                 ClearAllOverrides();
 
             GUILayout.FlexibleSpace();
@@ -1034,62 +1069,66 @@ namespace AssemblyInspectorMod
             if (method.ReturnType == typeof(void))
             {
                 GUILayout.Label("This method returns void, so there is no return value to override.");
-                return;
-            }
-
-            string unsupportedReason;
-            bool canLiveOverride = CanOverride(method, out unsupportedReason);
-            if (!canLiveOverride)
-            {
-                GUILayout.Label("Live override unavailable: " + unsupportedReason);
             }
             else
             {
-                DrawOverrideEditor(method);
-            }
-
-            GUILayout.Space(8f);
-            GUILayout.Label("Generated mod source");
-            if (CanGenerateScalarPatch(method.ReturnType))
-            {
-                GUILayout.BeginHorizontal();
-                if (GUILayout.Button("Copy postfix mod"))
+                string unsupportedReason;
+                bool canLiveOverride = CanOverride(method, out unsupportedReason);
+                if (!canLiveOverride)
                 {
-                    object value;
-                    string error;
-                    if (TryParseOverride(method.ReturnType, out value, out error))
-                    {
-                        GUIUtility.systemCopyBuffer = BuildGeneratedMod(method, value, false);
-                        _status = "Postfix override mod copied. Original method still runs.";
-                    }
-                    else
-                    {
-                        _status = error;
-                    }
+                    GUILayout.Label("Live override unavailable: " + unsupportedReason);
+                }
+                else
+                {
+                    DrawOverrideEditor(method);
                 }
 
-                if (GUILayout.Button("Copy hard override mod"))
+                GUILayout.Space(8f);
+                GUILayout.Label("Generated return-override source");
+                if (CanGenerateScalarPatch(method.ReturnType))
                 {
-                    object value;
-                    string error;
-                    if (TryParseOverride(method.ReturnType, out value, out error))
+                    GUILayout.BeginHorizontal();
+                    if (GUILayout.Button("Copy postfix mod"))
                     {
-                        GUIUtility.systemCopyBuffer = BuildGeneratedMod(method, value, true);
-                        _status = "Hard override mod copied. Original method is skipped.";
+                        object value;
+                        string error;
+                        if (TryParseOverride(method.ReturnType, out value, out error))
+                        {
+                            GUIUtility.systemCopyBuffer = BuildGeneratedMod(method, value, false);
+                            _status = "Postfix override mod copied. Original method still runs.";
+                        }
+                        else
+                        {
+                            _status = error;
+                        }
                     }
-                    else
-                    {
-                        _status = error;
-                    }
-                }
-                GUILayout.EndHorizontal();
 
-                GUILayout.Label("Postfix is the safer default: Valheim runs the original method, then the return value is replaced. Hard override sets the result and skips the original method completely.");
+                    if (GUILayout.Button("Copy hard override mod"))
+                    {
+                        object value;
+                        string error;
+                        if (TryParseOverride(method.ReturnType, out value, out error))
+                        {
+                            GUIUtility.systemCopyBuffer = BuildGeneratedMod(method, value, true);
+                            _status = "Hard override mod copied. Original method is skipped.";
+                        }
+                        else
+                        {
+                            _status = error;
+                        }
+                    }
+                    GUILayout.EndHorizontal();
+
+                    GUILayout.Label("Postfix is the safer default: Valheim runs the original method, then the return value is replaced. Hard override sets the result and skips the original method completely.");
+                }
+                else
+                {
+                    GUILayout.Label("Automatic ready-to-build source is limited to bool, string, char, enum, decimal, and primitive numeric return types.");
+                }
             }
-            else
-            {
-                GUILayout.Label("Automatic ready-to-build source is limited to bool, string, char, enum, decimal, and primitive numeric return types.");
-            }
+
+            DrawArgumentOverrideEditor(method);
+            DrawFieldMutationEditor(method);
         }
 
         private void DrawOverrideEditor(MethodInfo method)
@@ -1134,6 +1173,191 @@ namespace AssemblyInspectorMod
                 RemoveLiveOverride(method);
 
             GUILayout.Label("Live overrides use a Harmony postfix: the original method still executes, but callers receive the forced value.");
+        }
+
+
+        private void DrawArgumentOverrideEditor(MethodInfo method)
+        {
+            GUILayout.Space(14f);
+            GUILayout.Label("Argument overrides");
+
+            ParameterInfo[] parameters = method.GetParameters();
+            if (parameters.Length == 0)
+            {
+                GUILayout.Label("This method has no arguments to override.");
+                return;
+            }
+
+            bool showedAny = false;
+
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                string reason;
+                if (!CanOverrideArgument(method, i, out reason))
+                    continue;
+
+                showedAny = true;
+                ParameterInfo parameter = parameters[i];
+                Type valueType = ParameterValueType(parameter);
+                string key = MethodIdentity(method) + "|arg:" + i;
+
+                string textValue;
+                if (!_argumentOverrideTexts.TryGetValue(key, out textValue))
+                    textValue = DefaultOverrideText(valueType);
+
+                bool active = IsArgumentOverrideActive(method, i);
+                GUILayout.Space(5f);
+                GUILayout.Label("[" + i + "] " + FriendlyType(parameter.ParameterType) + " " + parameter.Name +
+                    (active ? "   LIVE: " + FormatValue(GetCurrentArgumentOverride(method, i)) : string.Empty));
+
+                GUILayout.BeginHorizontal();
+                textValue = GUILayout.TextField(textValue ?? string.Empty);
+                _argumentOverrideTexts[key] = textValue;
+
+                if (GUILayout.Button("Apply live", GUILayout.Width(92f)))
+                {
+                    object value;
+                    string error;
+                    if (TryParseScalarValue(valueType, textValue, out value, out error))
+                        ApplyLiveArgumentOverride(method, i, value);
+                    else
+                        _status = error;
+                }
+
+                if (GUILayout.Button("Copy argument mod", GUILayout.Width(142f)))
+                {
+                    object value;
+                    string error;
+                    if (TryParseScalarValue(valueType, textValue, out value, out error))
+                    {
+                        GUIUtility.systemCopyBuffer = BuildGeneratedArgumentMod(method, i, value);
+                        _status = "Argument override mod copied.";
+                    }
+                    else
+                    {
+                        _status = error;
+                    }
+                }
+
+                if (active && GUILayout.Button("Remove live", GUILayout.Width(100f)))
+                    RemoveLiveArgumentOverride(method, i);
+
+                GUILayout.EndHorizontal();
+            }
+
+            if (!showedAny)
+                GUILayout.Label("No scalar arguments on this method can be safely overridden automatically.");
+            else
+                GUILayout.Label("Argument overrides use a Harmony prefix and replace the selected argument before Valheim receives it.");
+        }
+
+        private void DrawFieldMutationEditor(MethodInfo method)
+        {
+            GUILayout.Space(14f);
+            GUILayout.Label("Field mutation patch");
+            GUILayout.Label("Target one field on this method's instance or one object argument, for example: this.m_cheated or item.m_cheated");
+
+            if (string.IsNullOrEmpty(_fieldMutationTargetText))
+                _fieldMutationTargetText = DefaultFieldMutationTarget(method);
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Target:", GUILayout.Width(58f));
+            _fieldMutationTargetText = GUILayout.TextField(_fieldMutationTargetText ?? string.Empty);
+            GUILayout.EndHorizontal();
+
+            FieldMutationPatch target;
+            string error;
+            if (!TryResolveFieldMutationTarget(method, _fieldMutationTargetText, out target, out error))
+            {
+                GUILayout.Label("Not ready: " + error);
+                return;
+            }
+
+            string fieldKey = MethodIdentity(method) + "|" + FieldMutationIdentity(target);
+            if (!string.Equals(_fieldMutationLastFieldKey, fieldKey, StringComparison.Ordinal))
+            {
+                _fieldMutationLastFieldKey = fieldKey;
+                _fieldMutationValueText = DefaultOverrideText(target.Field.FieldType);
+            }
+
+            DetailLine("Resolved field", (target.Field.DeclaringType == null ? string.Empty : target.Field.DeclaringType.FullName) +
+                "." + target.Field.Name);
+            DetailLine("Field type", FriendlyType(target.Field.FieldType));
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Value:", GUILayout.Width(58f));
+            _fieldMutationValueText = GUILayout.TextField(_fieldMutationValueText ?? string.Empty);
+            GUILayout.EndHorizontal();
+
+            _fieldMutationPostfix = GUILayout.Toggle(
+                _fieldMutationPostfix,
+                "Run after the original method (postfix). Off = mutate before it runs (prefix).");
+            target.Postfix = _fieldMutationPostfix;
+
+            FieldMutationPatch active = GetCurrentFieldMutation(method, target);
+            if (active != null)
+                GUILayout.Label("LIVE FIELD MUTATION ACTIVE: " + FormatValue(active.Value));
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Apply live"))
+            {
+                object value;
+                if (TryParseScalarValue(target.Field.FieldType, _fieldMutationValueText, out value, out error))
+                {
+                    target.Value = value;
+                    ApplyLiveFieldMutation(target);
+                }
+                else
+                {
+                    _status = error;
+                }
+            }
+
+            if (GUILayout.Button("Copy field-mutation mod"))
+            {
+                object value;
+                if (TryParseScalarValue(target.Field.FieldType, _fieldMutationValueText, out value, out error))
+                {
+                    GUIUtility.systemCopyBuffer = BuildGeneratedFieldMutationMod(
+                        method,
+                        _fieldMutationTargetText,
+                        value,
+                        _fieldMutationPostfix);
+                    _status = "Field mutation mod copied.";
+                }
+                else
+                {
+                    _status = error;
+                }
+            }
+
+            if (active != null && GUILayout.Button("Remove live"))
+                RemoveLiveFieldMutation(method, target);
+
+            GUILayout.EndHorizontal();
+
+            GUILayout.Label(_fieldMutationPostfix
+                ? "Postfix field mutation runs after Valheim finishes the method; useful for clearing a field that the method just loaded or created."
+                : "Prefix field mutation runs before Valheim enters the method; useful for sanitizing an object before it is saved or consumed.");
+        }
+
+        private static string DefaultFieldMutationTarget(MethodInfo method)
+        {
+            if (method == null)
+                return string.Empty;
+
+            if (!method.IsStatic)
+                return "this.";
+
+            ParameterInfo[] parameters = method.GetParameters();
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                Type type = ParameterValueType(parameters[i]);
+                if (type != null && !type.IsValueType && !type.IsPointer && type != typeof(string))
+                    return (parameters[i].Name ?? ("arg" + i)) + ".";
+            }
+
+            return string.Empty;
         }
 
         private void DrawFieldDetails(FieldInfo field)
@@ -1422,6 +1646,10 @@ namespace AssemblyInspectorMod
             _selectedProperty = null;
             _selectedField = null;
             _overrideText = string.Empty;
+            _fieldMutationTargetText = string.Empty;
+            _fieldMutationValueText = string.Empty;
+            _fieldMutationLastFieldKey = string.Empty;
+            _fieldMutationPostfix = false;
         }
 
         private void SelectMethod(MethodInfo method)
@@ -1430,6 +1658,10 @@ namespace AssemblyInspectorMod
             _selectedProperty = null;
             _selectedField = null;
             _overrideText = DefaultOverrideText(method.ReturnType);
+            _fieldMutationTargetText = DefaultFieldMutationTarget(method);
+            _fieldMutationValueText = string.Empty;
+            _fieldMutationLastFieldKey = string.Empty;
+            _fieldMutationPostfix = false;
             _detailScroll = Vector2.zero;
         }
 
@@ -1439,6 +1671,10 @@ namespace AssemblyInspectorMod
             _selectedField = null;
             _selectedMethod = property.GetGetMethod(true);
             _overrideText = _selectedMethod == null ? string.Empty : DefaultOverrideText(_selectedMethod.ReturnType);
+            _fieldMutationTargetText = DefaultFieldMutationTarget(_selectedMethod);
+            _fieldMutationValueText = string.Empty;
+            _fieldMutationLastFieldKey = string.Empty;
+            _fieldMutationPostfix = false;
             _detailScroll = Vector2.zero;
 
             if (_selectedMethod == null)
@@ -1451,6 +1687,10 @@ namespace AssemblyInspectorMod
             _selectedMethod = null;
             _selectedProperty = null;
             _overrideText = string.Empty;
+            _fieldMutationTargetText = string.Empty;
+            _fieldMutationValueText = string.Empty;
+            _fieldMutationLastFieldKey = string.Empty;
+            _fieldMutationPostfix = false;
             _detailScroll = Vector2.zero;
         }
 
@@ -1520,28 +1760,19 @@ namespace AssemblyInspectorMod
                 return;
             }
 
+            lock (OverrideLock)
+                RuntimeOverrides[method] = value;
+
             try
             {
-                if (!_livePatchedMethods.Contains(method))
-                {
-                    MethodInfo factory = typeof(AssemblyInspector).GetMethod(
-                        nameof(LivePostfixFactory),
-                        BindingFlags.Static | BindingFlags.NonPublic);
-
-                    if (factory == null)
-                        throw new MissingMethodException(typeof(AssemblyInspector).FullName, nameof(LivePostfixFactory));
-
-                    _harmony.Patch(method, postfix: new HarmonyMethod(factory));
-                    _livePatchedMethods.Add(method);
-                }
-
-                lock (OverrideLock)
-                    RuntimeOverrides[method] = value;
-
+                RefreshLivePatches(method);
                 _status = FormatMethodShort(method) + " now returns " + FormatValue(value) + " to callers.";
             }
             catch (Exception ex)
             {
+                lock (OverrideLock)
+                    RuntimeOverrides.Remove(method);
+                try { RefreshLivePatches(method); } catch { }
                 _status = "Patch failed: " + ex.GetType().Name + ": " + ex.Message;
                 Logger.LogWarning(_status);
             }
@@ -1551,16 +1782,224 @@ namespace AssemblyInspectorMod
         {
             try
             {
-                _harmony.Unpatch(method, HarmonyPatchType.Postfix, HarmonyId);
-                _livePatchedMethods.Remove(method);
                 lock (OverrideLock)
                     RuntimeOverrides.Remove(method);
-                _status = "Removed live override from " + FormatMethodShort(method) + ".";
+                RefreshLivePatches(method);
+                _status = "Removed live return override from " + FormatMethodShort(method) + ".";
             }
             catch (Exception ex)
             {
                 _status = "Unpatch failed: " + ex.GetType().Name + ": " + ex.Message;
             }
+        }
+
+        private void ApplyLiveArgumentOverride(MethodInfo method, int argumentIndex, object value)
+        {
+            string reason;
+            if (!CanOverrideArgument(method, argumentIndex, out reason))
+            {
+                _status = "Cannot override argument: " + reason;
+                return;
+            }
+
+            lock (OverrideLock)
+            {
+                Dictionary<int, object> entries;
+                if (!RuntimeArgumentOverrides.TryGetValue(method, out entries))
+                {
+                    entries = new Dictionary<int, object>();
+                    RuntimeArgumentOverrides[method] = entries;
+                }
+                entries[argumentIndex] = value;
+            }
+
+            try
+            {
+                RefreshLivePatches(method);
+                ParameterInfo parameter = method.GetParameters()[argumentIndex];
+                _status = FormatMethodShort(method) + " argument '" + parameter.Name + "' now receives " + FormatValue(value) + ".";
+            }
+            catch (Exception ex)
+            {
+                lock (OverrideLock)
+                {
+                    Dictionary<int, object> entries;
+                    if (RuntimeArgumentOverrides.TryGetValue(method, out entries))
+                    {
+                        entries.Remove(argumentIndex);
+                        if (entries.Count == 0)
+                            RuntimeArgumentOverrides.Remove(method);
+                    }
+                }
+                try { RefreshLivePatches(method); } catch { }
+                _status = "Argument patch failed: " + ex.GetType().Name + ": " + ex.Message;
+                Logger.LogWarning(_status);
+            }
+        }
+
+        private void RemoveLiveArgumentOverride(MethodInfo method, int argumentIndex)
+        {
+            lock (OverrideLock)
+            {
+                Dictionary<int, object> entries;
+                if (RuntimeArgumentOverrides.TryGetValue(method, out entries))
+                {
+                    entries.Remove(argumentIndex);
+                    if (entries.Count == 0)
+                        RuntimeArgumentOverrides.Remove(method);
+                }
+            }
+
+            try
+            {
+                RefreshLivePatches(method);
+                _status = "Removed live argument override from " + FormatMethodShort(method) + ".";
+            }
+            catch (Exception ex)
+            {
+                _status = "Unpatch failed: " + ex.GetType().Name + ": " + ex.Message;
+            }
+        }
+
+        private void ApplyLiveFieldMutation(FieldMutationPatch patch)
+        {
+            if (patch == null || patch.Method == null || patch.Field == null)
+            {
+                _status = "Cannot apply field mutation: target is incomplete.";
+                return;
+            }
+
+            FieldMutationPatch stored = new FieldMutationPatch
+            {
+                Method = patch.Method,
+                SourceKind = patch.SourceKind,
+                ArgumentIndex = patch.ArgumentIndex,
+                Field = patch.Field,
+                Value = patch.Value,
+                Postfix = patch.Postfix,
+                TargetPath = patch.TargetPath
+            };
+
+            lock (OverrideLock)
+            {
+                List<FieldMutationPatch> entries;
+                if (!RuntimeFieldMutations.TryGetValue(patch.Method, out entries))
+                {
+                    entries = new List<FieldMutationPatch>();
+                    RuntimeFieldMutations[patch.Method] = entries;
+                }
+
+                entries.RemoveAll(existing => FieldMutationMatches(existing, stored));
+                entries.Add(stored);
+            }
+
+            try
+            {
+                RefreshLivePatches(patch.Method);
+                _status = (patch.Postfix ? "Postfix" : "Prefix") + " field mutation active: " +
+                    patch.TargetPath + " = " + FormatValue(patch.Value) + ".";
+            }
+            catch (Exception ex)
+            {
+                lock (OverrideLock)
+                {
+                    List<FieldMutationPatch> entries;
+                    if (RuntimeFieldMutations.TryGetValue(patch.Method, out entries))
+                    {
+                        entries.RemoveAll(existing => FieldMutationMatches(existing, stored));
+                        if (entries.Count == 0)
+                            RuntimeFieldMutations.Remove(patch.Method);
+                    }
+                }
+                try { RefreshLivePatches(patch.Method); } catch { }
+                _status = "Field mutation patch failed: " + ex.GetType().Name + ": " + ex.Message;
+                Logger.LogWarning(_status);
+            }
+        }
+
+        private void RemoveLiveFieldMutation(MethodInfo method, FieldMutationPatch patch)
+        {
+            lock (OverrideLock)
+            {
+                List<FieldMutationPatch> entries;
+                if (RuntimeFieldMutations.TryGetValue(method, out entries))
+                {
+                    entries.RemoveAll(existing => FieldMutationMatches(existing, patch));
+                    if (entries.Count == 0)
+                        RuntimeFieldMutations.Remove(method);
+                }
+            }
+
+            try
+            {
+                RefreshLivePatches(method);
+                _status = "Removed live field mutation from " + FormatMethodShort(method) + ".";
+            }
+            catch (Exception ex)
+            {
+                _status = "Unpatch failed: " + ex.GetType().Name + ": " + ex.Message;
+            }
+        }
+
+        private void RefreshLivePatches(MethodInfo method)
+        {
+            _harmony.Unpatch(method, HarmonyPatchType.Prefix, HarmonyId);
+            _harmony.Unpatch(method, HarmonyPatchType.Postfix, HarmonyId);
+
+            bool patched = false;
+
+            if (IsOverrideActive(method))
+            {
+                MethodInfo factory = typeof(AssemblyInspector).GetMethod(
+                    nameof(LivePostfixFactory),
+                    BindingFlags.Static | BindingFlags.NonPublic);
+                if (factory == null)
+                    throw new MissingMethodException(typeof(AssemblyInspector).FullName, nameof(LivePostfixFactory));
+
+                _harmony.Patch(method, postfix: new HarmonyMethod(factory));
+                patched = true;
+            }
+
+            if (HasArgumentOverride(method) || HasFieldMutation(method, false, false))
+            {
+                MethodInfo prefix = typeof(AssemblyInspector).GetMethod(
+                    nameof(LiveArgumentAndFieldPrefix),
+                    BindingFlags.Static | BindingFlags.NonPublic);
+                _harmony.Patch(method, prefix: new HarmonyMethod(prefix));
+                patched = true;
+            }
+
+            if (HasFieldMutation(method, true, false))
+            {
+                MethodInfo postfix = typeof(AssemblyInspector).GetMethod(
+                    nameof(LiveArgumentAndFieldPostfix),
+                    BindingFlags.Static | BindingFlags.NonPublic);
+                _harmony.Patch(method, postfix: new HarmonyMethod(postfix));
+                patched = true;
+            }
+
+            if (!method.IsStatic && HasFieldMutation(method, false, true))
+            {
+                MethodInfo prefix = typeof(AssemblyInspector).GetMethod(
+                    nameof(LiveInstanceFieldPrefix),
+                    BindingFlags.Static | BindingFlags.NonPublic);
+                _harmony.Patch(method, prefix: new HarmonyMethod(prefix));
+                patched = true;
+            }
+
+            if (!method.IsStatic && HasFieldMutation(method, true, true))
+            {
+                MethodInfo postfix = typeof(AssemblyInspector).GetMethod(
+                    nameof(LiveInstanceFieldPostfix),
+                    BindingFlags.Static | BindingFlags.NonPublic);
+                _harmony.Patch(method, postfix: new HarmonyMethod(postfix));
+                patched = true;
+            }
+
+            if (patched)
+                _livePatchedMethods.Add(method);
+            else
+                _livePatchedMethods.Remove(method);
         }
 
         private void ClearAllOverrides()
@@ -1571,14 +2010,128 @@ namespace AssemblyInspectorMod
             }
             catch (Exception ex)
             {
-                Logger.LogWarning("Could not unpatch all Assembly Inspector overrides: " + ex.Message);
+                Logger.LogWarning("Could not unpatch all Assembly Inspector live patches: " + ex.Message);
             }
 
             _livePatchedMethods.Clear();
             lock (OverrideLock)
+            {
                 RuntimeOverrides.Clear();
+                RuntimeArgumentOverrides.Clear();
+                RuntimeFieldMutations.Clear();
+            }
 
-            _status = "Cleared all live return overrides.";
+            _status = "Cleared all live patches.";
+        }
+
+        private static void LiveArgumentAndFieldPrefix(MethodBase __originalMethod, object[] __args)
+        {
+            Dictionary<int, object> argumentOverrides = null;
+            List<FieldMutationPatch> fieldMutations = null;
+
+            lock (OverrideLock)
+            {
+                Dictionary<int, object> storedArguments;
+                if (RuntimeArgumentOverrides.TryGetValue(__originalMethod, out storedArguments))
+                    argumentOverrides = new Dictionary<int, object>(storedArguments);
+
+                List<FieldMutationPatch> storedFields;
+                if (RuntimeFieldMutations.TryGetValue(__originalMethod, out storedFields))
+                    fieldMutations = storedFields
+                        .Where(patch => !patch.Postfix && patch.SourceKind != FieldMutationSourceKind.Instance)
+                        .ToList();
+            }
+
+            if (argumentOverrides != null && __args != null)
+            {
+                foreach (KeyValuePair<int, object> entry in argumentOverrides)
+                {
+                    if (entry.Key >= 0 && entry.Key < __args.Length)
+                        __args[entry.Key] = entry.Value;
+                }
+            }
+
+            ApplyNonInstanceFieldMutations(fieldMutations, __args);
+        }
+
+        private static void LiveArgumentAndFieldPostfix(MethodBase __originalMethod, object[] __args)
+        {
+            List<FieldMutationPatch> fieldMutations = null;
+            lock (OverrideLock)
+            {
+                List<FieldMutationPatch> storedFields;
+                if (RuntimeFieldMutations.TryGetValue(__originalMethod, out storedFields))
+                    fieldMutations = storedFields
+                        .Where(patch => patch.Postfix && patch.SourceKind != FieldMutationSourceKind.Instance)
+                        .ToList();
+            }
+
+            ApplyNonInstanceFieldMutations(fieldMutations, __args);
+        }
+
+        private static void LiveInstanceFieldPrefix(MethodBase __originalMethod, object __instance)
+        {
+            ApplyInstanceFieldMutations(__originalMethod, __instance, false);
+        }
+
+        private static void LiveInstanceFieldPostfix(MethodBase __originalMethod, object __instance)
+        {
+            ApplyInstanceFieldMutations(__originalMethod, __instance, true);
+        }
+
+        private static void ApplyInstanceFieldMutations(MethodBase method, object instance, bool postfix)
+        {
+            List<FieldMutationPatch> mutations = null;
+            lock (OverrideLock)
+            {
+                List<FieldMutationPatch> stored;
+                if (RuntimeFieldMutations.TryGetValue(method, out stored))
+                    mutations = stored
+                        .Where(patch => patch.Postfix == postfix && patch.SourceKind == FieldMutationSourceKind.Instance)
+                        .ToList();
+            }
+
+            if (mutations == null)
+                return;
+
+            foreach (FieldMutationPatch patch in mutations)
+                TrySetRuntimeField(patch, instance);
+        }
+
+        private static void ApplyNonInstanceFieldMutations(List<FieldMutationPatch> mutations, object[] args)
+        {
+            if (mutations == null)
+                return;
+
+            foreach (FieldMutationPatch patch in mutations)
+            {
+                object target = null;
+                if (patch.SourceKind == FieldMutationSourceKind.Argument &&
+                    args != null &&
+                    patch.ArgumentIndex >= 0 &&
+                    patch.ArgumentIndex < args.Length)
+                {
+                    target = args[patch.ArgumentIndex];
+                }
+
+                TrySetRuntimeField(patch, target);
+            }
+        }
+
+        private static void TrySetRuntimeField(FieldMutationPatch patch, object target)
+        {
+            try
+            {
+                if (patch.Field.IsStatic)
+                    patch.Field.SetValue(null, patch.Value);
+                else if (target != null)
+                    patch.Field.SetValue(target, patch.Value);
+            }
+            catch (Exception ex)
+            {
+                if (_instance != null)
+                    _instance.Logger.LogWarning("Live field mutation failed for " + patch.TargetPath + ": " + ex.Message);
+            }
         }
 
         private static DynamicMethod LivePostfixFactory(MethodBase originalMethod)
@@ -1654,10 +2207,85 @@ namespace AssemblyInspectorMod
             }
         }
 
+        private static bool IsArgumentOverrideActive(MethodInfo method, int argumentIndex)
+        {
+            lock (OverrideLock)
+            {
+                Dictionary<int, object> entries;
+                return RuntimeArgumentOverrides.TryGetValue(method, out entries) &&
+                       entries.ContainsKey(argumentIndex);
+            }
+        }
+
+        private static object GetCurrentArgumentOverride(MethodInfo method, int argumentIndex)
+        {
+            lock (OverrideLock)
+            {
+                Dictionary<int, object> entries;
+                object value;
+                return RuntimeArgumentOverrides.TryGetValue(method, out entries) &&
+                       entries.TryGetValue(argumentIndex, out value)
+                    ? value
+                    : null;
+            }
+        }
+
+        private static FieldMutationPatch GetCurrentFieldMutation(MethodInfo method, FieldMutationPatch target)
+        {
+            lock (OverrideLock)
+            {
+                List<FieldMutationPatch> entries;
+                if (!RuntimeFieldMutations.TryGetValue(method, out entries))
+                    return null;
+
+                return entries.FirstOrDefault(existing => FieldMutationMatches(existing, target));
+            }
+        }
+
+        private static bool HasArgumentOverride(MethodInfo method)
+        {
+            lock (OverrideLock)
+            {
+                Dictionary<int, object> entries;
+                return RuntimeArgumentOverrides.TryGetValue(method, out entries) && entries.Count != 0;
+            }
+        }
+
+        private static bool HasFieldMutation(MethodInfo method, bool postfix, bool instanceSource)
+        {
+            lock (OverrideLock)
+            {
+                List<FieldMutationPatch> entries;
+                if (!RuntimeFieldMutations.TryGetValue(method, out entries))
+                    return false;
+
+                return entries.Any(patch =>
+                    patch.Postfix == postfix &&
+                    (instanceSource
+                        ? patch.SourceKind == FieldMutationSourceKind.Instance
+                        : patch.SourceKind != FieldMutationSourceKind.Instance));
+            }
+        }
+
+        private static bool FieldMutationMatches(FieldMutationPatch left, FieldMutationPatch right)
+        {
+            return left != null &&
+                   right != null &&
+                   left.Postfix == right.Postfix &&
+                   left.SourceKind == right.SourceKind &&
+                   left.ArgumentIndex == right.ArgumentIndex &&
+                   Equals(left.Field, right.Field);
+        }
+
         private static int GetLiveOverrideCount()
         {
             lock (OverrideLock)
-                return RuntimeOverrides.Count;
+            {
+                int count = RuntimeOverrides.Count;
+                count += RuntimeArgumentOverrides.Values.Sum(entries => entries.Count);
+                count += RuntimeFieldMutations.Values.Sum(entries => entries.Count);
+                return count;
+            }
         }
 
         private static List<KeyValuePair<MethodInfo, object>> GetLiveOverrideSnapshot()
@@ -1667,11 +2295,49 @@ namespace AssemblyInspectorMod
                 return RuntimeOverrides
                     .Where(pair => pair.Key is MethodInfo)
                     .Select(pair => new KeyValuePair<MethodInfo, object>((MethodInfo)pair.Key, pair.Value))
-                    .OrderBy(pair => pair.Key.DeclaringType == null ? string.Empty : pair.Key.DeclaringType.FullName, StringComparer.Ordinal)
-                    .ThenBy(pair => pair.Key.Name, StringComparer.Ordinal)
-                    .ThenBy(pair => string.Join(",", pair.Key.GetParameters()
-                        .Select(parameter => ReflectionTypeIdentity(parameter.ParameterType))
-                        .ToArray()), StringComparer.Ordinal)
+                    .OrderBy(pair => MethodIdentity(pair.Key), StringComparer.Ordinal)
+                    .ToList();
+            }
+        }
+
+        private static List<ArgumentOverrideSnapshot> GetLiveArgumentOverrideSnapshot()
+        {
+            lock (OverrideLock)
+            {
+                List<ArgumentOverrideSnapshot> result = new List<ArgumentOverrideSnapshot>();
+                foreach (KeyValuePair<MethodBase, Dictionary<int, object>> methodEntry in RuntimeArgumentOverrides)
+                {
+                    MethodInfo method = methodEntry.Key as MethodInfo;
+                    if (method == null)
+                        continue;
+
+                    foreach (KeyValuePair<int, object> entry in methodEntry.Value)
+                    {
+                        result.Add(new ArgumentOverrideSnapshot
+                        {
+                            Method = method,
+                            ArgumentIndex = entry.Key,
+                            Value = entry.Value
+                        });
+                    }
+                }
+
+                return result
+                    .OrderBy(entry => MethodIdentity(entry.Method), StringComparer.Ordinal)
+                    .ThenBy(entry => entry.ArgumentIndex)
+                    .ToList();
+            }
+        }
+
+        private static List<FieldMutationPatch> GetLiveFieldMutationSnapshot()
+        {
+            lock (OverrideLock)
+            {
+                return RuntimeFieldMutations.Values
+                    .SelectMany(entries => entries)
+                    .OrderBy(entry => MethodIdentity(entry.Method), StringComparer.Ordinal)
+                    .ThenBy(entry => entry.Postfix)
+                    .ThenBy(entry => entry.TargetPath, StringComparer.Ordinal)
                     .ToList();
             }
         }
@@ -1720,9 +2386,229 @@ namespace AssemblyInspectorMod
             return true;
         }
 
+        private static bool CanOverrideArgument(MethodInfo method, int argumentIndex, out string reason)
+        {
+            if (method == null)
+            {
+                reason = "no method selected";
+                return false;
+            }
+
+            if (method.IsAbstract)
+            {
+                reason = "method is abstract";
+                return false;
+            }
+
+            if (method.ContainsGenericParameters)
+            {
+                reason = "open generic methods are not supported";
+                return false;
+            }
+
+            ParameterInfo[] parameters = method.GetParameters();
+            if (argumentIndex < 0 || argumentIndex >= parameters.Length)
+            {
+                reason = "argument index is out of range";
+                return false;
+            }
+
+            Type type = ParameterValueType(parameters[argumentIndex]);
+            if (type == null || type.IsPointer || type.ContainsGenericParameters)
+            {
+                reason = "pointer/open-generic arguments are not supported";
+                return false;
+            }
+
+            if (!CanGenerateScalarPatch(type))
+            {
+                reason = "automatic argument overrides are limited to scalar values";
+                return false;
+            }
+
+            reason = string.Empty;
+            return true;
+        }
+
+        private static Type ParameterValueType(ParameterInfo parameter)
+        {
+            if (parameter == null)
+                return null;
+
+            Type type = parameter.ParameterType;
+            return type.IsByRef ? type.GetElementType() : type;
+        }
+
+        private static bool TryResolveFieldMutationTarget(
+            MethodInfo method,
+            string targetPath,
+            out FieldMutationPatch patch,
+            out string error)
+        {
+            patch = null;
+            string raw = (targetPath ?? string.Empty).Trim();
+
+            if (method == null)
+            {
+                error = "no method selected";
+                return false;
+            }
+
+            if (method.IsAbstract || method.ContainsGenericParameters)
+            {
+                error = "abstract/open-generic methods cannot be patched";
+                return false;
+            }
+
+            int dot = raw.IndexOf('.');
+            if (dot <= 0 || dot == raw.Length - 1 || raw.IndexOf('.', dot + 1) >= 0)
+            {
+                error = "enter one-level path such as this.m_cheated or item.m_cheated";
+                return false;
+            }
+
+            string owner = raw.Substring(0, dot).Trim();
+            string fieldName = raw.Substring(dot + 1).Trim();
+            Type sourceType;
+            FieldMutationSourceKind sourceKind;
+            int argumentIndex = -1;
+
+            if (string.Equals(owner, "this", StringComparison.Ordinal))
+            {
+                if (method.IsStatic)
+                {
+                    error = "this is unavailable on a static method";
+                    return false;
+                }
+
+                sourceType = method.DeclaringType;
+                sourceKind = FieldMutationSourceKind.Instance;
+            }
+            else
+            {
+                ParameterInfo[] parameters = method.GetParameters();
+                argumentIndex = -1;
+
+                for (int i = 0; i < parameters.Length; i++)
+                {
+                    if (string.Equals(parameters[i].Name, owner, StringComparison.Ordinal))
+                    {
+                        argumentIndex = i;
+                        break;
+                    }
+                }
+
+                if (argumentIndex < 0 && owner.StartsWith("arg", StringComparison.OrdinalIgnoreCase))
+                {
+                    int parsed;
+                    if (int.TryParse(owner.Substring(3), NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed) &&
+                        parsed >= 0 &&
+                        parsed < parameters.Length)
+                    {
+                        argumentIndex = parsed;
+                    }
+                }
+
+                if (argumentIndex < 0)
+                {
+                    error = "left side must be this, a parameter name, or argN";
+                    return false;
+                }
+
+                sourceType = ParameterValueType(parameters[argumentIndex]);
+                sourceKind = FieldMutationSourceKind.Argument;
+            }
+
+            if (sourceType == null || sourceType.IsPointer)
+            {
+                error = "field source type is unsupported";
+                return false;
+            }
+
+            FieldInfo field = FindFieldInHierarchy(sourceType, fieldName);
+            if (field == null)
+            {
+                error = "field '" + fieldName + "' was not found on " + FriendlyType(sourceType);
+                return false;
+            }
+
+            if (field.IsLiteral || field.IsInitOnly)
+            {
+                error = "constant/readonly fields are not writable";
+                return false;
+            }
+
+            if (!CanGenerateScalarPatch(field.FieldType))
+            {
+                error = "automatic field mutation is limited to scalar field types";
+                return false;
+            }
+
+            if (!field.IsStatic && sourceType.IsValueType)
+            {
+                error = "instance fields on value-type arguments are not supported";
+                return false;
+            }
+
+            if (field.IsStatic)
+            {
+                sourceKind = FieldMutationSourceKind.Static;
+                argumentIndex = -1;
+            }
+
+            patch = new FieldMutationPatch
+            {
+                Method = method,
+                SourceKind = sourceKind,
+                ArgumentIndex = argumentIndex,
+                Field = field,
+                Value = null,
+                Postfix = false,
+                TargetPath = raw
+            };
+
+            error = string.Empty;
+            return true;
+        }
+
+        private static FieldInfo FindFieldInHierarchy(Type type, string fieldName)
+        {
+            for (Type current = type; current != null; current = current.BaseType)
+            {
+                FieldInfo field = current.GetField(
+                    fieldName,
+                    BindingFlags.Instance | BindingFlags.Static |
+                    BindingFlags.Public | BindingFlags.NonPublic |
+                    BindingFlags.DeclaredOnly);
+                if (field != null)
+                    return field;
+            }
+
+            return null;
+        }
+
+        private static string FieldMutationIdentity(FieldMutationPatch patch)
+        {
+            string declaringType = patch.Field == null || patch.Field.DeclaringType == null
+                ? string.Empty
+                : patch.Field.DeclaringType.FullName;
+
+            return (patch.Postfix ? "post" : "pre") + "|" +
+                   patch.SourceKind + "|" +
+                   patch.ArgumentIndex + "|" +
+                   declaringType + "|" +
+                   (patch.Field == null ? string.Empty : patch.Field.Name);
+        }
+
         private bool TryParseOverride(Type type, out object value, out string error)
         {
-            string raw = (_overrideText ?? string.Empty).Trim();
+            return TryParseScalarValue(type, _overrideText, out value, out error);
+        }
+
+        private static bool TryParseScalarValue(Type type, string input, out object value, out string error)
+        {
+            string rawInput = input ?? string.Empty;
+            string raw = rawInput.Trim();
 
             if (type == typeof(bool))
             {
@@ -1741,16 +2627,16 @@ namespace AssemblyInspectorMod
 
             if (type == typeof(string))
             {
-                value = _overrideText ?? string.Empty;
+                value = rawInput;
                 error = string.Empty;
                 return true;
             }
 
             if (type == typeof(char))
             {
-                if ((_overrideText ?? string.Empty).Length == 1)
+                if (rawInput.Length == 1)
                 {
-                    value = _overrideText[0];
+                    value = rawInput[0];
                     error = string.Empty;
                     return true;
                 }
@@ -1822,20 +2708,97 @@ namespace AssemblyInspectorMod
 
         private static string BuildGeneratedLiveBundle()
         {
-            List<KeyValuePair<MethodInfo, object>> overrides = GetLiveOverrideSnapshot();
-            if (overrides.Count == 0)
-                throw new InvalidOperationException("No live overrides are active.");
+            List<KeyValuePair<MethodInfo, object>> returnOverrides = GetLiveOverrideSnapshot();
+            List<ArgumentOverrideSnapshot> argumentOverrides = GetLiveArgumentOverrideSnapshot();
+            List<FieldMutationPatch> fieldMutations = GetLiveFieldMutationSnapshot();
 
-            string bundleId = ComputeLiveBundleId(overrides);
-            string className = "AssemblyInspectorLiveBundle_" + bundleId;
-            string guid = "claire.valheim.generated.livebundle." + bundleId;
-            string pluginName = "Assembly Inspector Bundle " + bundleId;
+            if (returnOverrides.Count + argumentOverrides.Count + fieldMutations.Count == 0)
+                throw new InvalidOperationException("No live patches are active.");
+
+            return BuildGeneratedPatchSource(
+                returnOverrides,
+                argumentOverrides,
+                fieldMutations,
+                true);
+        }
+
+        private static string BuildGeneratedArgumentMod(MethodInfo method, int argumentIndex, object value)
+        {
+            string reason;
+            if (!CanOverrideArgument(method, argumentIndex, out reason))
+                throw new InvalidOperationException(reason);
+
+            return BuildGeneratedPatchSource(
+                new List<KeyValuePair<MethodInfo, object>>(),
+                new List<ArgumentOverrideSnapshot>
+                {
+                    new ArgumentOverrideSnapshot
+                    {
+                        Method = method,
+                        ArgumentIndex = argumentIndex,
+                        Value = value
+                    }
+                },
+                new List<FieldMutationPatch>(),
+                false);
+        }
+
+        private static string BuildGeneratedFieldMutationMod(
+            MethodInfo method,
+            string targetPath,
+            object value,
+            bool postfix)
+        {
+            FieldMutationPatch patch;
+            string error;
+            if (!TryResolveFieldMutationTarget(method, targetPath, out patch, out error))
+                throw new InvalidOperationException(error);
+
+            patch.Value = value;
+            patch.Postfix = postfix;
+
+            return BuildGeneratedPatchSource(
+                new List<KeyValuePair<MethodInfo, object>>(),
+                new List<ArgumentOverrideSnapshot>(),
+                new List<FieldMutationPatch> { patch },
+                false);
+        }
+
+        private static string BuildGeneratedPatchSource(
+            List<KeyValuePair<MethodInfo, object>> returnOverrides,
+            List<ArgumentOverrideSnapshot> argumentOverrides,
+            List<FieldMutationPatch> fieldMutations,
+            bool liveBundle)
+        {
+            returnOverrides = returnOverrides
+                .OrderBy(entry => MethodIdentity(entry.Key), StringComparer.Ordinal)
+                .ToList();
+            argumentOverrides = argumentOverrides
+                .OrderBy(entry => MethodIdentity(entry.Method), StringComparer.Ordinal)
+                .ThenBy(entry => entry.ArgumentIndex)
+                .ToList();
+            fieldMutations = fieldMutations
+                .OrderBy(entry => MethodIdentity(entry.Method), StringComparer.Ordinal)
+                .ThenBy(entry => entry.Postfix)
+                .ThenBy(entry => entry.TargetPath, StringComparer.Ordinal)
+                .ToList();
+
+            int total = returnOverrides.Count + argumentOverrides.Count + fieldMutations.Count;
+            string bundleId = ComputePatchBundleId(returnOverrides, argumentOverrides, fieldMutations);
+            string className = liveBundle
+                ? "AssemblyInspectorLiveBundle_" + bundleId
+                : "AssemblyInspectorGeneratedPatch_" + bundleId;
+            string guid = liveBundle
+                ? "claire.valheim.generated.livebundle." + bundleId
+                : "claire.valheim.generated.patch." + bundleId;
+            string pluginName = liveBundle
+                ? "Assembly Inspector Bundle " + bundleId
+                : "Assembly Inspector Patch " + bundleId;
 
             StringBuilder source = new StringBuilder();
             source.AppendLine("// Generated by Assembly Inspector " + PluginVersion + ".");
-            source.AppendLine("// Contains " + overrides.Count + " active live return override" +
-                (overrides.Count == 1 ? "." : "s."));
-            source.AppendLine("// Deterministic bundle ID: " + bundleId);
+            source.AppendLine("// Contains " + total + " patch" + (total == 1 ? "." : "es."));
+            source.AppendLine("// Deterministic content ID: " + bundleId);
             source.AppendLine("using BepInEx;");
             source.AppendLine("using HarmonyLib;");
             source.AppendLine("using System;");
@@ -1852,47 +2815,55 @@ namespace AssemblyInspectorMod
             source.AppendLine("    {");
             source.AppendLine("        var harmony = new Harmony(PluginGuid);");
 
-            for (int i = 0; i < overrides.Count; i++)
+            for (int i = 0; i < returnOverrides.Count; i++)
             {
-                MethodInfo method = overrides[i].Key;
-                string typeName = method.DeclaringType == null ? string.Empty : method.DeclaringType.FullName;
-                string[] wanted = method.GetParameters()
-                    .Select(parameter => ReflectionTypeIdentity(parameter.ParameterType))
-                    .ToArray();
-
-                source.Append("        harmony.Patch(FindMethod(\"");
-                source.Append(EscapeCSharp(typeName));
-                source.Append("\", \"");
-                source.Append(EscapeCSharp(method.Name));
-                source.Append("\", ");
-                source.Append(method.GetGenericArguments().Length);
-                source.Append(", new string[] { ");
-
-                for (int p = 0; p < wanted.Length; p++)
-                {
-                    if (p != 0) source.Append(", ");
-                    source.Append("\"");
-                    source.Append(EscapeCSharp(wanted[p]));
-                    source.Append("\"");
-                }
-
-                source.Append(" }), postfix: new HarmonyMethod(typeof(");
+                MethodInfo method = returnOverrides[i].Key;
+                source.Append("        harmony.Patch(");
+                source.Append(GeneratedTargetExpression(method));
+                source.Append(", postfix: new HarmonyMethod(typeof(");
                 source.Append(className);
                 source.Append("), nameof(Postfix_");
                 source.Append(i);
                 source.AppendLine(")));");
             }
 
+            for (int i = 0; i < argumentOverrides.Count; i++)
+            {
+                MethodInfo method = argumentOverrides[i].Method;
+                source.Append("        harmony.Patch(");
+                source.Append(GeneratedTargetExpression(method));
+                source.Append(", prefix: new HarmonyMethod(typeof(");
+                source.Append(className);
+                source.Append("), nameof(PrefixArg_");
+                source.Append(i);
+                source.AppendLine(")));");
+            }
+
+            for (int i = 0; i < fieldMutations.Count; i++)
+            {
+                FieldMutationPatch patch = fieldMutations[i];
+                string patchName = (patch.Postfix ? "PostfixField_" : "PrefixField_") + i;
+
+                source.Append("        harmony.Patch(");
+                source.Append(GeneratedTargetExpression(patch.Method));
+                source.Append(patch.Postfix ? ", postfix: " : ", prefix: ");
+                source.Append("new HarmonyMethod(typeof(");
+                source.Append(className);
+                source.Append("), nameof(");
+                source.Append(patchName);
+                source.AppendLine(")));");
+            }
+
             source.AppendLine("    }");
             source.AppendLine();
 
-            for (int i = 0; i < overrides.Count; i++)
+            for (int i = 0; i < returnOverrides.Count; i++)
             {
-                MethodInfo method = overrides[i].Key;
-                object value = overrides[i].Value;
+                MethodInfo method = returnOverrides[i].Key;
+                object value = returnOverrides[i].Value;
                 Type resultType = method.ReturnType;
 
-                source.AppendLine("    // " + EscapeCSharp(FormatMethodShort(method)) + " = " + EscapeCSharp(FormatValue(value)));
+                source.AppendLine("    // Return: " + EscapeCSharp(FormatMethodShort(method)) + " = " + EscapeCSharp(FormatValue(value)));
                 source.Append("    private static void Postfix_");
                 source.Append(i);
                 source.Append("(ref ");
@@ -1902,6 +2873,70 @@ namespace AssemblyInspectorMod
                 source.Append("        __result = ");
                 source.Append(SourceLiteral(resultType, value));
                 source.AppendLine(";");
+                source.AppendLine("    }");
+                source.AppendLine();
+            }
+
+            for (int i = 0; i < argumentOverrides.Count; i++)
+            {
+                ArgumentOverrideSnapshot entry = argumentOverrides[i];
+                ParameterInfo parameter = entry.Method.GetParameters()[entry.ArgumentIndex];
+                Type valueType = ParameterValueType(parameter);
+
+                source.AppendLine("    // Argument: " + EscapeCSharp(FormatMethodShort(entry.Method)) +
+                    " [" + entry.ArgumentIndex + "] " + EscapeCSharp(parameter.Name ?? ("arg" + entry.ArgumentIndex)) +
+                    " = " + EscapeCSharp(FormatValue(entry.Value)));
+                source.Append("    private static void PrefixArg_");
+                source.Append(i);
+                source.AppendLine("(object[] __args)");
+                source.AppendLine("    {");
+                source.Append("        __args[");
+                source.Append(entry.ArgumentIndex);
+                source.Append("] = ");
+                source.Append(SourceObjectExpression(valueType, entry.Value));
+                source.AppendLine(";");
+                source.AppendLine("    }");
+                source.AppendLine();
+            }
+
+            for (int i = 0; i < fieldMutations.Count; i++)
+            {
+                FieldMutationPatch patch = fieldMutations[i];
+                string patchName = (patch.Postfix ? "PostfixField_" : "PrefixField_") + i;
+                string sourceExpression;
+
+                if (patch.SourceKind == FieldMutationSourceKind.Instance)
+                {
+                    source.Append("    private static void ");
+                    source.Append(patchName);
+                    source.AppendLine("(object __instance)");
+                    sourceExpression = "__instance";
+                }
+                else if (patch.SourceKind == FieldMutationSourceKind.Argument)
+                {
+                    source.Append("    private static void ");
+                    source.Append(patchName);
+                    source.AppendLine("(object[] __args)");
+                    sourceExpression = "__args[" + patch.ArgumentIndex + "]";
+                }
+                else
+                {
+                    source.Append("    private static void ");
+                    source.Append(patchName);
+                    source.AppendLine("()");
+                    sourceExpression = "null";
+                }
+
+                source.AppendLine("    {");
+                source.Append("        SetField(");
+                source.Append(sourceExpression);
+                source.Append(", \"");
+                source.Append(EscapeCSharp(patch.Field.DeclaringType == null ? string.Empty : patch.Field.DeclaringType.FullName));
+                source.Append("\", \"");
+                source.Append(EscapeCSharp(patch.Field.Name));
+                source.Append("\", ");
+                source.Append(SourceObjectExpression(patch.Field.FieldType, patch.Value));
+                source.AppendLine(");");
                 source.AppendLine("    }");
                 source.AppendLine();
             }
@@ -1926,6 +2961,21 @@ namespace AssemblyInspectorMod
             source.AppendLine("        return method;");
             source.AppendLine("    }");
             source.AppendLine();
+
+            if (fieldMutations.Count != 0)
+            {
+                source.AppendLine("    private static void SetField(object instance, string declaringTypeName, string fieldName, object value)");
+                source.AppendLine("    {");
+                source.AppendLine("        var type = FindType(declaringTypeName);");
+                source.AppendLine("        var field = type.GetField(fieldName, BindingFlags.Instance | BindingFlags.Static |");
+                source.AppendLine("            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);");
+                source.AppendLine("        if (field == null) throw new MissingFieldException(type.FullName, fieldName);");
+                source.AppendLine("        if (!field.IsStatic && instance == null) return;");
+                source.AppendLine("        field.SetValue(field.IsStatic ? null : instance, value);");
+                source.AppendLine("    }");
+                source.AppendLine();
+            }
+
             source.AppendLine("    private static Type FindType(string fullName)");
             source.AppendLine("    {");
             source.AppendLine("        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())");
@@ -1948,37 +2998,76 @@ namespace AssemblyInspectorMod
             return source.ToString();
         }
 
-        private static string ComputeLiveBundleId(List<KeyValuePair<MethodInfo, object>> overrides)
+        private static string GeneratedTargetExpression(MethodInfo method)
         {
-            StringBuilder canonical = new StringBuilder();
+            string[] wanted = method.GetParameters()
+                .Select(parameter => ReflectionTypeIdentity(parameter.ParameterType))
+                .ToArray();
 
-            foreach (KeyValuePair<MethodInfo, object> entry in overrides)
+            StringBuilder text = new StringBuilder();
+            text.Append("FindMethod(\\"");
+            text.Append(EscapeCSharp(method.DeclaringType == null ? string.Empty : method.DeclaringType.FullName));
+            text.Append("\\", \\"");
+            text.Append(EscapeCSharp(method.Name));
+            text.Append("\\", ");
+            text.Append(method.GetGenericArguments().Length);
+            text.Append(", new string[] { ");
+
+            for (int i = 0; i < wanted.Length; i++)
             {
-                MethodInfo method = entry.Key;
-
-                canonical.Append(method.DeclaringType == null ? string.Empty : method.DeclaringType.FullName);
-                canonical.Append('|');
-                canonical.Append(method.Name);
-                canonical.Append('|');
-                canonical.Append(method.GetGenericArguments().Length);
-                canonical.Append('|');
-                canonical.Append(ReflectionTypeIdentity(method.ReturnType));
-                canonical.Append('|');
-
-                foreach (ParameterInfo parameter in method.GetParameters())
-                {
-                    canonical.Append(ReflectionTypeIdentity(parameter.ParameterType));
-                    canonical.Append(';');
-                }
-
-                canonical.Append('=');
-                canonical.Append(SourceLiteral(method.ReturnType, entry.Value));
-                canonical.Append('\n');
+                if (i != 0) text.Append(", ");
+                text.Append("\\");
+                text.Append(EscapeCSharp(wanted[i]));
+                text.Append("\\");
             }
 
-            byte[] data = Encoding.UTF8.GetBytes(canonical.ToString());
-            byte[] hash;
+            text.Append(" })");
+            return text.ToString();
+        }
 
+        private static string ComputePatchBundleId(
+            List<KeyValuePair<MethodInfo, object>> returnOverrides,
+            List<ArgumentOverrideSnapshot> argumentOverrides,
+            List<FieldMutationPatch> fieldMutations)
+        {
+            List<string> canonical = new List<string>();
+
+            foreach (KeyValuePair<MethodInfo, object> entry in returnOverrides)
+            {
+                canonical.Add(
+                    "return|" + MethodIdentity(entry.Key) + "|" +
+                    ReflectionTypeIdentity(entry.Key.ReturnType) + "=" +
+                    SourceLiteral(entry.Key.ReturnType, entry.Value));
+            }
+
+            foreach (ArgumentOverrideSnapshot entry in argumentOverrides)
+            {
+                ParameterInfo parameter = entry.Method.GetParameters()[entry.ArgumentIndex];
+                Type valueType = ParameterValueType(parameter);
+                canonical.Add(
+                    "argument|" + MethodIdentity(entry.Method) + "|" +
+                    entry.ArgumentIndex + "|" +
+                    ReflectionTypeIdentity(valueType) + "=" +
+                    SourceObjectExpression(valueType, entry.Value));
+            }
+
+            foreach (FieldMutationPatch patch in fieldMutations)
+            {
+                canonical.Add(
+                    "field|" + MethodIdentity(patch.Method) + "|" +
+                    (patch.Postfix ? "postfix" : "prefix") + "|" +
+                    patch.SourceKind + "|" +
+                    patch.ArgumentIndex + "|" +
+                    (patch.Field.DeclaringType == null ? string.Empty : patch.Field.DeclaringType.FullName) + "|" +
+                    patch.Field.Name + "|" +
+                    ReflectionTypeIdentity(patch.Field.FieldType) + "=" +
+                    SourceObjectExpression(patch.Field.FieldType, patch.Value));
+            }
+
+            canonical.Sort(StringComparer.Ordinal);
+
+            byte[] data = Encoding.UTF8.GetBytes(string.Join("\n", canonical.ToArray()));
+            byte[] hash;
             using (System.Security.Cryptography.SHA256 sha = System.Security.Cryptography.SHA256.Create())
                 hash = sha.ComputeHash(data);
 
@@ -1987,6 +3076,26 @@ namespace AssemblyInspectorMod
                 suffix.Append(hash[i].ToString("x2", CultureInfo.InvariantCulture));
 
             return suffix.ToString();
+        }
+
+        private static string MethodIdentity(MethodInfo method)
+        {
+            StringBuilder text = new StringBuilder();
+            text.Append(method.DeclaringType == null ? string.Empty : method.DeclaringType.FullName);
+            text.Append('|');
+            text.Append(method.Name);
+            text.Append('|');
+            text.Append(method.GetGenericArguments().Length);
+            text.Append('|');
+
+            ParameterInfo[] parameters = method.GetParameters();
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                if (i != 0) text.Append(';');
+                text.Append(ReflectionTypeIdentity(parameters[i].ParameterType));
+            }
+
+            return text.ToString();
         }
 
         private static string BuildGeneratedMod(MethodInfo method, object value, bool hardOverride)
@@ -2172,6 +3281,43 @@ namespace AssemblyInspectorMod
                 return SourceTypeName(type) + "." + Enum.GetName(type, value);
 
             return Convert.ToString(value, CultureInfo.InvariantCulture);
+        }
+
+
+        private static string SourceObjectExpression(Type type, object value)
+        {
+            if (type == null)
+                throw new ArgumentNullException(nameof(type));
+
+            if (type.IsEnum)
+            {
+                string name = Enum.GetName(type, value);
+                if (!string.IsNullOrEmpty(name))
+                {
+                    return "Enum.Parse(FindType(\\"" +
+                        EscapeCSharp(type.FullName ?? type.Name) +
+                        "\\"), \\"" +
+                        EscapeCSharp(name) +
+                        "\\")";
+                }
+
+                Type underlying = Enum.GetUnderlyingType(type);
+                object raw = Convert.ChangeType(value, underlying, CultureInfo.InvariantCulture);
+                return "Enum.ToObject(FindType(\\"" +
+                    EscapeCSharp(type.FullName ?? type.Name) +
+                    "\\"), " +
+                    SourceObjectExpression(underlying, raw) +
+                    ")";
+            }
+
+            if (type == typeof(byte) || type == typeof(sbyte) ||
+                type == typeof(short) || type == typeof(ushort))
+            {
+                return "(" + SourceTypeName(type) + ")" +
+                    Convert.ToString(value, CultureInfo.InvariantCulture);
+            }
+
+            return SourceLiteral(type, value);
         }
 
         private static string FormatMethodShort(MethodInfo method)
