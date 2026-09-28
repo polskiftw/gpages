@@ -19,12 +19,17 @@
 <div class="card">
   <a class="download" href="NoCheatTags.dll">Download NoCheatTags.dll</a>
   <p class="buildstamp"><strong>Hosted build:</strong> <time id="hosted-build" data-build-id="fa4c568b0675a558c285806f727790db3798e40cea7caf4fac842a8b8af89dd6" datetime="2026-09-28T07:31:38Z">2026-09-28 07:31:38 UTC</time></p>
-  <p class="note">BepInEx 5 + Harmony. Version <span class="plugin-version">1.1.0</span>.</p>
+  <p class="note">BepInEx 5 + Harmony. Version <span class="plugin-version">1.2.0</span>.</p>
 </div>
 
 <div class="card">
   <div class="title">What it forces</div>
-  <p class="meta"><strong>ItemData.m_cheated:</strong> cleared on load, before save, through inventory load/save/add paths, and before tooltip rendering.<br><strong>cheated arguments:</strong> every boolean parameter literally named <code>cheated</code> in the Valheim gameplay assembly is forced to false.<br><strong>ItemCheated(...):</strong> every bool-returning method with that name returns false.<br><strong>PlayerProfile.s_bypassCheatChecks:</strong> returns true in memory without invoking the vanilla command or writing its saved <code>bypasscheatchecks</code> key.<br><strong>PlayerProfile.m_usedCheats:</strong> existing values are cleared on profile load/save paths, the vanilla console write is removed from <code>Terminal.ConsoleCommand.RunAction</code>, and the active profile is scrubbed around command execution as a fallback.<br><strong>PlayerStatType.Cheats:</strong> <code>PlayerProfile.IncrementStat</code> ignores this one stat and existing values are reset to zero across the profile's player-stat tracks.<br><strong>ZDO cheat markers:</strong> <code>s_cheated</code> and the eight queued cheat slots cannot be written true and are read as false.</p>
+  <p class="meta"><strong>ItemData.m_cheated:</strong> cleared on load, before save, through inventory load/save/add paths, before tooltip rendering, and by a periodic sweep of the live local-player inventory. Version 1.2.0 also falls back to directly scanning Inventory's enumerable fields when <code>GetAllItems()</code> is unavailable or insufficient.<br><strong>cheated arguments:</strong> every boolean parameter literally named <code>cheated</code> in the Valheim gameplay assembly is forced to false.<br><strong>ItemCheated(...):</strong> every bool-returning method with that name returns false.<br><strong>PlayerProfile.s_bypassCheatChecks:</strong> returns true in memory without invoking the vanilla command or writing its saved <code>bypasscheatchecks</code> key.<br><strong>PlayerProfile.m_usedCheats:</strong> existing values are cleared on profile load/save paths, the vanilla console write is removed from <code>Terminal.ConsoleCommand.RunAction</code>, and the active profile is scrubbed around command execution as a fallback.<br><strong>PlayerStatType.Cheats:</strong> <code>PlayerProfile.IncrementStat</code> ignores this one stat and existing values are reset to zero across the profile's player-stat tracks.<br><strong>ZDO cheat markers:</strong> <code>s_cheated</code> and the eight queued cheat slots cannot be written true and are read as false.</p>
+</div>
+
+<div class="card">
+  <div class="title">Existing inventory cleanup</div>
+  <p class="meta">Version 1.2.0 explicitly sweeps the already-live local player's inventory every 500 ms. This closes the hole where an inventory could already be in memory without passing through one of the patched load/add paths. When an existing <code>m_cheated=true</code> item is found, the actual field is set to false immediately and the plugin logs how many items it cleaned.</p>
 </div>
 
 <div class="card">
