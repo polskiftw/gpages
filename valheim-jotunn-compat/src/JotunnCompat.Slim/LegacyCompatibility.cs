@@ -248,6 +248,23 @@ namespace Jotunn.Managers
             return pieceTables.Values.Distinct().ToList();
         }
 
+        public Piece.PieceCategory? GetPieceCategory(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                return null;
+            }
+
+            if (Enum.TryParse(name, true, out Piece.PieceCategory vanilla))
+            {
+                return vanilla;
+            }
+
+            return categories.TryGetValue(name, out var custom)
+                ? custom
+                : (Piece.PieceCategory?)null;
+        }
+
         public Piece.PieceCategory AddPieceCategory(string name)
         {
             if (string.IsNullOrEmpty(name))
