@@ -1601,7 +1601,7 @@ namespace AssemblyInspectorMod
                 if (TryParseScalarValue(field.FieldType, _fieldEditorValueText, out value, out error))
                 {
                     patch.Value = value;
-                    GUIUtility.systemCopyBuffer = BuildGeneratedFieldMutationMod(patch);
+                    GUIUtility.systemCopyBuffer = BuildGeneratedFieldMutationModFromPatch(patch);
                     _status = "Field mutation mod copied.";
                 }
                 else
@@ -3141,10 +3141,10 @@ namespace AssemblyInspectorMod
 
             patch.Value = value;
             patch.Postfix = postfix;
-            return BuildGeneratedFieldMutationMod(patch);
+            return BuildGeneratedFieldMutationModFromPatch(patch);
         }
 
-        private static string BuildGeneratedFieldMutationMod(FieldMutationPatch patch)
+        private static string BuildGeneratedFieldMutationModFromPatch(FieldMutationPatch patch)
         {
             if (patch == null || patch.Method == null || patch.Field == null)
                 throw new ArgumentException("Field mutation patch is incomplete.", nameof(patch));
