@@ -345,18 +345,39 @@ namespace Jotunn.Entities
             new[] { typeof(string), typeof(string) },
             null);
 
+        private static readonly FieldInfo TranslationsField = typeof(Localization).GetField(
+            "m_translations",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
         private readonly Dictionary<string, Dictionary<string, string>> map =
             new Dictionary<string, Dictionary<string, string>>();
 
-        private static void AddWord(string key, string value)
+        private static void AddWord(
+            Localization target,
+            string key,
+            string value,
+            bool replaceExisting)
         {
-            if (Localization.instance == null || AddWordMethod == null)
+            if (target == null || AddWordMethod == null)
             {
                 return;
             }
 
+            var translations = TranslationsField?.GetValue(target)
+                as IDictionary<string, string>;
+
+            if (translations != null &&
+                translations.TryGetValue(key, out var existing))
+            {
+                if (!replaceExisting ||
+                    string.Equals(existing, value, StringComparison.Ordinal))
+                {
+                    return;
+                }
+            }
+
             AddWordMethod.Invoke(
-                Localization.instance,
+                target,
                 new object[] { key, value });
         }
 
@@ -379,7 +400,10 @@ namespace Jotunn.Entities
                 lang[key] = value ?? string.Empty;
             }
 
-            AddWord(key, lang[key]);
+            // Match Jotunn's normal registration behavior: make a newly added
+            // token available immediately, but do not repeatedly rewrite an
+            // already-loaded word unless the caller explicitly requested it.
+            AddWord(Localization.instance, key, lang[key], force);
         }
 
         public void AddYamlFile(string language, string fileContent)
@@ -419,27 +443,46 @@ namespace Jotunn.Entities
             {
                 var key = kv.Key.TrimStart('$');
                 lang[key] = kv.Value;
-                AddWord(key, kv.Value);
+
+                // Real Jotunn only injects a newly registered translation
+                // immediately when vanilla has not already supplied that key.
+                AddWord(Localization.instance, key, kv.Value, false);
             }
         }
 
-        internal void ApplyCurrent()
+        internal void Apply(Localization target, string language)
         {
-            if (Localization.instance == null)
+            if (target == null)
             {
                 return;
             }
 
-            var language = Localization.instance.GetSelectedLanguage();
-            if (!map.TryGetValue(language, out var words) &&
-                !map.TryGetValue("English", out words))
+            ApplyLanguage(target, "English");
+
+            var selected = string.IsNullOrEmpty(language)
+                ? target.GetSelectedLanguage()
+                : language;
+
+            if (!string.IsNullOrEmpty(selected) &&
+                !string.Equals(selected, "English", StringComparison.Ordinal))
+            {
+                ApplyLanguage(target, selected);
+            }
+        }
+
+        private void ApplyLanguage(Localization target, string language)
+        {
+            if (!map.TryGetValue(language, out var words))
             {
                 return;
             }
 
             foreach (var kv in words)
             {
-                AddWord(kv.Key, kv.Value);
+                // SetupLanguage has just rebuilt the game's translation map.
+                // Jotunn semantics are English fallback first, then the
+                // selected-language override.
+                AddWord(target, kv.Key, kv.Value, true);
             }
         }
     }
