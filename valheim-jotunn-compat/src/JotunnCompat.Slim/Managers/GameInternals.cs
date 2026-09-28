@@ -31,6 +31,21 @@ namespace Jotunn.Managers
         private static readonly FieldInfo RuntimeAssetLoader =
             AccessTools.Field(typeof(Runtime), "s_assetLoader");
 
+        private static readonly FieldInfo PieceTableAvailablePiecesByCategory =
+            AccessTools.Field(typeof(PieceTable), "m_availablePiecesByCategory");
+        private static readonly FieldInfo PlayerBuildPieces =
+            AccessTools.Field(typeof(Player), "m_buildPieces");
+        private static readonly MethodInfo PlayerUpdateAvailablePiecesList =
+            AccessTools.Method(typeof(Player), "UpdateAvailablePiecesList");
+        private static readonly FieldInfo ByUsagePieceListUsageTags =
+            AccessTools.Field(typeof(ByUsagePieceList), "m_usageTags");
+        private static readonly FieldInfo ByUsagePieceListAvailableTags =
+            AccessTools.Field(typeof(ByUsagePieceList), "m_availableTags");
+        private static readonly FieldInfo UIInputHandlerOnLeftDown =
+            AccessTools.Field(typeof(UIInputHandler), "m_onLeftDown");
+        private static readonly MethodInfo HudOnLeftClickCategory =
+            AccessTools.Method(typeof(Hud), "OnLeftClickCategory");
+
         private static readonly MethodInfo ZNetViewGetPrefabName =
             AccessTools.Method(typeof(ZNetView), "GetPrefabName");
         private static readonly MethodInfo RandomSpawnPrepare =
@@ -104,6 +119,91 @@ namespace Jotunn.Managers
 
         internal static object AssetLoaderObject =>
             RuntimeAssetLoader?.GetValue(null);
+
+        internal static List<List<Piece>> AvailablePiecesByCategory(
+            PieceTable table)
+        {
+            return table && PieceTableAvailablePiecesByCategory != null
+                ? PieceTableAvailablePiecesByCategory.GetValue(table)
+                    as List<List<Piece>>
+                : null;
+        }
+
+        internal static PieceTable BuildPieces(Player player)
+        {
+            return player && PlayerBuildPieces != null
+                ? PlayerBuildPieces.GetValue(player) as PieceTable
+                : null;
+        }
+
+        internal static void UpdateAvailablePiecesList(Player player)
+        {
+            if (!player || PlayerUpdateAvailablePiecesList == null)
+            {
+                return;
+            }
+
+            PlayerUpdateAvailablePiecesList.Invoke(
+                player,
+                Array.Empty<object>());
+        }
+
+        internal static Piece.UsageTagFlags[] UsageTags(
+            ByUsagePieceList list)
+        {
+            return list != null && ByUsagePieceListUsageTags != null
+                ? ByUsagePieceListUsageTags.GetValue(list)
+                    as Piece.UsageTagFlags[]
+                : null;
+        }
+
+        internal static List<int> AvailableTags(ByUsagePieceList list)
+        {
+            return list != null && ByUsagePieceListAvailableTags != null
+                ? ByUsagePieceListAvailableTags.GetValue(list)
+                    as List<int>
+                : null;
+        }
+
+        internal static void WireCategoryClick(
+            Hud hud,
+            UIInputHandler handler)
+        {
+            if (!hud ||
+                !handler ||
+                UIInputHandlerOnLeftDown == null ||
+                HudOnLeftClickCategory == null ||
+                !typeof(Delegate).IsAssignableFrom(
+                    UIInputHandlerOnLeftDown.FieldType))
+            {
+                return;
+            }
+
+            try
+            {
+                var callback = Delegate.CreateDelegate(
+                    UIInputHandlerOnLeftDown.FieldType,
+                    hud,
+                    HudOnLeftClickCategory,
+                    false);
+                if (callback == null)
+                {
+                    return;
+                }
+
+                var current =
+                    UIInputHandlerOnLeftDown.GetValue(handler) as Delegate;
+                UIInputHandlerOnLeftDown.SetValue(
+                    handler,
+                    Delegate.Combine(current, callback));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(
+                    "Could not wire legacy category tab click handler: " +
+                    ex.Message);
+            }
+        }
 
         internal static bool AssetLoaderReady
         {
