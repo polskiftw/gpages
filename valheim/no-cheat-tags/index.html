@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2f2f7">
+<title>No Cheat Tags — gpages</title>
+<style>
+:root{color-scheme:light dark;--bg:#f2f2f7;--card:#fff;--text:#111;--muted:#6e6e73;--border:rgba(60,60,67,.18);--accent:#007aff;--button:#007aff;--buttonText:#fff}
+@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#f5f5f7;--muted:#98989d;--border:rgba(84,84,88,.65);--accent:#0a84ff;--button:#0a84ff;--buttonText:#fff}}
+*{box-sizing:border-box}body{margin:0;padding:max(28px,env(safe-area-inset-top)) 16px max(28px,env(safe-area-inset-bottom));background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}main{width:min(100%,680px);margin:0 auto}.back{display:inline-block;color:var(--accent);text-decoration:none;margin:0 0 18px}h1{font-size:32px;margin:4px 0 8px;letter-spacing:-.7px}.sub{color:var(--muted);margin:0 0 22px;line-height:1.45}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;margin-bottom:14px}.download{display:block;width:100%;text-align:center;text-decoration:none;background:var(--button);color:var(--buttonText);font-weight:700;border-radius:14px;padding:14px 16px;margin:4px 0 10px}.buildstamp{font-size:13px;color:var(--muted);text-align:center;margin:0 0 12px}.buildstamp strong{color:var(--text)}.note{font-size:13px;color:var(--muted);line-height:1.45;margin:0}.title{font-size:17px;font-weight:700;margin:0 0 8px}.steps{margin:0;padding-left:22px;line-height:1.6}.meta{font-size:14px;color:var(--muted);line-height:1.55;margin:0}.meta strong{color:var(--text)}code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}
+</style>
+</head>
+<body><main>
+<a class="back" href="../">‹ Valheim</a>
+<h1>No Cheat Tags</h1>
+<p class="sub">Nuclear Valheim cheat-marker suppression: item flags are scrubbed, cheated arguments are forced false, ItemCheated checks return false, the native bypass is forced in memory, and world-object cheat flags read/write as false.</p>
+
+<div class="card">
+  <a class="download" href="NoCheatTags.dll">Download NoCheatTags.dll</a>
+  <p class="buildstamp"><strong>Hosted build:</strong> <time id="hosted-build" data-build-id="" datetime="1970-01-01T00:00:00Z">not built yet</time></p>
+  <p class="note">BepInEx 5 + Harmony. Version <span class="plugin-version">1.0.0</span>.</p>
+</div>
+
+<div class="card">
+  <div class="title">What it forces</div>
+  <p class="meta"><strong>ItemData.m_cheated:</strong> cleared on load, before save, through inventory load/save/add paths, and before tooltip rendering.<br><strong>cheated arguments:</strong> every boolean parameter literally named <code>cheated</code> in the Valheim gameplay assembly is forced to false.<br><strong>ItemCheated(...):</strong> every bool-returning method with that name returns false.<br><strong>PlayerProfile.s_bypassCheatChecks:</strong> returns true in memory without invoking the vanilla command or writing its saved <code>bypasscheatchecks</code> key.<br><strong>ZDO cheat markers:</strong> <code>s_cheated</code> and the eight queued cheat slots cannot be written true and are read as false.</p>
+</div>
+
+<div class="card">
+  <div class="title">Persistence</div>
+  <p class="meta">Loaded item flags are actually cleared in memory and are clean when those items are next saved. Existing raw world-ZDO cheat bits are neutralized on read and new true writes are blocked; this first version does not bulk-rewrite untouched historical ZDO records just to remove dormant bits from the world file.</p>
+</div>
+
+<div class="card">
+  <div class="title">The vanilla dev bypass</div>
+  <p class="meta">The vanilla command persists a character key named <code>bypasscheatchecks</code>. This plugin does not use that command or setter; it patches the getter result in memory instead, so installing the plugin does not create that saved key. Existing keys are left alone.</p>
+</div>
+
+<div class="card">
+  <div class="title">Install</div>
+  <ol class="steps">
+    <li>Install BepInEx 5 for Valheim.</li>
+    <li>Download <code>NoCheatTags.dll</code>.</li>
+    <li>Put it in <code>Valheim/BepInEx/plugins/</code>.</li>
+    <li>Restart Valheim.</li>
+  </ol>
+  <p class="note">For absolute world-side suppression on a dedicated/listen server, install it on the authoritative host/server too.</p>
+</div>
+
+<div class="card">
+  <p class="meta"><strong>Character m_usedCheats:</strong> deliberately not erased<br><strong>Cheats stat:</strong> deliberately not erased<br><strong>Game.isModded:</strong> deliberately not hidden<br><strong>Goal:</strong> eliminate item/object propagation tags without falsifying unrelated history markers</p>
+</div>
+</main>
+<script>
+(() => {
+  const stamp = document.getElementById("hosted-build");
+  if (!stamp || !stamp.dateTime || stamp.dateTime.startsWith("1970-")) return;
+  const date = new Date(stamp.dateTime);
+  if (Number.isNaN(date.getTime())) return;
+  stamp.textContent = date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZoneName: "short"
+  });
+})();
+</script>
+</body>
+</html>
