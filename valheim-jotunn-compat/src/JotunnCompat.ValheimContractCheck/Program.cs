@@ -64,8 +64,18 @@ try
     RequireMethod(modules, "DungeonGenerator", "SetupAvailableRooms");
 
     RequireMethod(modules, "Game", "Start");
+
+    // Current build-menu internals used through GameInternals reflection bridges.
+    RequireField(modules, "PieceTable", "m_availablePiecesByCategory", isStatic: false);
+    RequireField(modules, "Player", "m_buildPieces", isStatic: false);
     RequireMethod(modules, "Player", "SetPlaceMode", "PieceTable");
+    RequireUniqueMethod(modules, "Player", "UpdateAvailablePiecesList");
+    RequireField(modules, "ByUsagePieceList", "m_usageTags", isStatic: false);
+    RequireField(modules, "ByUsagePieceList", "m_availableTags", isStatic: false);
+    RequireField(modules, "UIInputHandler", "m_onLeftDown", isStatic: false);
     RequireMethod(modules, "Hud", "Awake");
+    RequireUniqueMethod(modules, "Hud", "OnLeftClickCategory");
+
     RequireMethod(modules, "Localization", "AddWord", "System.String", "System.String");
     RequireUniqueMethod(modules, "Localization", "SetupLanguage");
 
@@ -133,7 +143,7 @@ try
 
     Console.WriteLine("Valheim runtime contract check passed.");
     Console.WriteLine($"  Managed assemblies scanned: {modules.Count}");
-    Console.WriteLine("  Reflection/Harmony targets checked: 44");
+    Console.WriteLine("  Reflection/Harmony targets checked: 51");
     return 0;
 }
 finally
