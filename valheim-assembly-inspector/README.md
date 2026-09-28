@@ -1,6 +1,6 @@
 # Assembly Inspector
 
-Current plugin version: **1.4.0**.
+Current plugin version: **1.5.0**.
 
 A BepInEx 5 + Harmony Valheim development/debug tool for browsing the live `assembly_valheim` managed assembly, forcing scalar return/argument values, and applying targeted scalar field mutations around selected methods.
 
@@ -32,7 +32,9 @@ The browser shows:
 
 ## Assembly-wide member search
 
-Version 1.3.0 adds a **Global search** box above the browser. It searches declared methods, properties, and fields across every loaded class at once, so you do not need to know or select the owning class first.
+Version 1.3.0 added a **Global search** box above the browser. It searches declared methods, properties, and fields across every loaded class at once, so you do not need to know or select the owning class first.
+
+Version 1.5.0 makes that search substantially lighter on the game thread. Search results are cached instead of rescanning all indexed members on every IMGUI layout/repaint pass, input is debounced for 120 ms while you type, and the 1,000+ class-button list is paused while a global search is active. The result cap is 200 buttons, with the full match count still shown so broad searches do not create hundreds of unnecessary GUI controls every frame.
 
 Plain search terms are ANDed together and can match:
 
@@ -98,7 +100,7 @@ For example, forcing the `cheated` argument to `false` changes the incoming flag
 
 ## Field mutation patches
 
-Version 1.4.0 also adds targeted scalar field mutation patches tied to a selected method. Enter a one-level target path:
+Version 1.4.0 added targeted scalar field mutation patches tied to a selected method. Enter a one-level target path:
 
 ```text
 this.m_cheated
@@ -116,6 +118,10 @@ Choose whether the mutation runs as a **prefix** (before the original method) or
 Only writable scalar fields are synthesized automatically: primitive values, strings, chars, enums, and decimals. Readonly/constants and instance fields on value-type arguments are rejected instead of generating a patch that would silently fail.
 
 **Copy field-mutation mod** produces a standalone generated patch using reflection for the field write, so private fields and private declaring types do not need to be referenced directly in generated source.
+
+Version 1.5.0 also makes the **field result itself editable from the Fields detail panel**. Select a writable scalar field such as `ItemData.m_cheated`, enter the value, choose prefix/postfix timing, then search/select a hook method on that class. From the field panel you can **Apply live**, **Copy field-mutation mod**, or **Open hook method** with the target prefilled. Instance fields only offer instance hook methods because each object owns its own copy of the field.
+
+Static fields can use the explicit `static.fieldName` target form in the method-side editor.
 
 
 ## Generate standalone override mods
