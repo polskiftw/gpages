@@ -3,6 +3,7 @@ using HarmonyLib;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -14,7 +15,7 @@ namespace NoCheatTagsMod
     {
         public const string PluginGuid = "claire.valheim.nocheattags";
         public const string PluginName = "No Cheat Tags";
-        public const string PluginVersion = "1.1.0";
+        public const string PluginVersion = "1.2.0";
 
         private const BindingFlags Declared =
             BindingFlags.Instance | BindingFlags.Static |
@@ -39,11 +40,13 @@ namespace NoCheatTagsMod
         private Type _playerProfileType;
         private Type _playerStatType;
         private Type _gameType;
+        private Type _playerType;
 
         private FieldInfo _itemCheatedField;
         private FieldInfo _itemDropItemDataField;
         private FieldInfo _characterDropCheatedField;
         private MethodInfo _inventoryGetAllItems;
+        private FieldInfo[] _inventoryEnumerableFields = new FieldInfo[0];
 
         private FieldInfo _profileUsedCheatsField;
         private FieldInfo _profilePlayerStatsField;
@@ -53,6 +56,11 @@ namespace NoCheatTagsMod
         private FieldInfo _gameInstanceField;
         private PropertyInfo _gameInstanceProperty;
         private MethodInfo _gameGetPlayerProfileMethod;
+
+        private FieldInfo _localPlayerField;
+        private PropertyInfo _localPlayerProperty;
+        private MethodInfo _playerGetInventoryMethod;
+        private readonly Stopwatch _liveSweepTimer = Stopwatch.StartNew();
 
         private bool _haveZdoHashes;
         private int _zdoCheatedHash;
@@ -95,6 +103,15 @@ namespace NoCheatTagsMod
             }
         }
 
+        private void Update()
+        {
+            if (_liveSweepTimer.ElapsedMilliseconds < 500)
+                return;
+
+            _liveSweepTimer.Restart();
+            SweepLiveState();
+        }
+
         private void OnDestroy()
         {
             try
@@ -126,6 +143,7 @@ namespace NoCheatTagsMod
             _playerProfileType = FindType("PlayerProfile");
             _playerStatType = FindType("PlayerStatType");
             _gameType = FindType("Game");
+            _playerType = FindType("Player");
 
             if (_itemDataType == null)
                 throw new MissingMemberException("Could not resolve Valheim ItemData.m_cheated.");
@@ -136,12 +154,14 @@ namespace NoCheatTagsMod
 
             if (_inventoryType != null)
             {
-                _inventoryGetAllItems = _inventoryType.GetMethod(
+                _inventoryGetAllItems = FindMethodInHierarchy(
+                    _inventoryType,
                     "GetAllItems",
-                    AnyMember,
-                    binder: null,
-                    types: Type.EmptyTypes,
-                    modifiers: null);
+                    Type.EmptyTypes);
+
+                _inventoryEnumerableFields = GetAllInstanceFields(_inventoryType)
+                    .Where(field => typeof(IEnumerable).IsAssignableFrom(field.FieldType))
+                    .ToArray();
             }
 
             if (_itemDropType != null)
@@ -152,7 +172,13 @@ namespace NoCheatTagsMod
 
             ResolveProfileHistoryContracts();
             ResolveGameProfileAccess();
+            ResolveLivePlayerAccess();
             ResolveZdoHashes();
+
+            Logger.LogInfo(
+                "Resolved item data type: " + _itemDataType.FullName +
+                "; Inventory.GetAllItems(): " + (_inventoryGetAllItems != null ? "yes" : "no") +
+                "; enumerable inventory field fallback(s): " + _inventoryEnumerableFields.Length + ".");
         }
 
 
@@ -226,6 +252,32 @@ namespace NoCheatTagsMod
                 binder: null,
                 types: Type.EmptyTypes,
                 modifiers: null);
+        }
+
+
+        private void ResolveLivePlayerAccess()
+        {
+            if (_playerType == null)
+            {
+                Logger.LogWarning("Player type was not found; periodic live-inventory sweeping is unavailable.");
+                return;
+            }
+
+            _localPlayerField = _playerType.GetField(
+                "m_localPlayer",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+
+            _localPlayerProperty = _playerType.GetProperty(
+                "m_localPlayer",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+
+            _playerGetInventoryMethod = FindMethodInHierarchy(
+                _playerType,
+                "GetInventory",
+                Type.EmptyTypes);
+
+            if (_playerGetInventoryMethod == null)
+                Logger.LogWarning("Player.GetInventory() was not found; periodic live-inventory sweeping is unavailable.");
         }
 
         private void ResolveZdoHashes()
@@ -824,6 +876,39 @@ namespace NoCheatTagsMod
         }
 
 
+
+        private void SweepLiveState()
+        {
+            ScrubActiveProfile();
+
+            if (_playerType == null || _playerGetInventoryMethod == null)
+                return;
+
+            try
+            {
+                object player = null;
+
+                if (_localPlayerField != null)
+                    player = _localPlayerField.GetValue(null);
+
+                if (player == null && _localPlayerProperty != null)
+                    player = _localPlayerProperty.GetValue(null, null);
+
+                if (player == null)
+                    return;
+
+                object inventory = _playerGetInventoryMethod.Invoke(player, null);
+                int cleaned = ScrubInventory(inventory);
+
+                if (cleaned > 0)
+                    Logger.LogInfo("Cleaned " + cleaned + " existing cheated inventory item" + (cleaned == 1 ? "." : "s."));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogDebug("Live inventory sweep skipped: " + ex.GetType().Name + ": " + ex.Message);
+            }
+        }
+
         private void ScrubActiveProfile()
         {
             if (_gameType == null || _gameGetPlayerProfileMethod == null)
@@ -954,32 +1039,77 @@ namespace NoCheatTagsMod
             }
         }
 
-        private void ScrubInventory(object inventory)
+        private int ScrubInventory(object inventory)
         {
-            if (inventory == null || _inventoryGetAllItems == null)
-                return;
+            if (inventory == null || _itemDataType == null || _itemCheatedField == null)
+                return 0;
+
+            int cleaned = 0;
+            var seen = new HashSet<object>(ReferenceEqualityComparer.Instance);
 
             try
             {
-                object result = _inventoryGetAllItems.Invoke(inventory, null);
-                IEnumerable items = result as IEnumerable;
-                if (items == null)
-                    return;
-
-                foreach (object item in items)
+                if (_inventoryGetAllItems != null)
                 {
-                    if (item != null &&
-                        _itemDataType != null &&
-                        _itemDataType.IsAssignableFrom(item.GetType()))
+                    object result = _inventoryGetAllItems.Invoke(inventory, null);
+                    cleaned += ScrubItemEnumerable(result as IEnumerable, seen);
+                }
+
+                foreach (FieldInfo field in _inventoryEnumerableFields)
+                {
+                    object value;
+                    try
                     {
-                        _itemCheatedField.SetValue(item, false);
+                        value = field.GetValue(inventory);
                     }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    cleaned += ScrubItemEnumerable(value as IEnumerable, seen);
                 }
             }
             catch (Exception ex)
             {
                 Logger.LogDebug("Inventory scrub skipped: " + ex.GetType().Name + ": " + ex.Message);
             }
+
+            return cleaned;
+        }
+
+        private int ScrubItemEnumerable(IEnumerable items, HashSet<object> seen)
+        {
+            if (items == null)
+                return 0;
+
+            int cleaned = 0;
+
+            foreach (object item in items)
+            {
+                if (item == null ||
+                    !_itemDataType.IsAssignableFrom(item.GetType()) ||
+                    !seen.Add(item))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    object current = _itemCheatedField.GetValue(item);
+                    if (current is bool cheated && cheated)
+                    {
+                        _itemCheatedField.SetValue(item, false);
+                        cleaned++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogDebug("Item cheat scrub skipped: " + ex.GetType().Name + ": " + ex.Message);
+                }
+            }
+
+            return cleaned;
         }
 
         private bool IsCheatZdoHash(int hash)
@@ -1020,6 +1150,42 @@ namespace NoCheatTagsMod
                 return preferred;
 
             return types.FirstOrDefault(type => HasField(type, fieldName, fieldType));
+        }
+
+
+        private static MethodInfo FindMethodInHierarchy(Type type, string name, Type[] parameterTypes)
+        {
+            for (Type current = type; current != null; current = current.BaseType)
+            {
+                MethodInfo method = current.GetMethod(
+                    name,
+                    BindingFlags.Instance | BindingFlags.Static |
+                    BindingFlags.Public | BindingFlags.NonPublic |
+                    BindingFlags.DeclaredOnly,
+                    binder: null,
+                    types: parameterTypes,
+                    modifiers: null);
+
+                if (method != null)
+                    return method;
+            }
+
+            return null;
+        }
+
+        private static FieldInfo[] GetAllInstanceFields(Type type)
+        {
+            var fields = new List<FieldInfo>();
+
+            for (Type current = type; current != null; current = current.BaseType)
+            {
+                fields.AddRange(current.GetFields(
+                    BindingFlags.Instance |
+                    BindingFlags.Public | BindingFlags.NonPublic |
+                    BindingFlags.DeclaredOnly));
+            }
+
+            return fields.ToArray();
         }
 
         private static bool HasField(Type type, string fieldName, Type fieldType)
@@ -1082,6 +1248,22 @@ namespace NoCheatTagsMod
             {
                 if (type != null)
                     yield return type;
+            }
+        }
+
+
+        private sealed class ReferenceEqualityComparer : IEqualityComparer<object>
+        {
+            internal static readonly ReferenceEqualityComparer Instance = new ReferenceEqualityComparer();
+
+            public new bool Equals(object x, object y)
+            {
+                return ReferenceEquals(x, y);
+            }
+
+            public int GetHashCode(object obj)
+            {
+                return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj);
             }
         }
 
