@@ -442,8 +442,31 @@ jobs:
           git rm -f --ignore-unmatch "valheim/jotunn-compat/JotunnCompat.Preloader.dll"
           Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\JotunnCompat.zip' '.\valheim\jotunn-compat\JotunnCompat.zip'
 
+          # Only advance the visible hosted-build timestamp when the Jotunn
+          # artifact itself changed. Unrelated Valheim artifact publishes must
+          # not make this page look newer than the DLL/ZIP it serves.
+          git diff --quiet -- "valheim/jotunn-compat/Jotunn.dll" "valheim/jotunn-compat/JotunnCompat.zip"
+          $jotunnChanged = $LASTEXITCODE -ne 0
+
+          if ($jotunnChanged) {
+            $pagePath = '.\valheim\jotunn-compat\index.html'
+            $utcNow = [DateTimeOffset]::UtcNow
+            $isoStamp = $utcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+            $fallbackStamp = $utcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'")
+            $page = Get-Content -Raw $pagePath
+            $pattern = '<time id="hosted-build" datetime="[^"]*">.*?</time>'
+
+            if (-not [regex]::IsMatch($page, $pattern)) {
+              throw "Could not find hosted-build timestamp marker in $pagePath"
+            }
+
+            $replacement = "<time id=`"hosted-build`" datetime=`"$isoStamp`">$fallbackStamp</time>"
+            $page = [regex]::Replace($page, $pattern, $replacement, 1)
+            Set-Content -Path $pagePath -Value $page -Encoding utf8NoBOM
+          }
+
           git rm -f --ignore-unmatch "valheim/jotunn-compat/JotunnCompat.FastPath.dll"
-          git add -- "valheim/ward-hit-sound/WardHitSoundToggle.dll" "valheim/gear-inspector/GearInspector.dll" "valheim/hammer-everything/HammerEverything.dll" "valheim/jotunn-compat/Jotunn.dll" "valheim/jotunn-compat/JotunnCompat.zip"
+          git add -- "valheim/ward-hit-sound/WardHitSoundToggle.dll" "valheim/gear-inspector/GearInspector.dll" "valheim/hammer-everything/HammerEverything.dll" "valheim/jotunn-compat/Jotunn.dll" "valheim/jotunn-compat/JotunnCompat.zip" "valheim/jotunn-compat/index.html"
 
           git diff --cached --quiet
           if ($LASTEXITCODE -eq 0) {
