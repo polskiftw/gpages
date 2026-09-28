@@ -355,9 +355,10 @@ jobs:
           }
 
           # Second compatibility canary: ValheimRAFT. Like MWL, this is test-only
-          # knowledge used to expand generic Jotunn API coverage.
-          $raftVersion = '4.3.5'
-          $raftUrl = "https://thunderstore.io/package/download/team0/ValheimRAFT/$raftVersion/"
+          # knowledge used to expand generic Jotunn API coverage. Track the
+          # current upstream release rather than an obsolete pre-Valheim-1.0 build.
+          $raftVersion = '5.0.6'
+          $raftUrl = "https://github.com/zolantris/ValheimMods/releases/download/ValheimRAFT-v$raftVersion/ValheimRAFT-$raftVersion-Thunderstore.zip"
           $raftZip = Join-Path $env:RUNNER_TEMP "ValheimRAFT-$raftVersion.zip"
           $raftExtract = Join-Path $env:RUNNER_TEMP "ValheimRAFT-$raftVersion"
 
