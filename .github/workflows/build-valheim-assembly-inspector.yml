@@ -130,6 +130,7 @@ jobs:
 
           @'
           using System;
+          using System.Collections;
           using System.IO;
           using System.Reflection;
           using System.Reflection.Emit;
@@ -143,11 +144,31 @@ jobs:
                   return false;
               }
 
+              public static bool EchoBool(bool value)
+              {
+                  return value;
+              }
+
+              private sealed class FieldCarrier
+              {
+                  public bool Flag = true;
+
+                  public void Touch()
+                  {
+                  }
+              }
+
               public static int Main()
               {
                   MethodInfo target = typeof(Program).GetMethod(
                       nameof(OriginalBool),
                       BindingFlags.Public | BindingFlags.Static);
+                  MethodInfo argumentTarget = typeof(Program).GetMethod(
+                      nameof(EchoBool),
+                      BindingFlags.Public | BindingFlags.Static);
+                  MethodInfo fieldTarget = typeof(FieldCarrier).GetMethod(
+                      nameof(FieldCarrier.Touch),
+                      BindingFlags.Public | BindingFlags.Instance);
 
                   Assembly plugin = Assembly.LoadFrom(
                       Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "AssemblyInspector.dll"));
@@ -161,9 +182,18 @@ jobs:
                   FieldInfo overridesField = inspector.GetField(
                       "RuntimeOverrides",
                       BindingFlags.NonPublic | BindingFlags.Static);
+                  FieldInfo argumentOverridesField = inspector.GetField(
+                      "RuntimeArgumentOverrides",
+                      BindingFlags.NonPublic | BindingFlags.Static);
+                  FieldInfo fieldMutationsField = inspector.GetField(
+                      "RuntimeFieldMutations",
+                      BindingFlags.NonPublic | BindingFlags.Static);
 
-                  if (factory == null || overridesField == null)
-                      throw new Exception("Assembly Inspector live override internals were not found.");
+                  if (factory == null || overridesField == null ||
+                      argumentOverridesField == null || fieldMutationsField == null)
+                  {
+                      throw new Exception("Assembly Inspector live patch internals were not found.");
+                  }
 
                   object overrides = overridesField.GetValue(null);
                   MethodInfo setter = overrides.GetType().GetMethod("set_Item");
@@ -188,6 +218,62 @@ jobs:
                   bool result = (bool)postfixArgs[1];
                   if (!result)
                       throw new Exception("Live override smoke test failed: dynamic postfix did not force false to true.");
+
+                  IDictionary argumentOverrides = (IDictionary)argumentOverridesField.GetValue(null);
+                  Type argumentMapType = argumentOverridesField.FieldType.GetGenericArguments()[1];
+                  IDictionary argumentMap = (IDictionary)Activator.CreateInstance(argumentMapType);
+                  argumentMap[0] = true;
+                  argumentOverrides[argumentTarget] = argumentMap;
+
+                  MethodInfo argumentPrefix = inspector.GetMethod(
+                      "LiveArgumentAndFieldPrefix",
+                      BindingFlags.NonPublic | BindingFlags.Static);
+                  if (argumentPrefix == null)
+                      throw new Exception("LiveArgumentAndFieldPrefix was not found.");
+
+                  object[] liveArgs = new object[] { false };
+                  argumentPrefix.Invoke(null, new object[] { argumentTarget, liveArgs });
+                  if (!(bool)liveArgs[0])
+                      throw new Exception("Live argument override smoke test failed.");
+
+                  Type fieldPatchType = inspector.GetNestedType(
+                      "FieldMutationPatch",
+                      BindingFlags.NonPublic);
+                  Type sourceKindType = inspector.GetNestedType(
+                      "FieldMutationSourceKind",
+                      BindingFlags.NonPublic);
+                  if (fieldPatchType == null || sourceKindType == null)
+                      throw new Exception("Field mutation patch metadata types were not found.");
+
+                  object fieldPatch = Activator.CreateInstance(fieldPatchType, true);
+                  fieldPatchType.GetField("Method").SetValue(fieldPatch, fieldTarget);
+                  fieldPatchType.GetField("SourceKind").SetValue(
+                      fieldPatch,
+                      Enum.Parse(sourceKindType, "Instance"));
+                  fieldPatchType.GetField("ArgumentIndex").SetValue(fieldPatch, -1);
+                  fieldPatchType.GetField("Field").SetValue(
+                      fieldPatch,
+                      typeof(FieldCarrier).GetField(nameof(FieldCarrier.Flag)));
+                  fieldPatchType.GetField("Value").SetValue(fieldPatch, false);
+                  fieldPatchType.GetField("Postfix").SetValue(fieldPatch, false);
+                  fieldPatchType.GetField("TargetPath").SetValue(fieldPatch, "this.Flag");
+
+                  Type fieldListType = fieldMutationsField.FieldType.GetGenericArguments()[1];
+                  IList fieldList = (IList)Activator.CreateInstance(fieldListType);
+                  fieldList.Add(fieldPatch);
+                  IDictionary fieldMutations = (IDictionary)fieldMutationsField.GetValue(null);
+                  fieldMutations[fieldTarget] = fieldList;
+
+                  MethodInfo instancePrefix = inspector.GetMethod(
+                      "LiveInstanceFieldPrefix",
+                      BindingFlags.NonPublic | BindingFlags.Static);
+                  if (instancePrefix == null)
+                      throw new Exception("LiveInstanceFieldPrefix was not found.");
+
+                  FieldCarrier carrier = new FieldCarrier();
+                  instancePrefix.Invoke(null, new object[] { fieldTarget, carrier });
+                  if (carrier.Flag)
+                      throw new Exception("Live field mutation smoke test failed.");
 
                   MethodInfo bundleGenerator = inspector.GetMethod(
                       "BuildGeneratedLiveBundle",
@@ -222,12 +308,50 @@ jobs:
 
                   setter.Invoke(overrides, new object[] { target, true });
 
+                  MethodInfo argumentGenerator = inspector.GetMethod(
+                      "BuildGeneratedArgumentMod",
+                      BindingFlags.NonPublic | BindingFlags.Static);
+                  MethodInfo fieldGenerator = inspector.GetMethod(
+                      "BuildGeneratedFieldMutationMod",
+                      BindingFlags.NonPublic | BindingFlags.Static);
+                  if (argumentGenerator == null || fieldGenerator == null)
+                      throw new Exception("Generated argument/field patch builders were not found.");
+
+                  string argumentSource = (string)argumentGenerator.Invoke(
+                      null,
+                      new object[] { argumentTarget, 0, false });
+                  string fieldSource = (string)fieldGenerator.Invoke(
+                      null,
+                      new object[] { fieldTarget, "this.Flag", false, false });
+
+                  if (!argumentSource.Contains("__args[0] = false;") ||
+                      !argumentSource.Contains("claire.valheim.generated.patch."))
+                  {
+                      throw new Exception("Generated argument override source was invalid.");
+                  }
+
+                  if (!fieldSource.Contains("SetField(__instance") ||
+                      !fieldSource.Contains("\"Flag\"") ||
+                      !fieldSource.Contains("claire.valheim.generated.patch."))
+                  {
+                      throw new Exception("Generated field mutation source was invalid.");
+                  }
+
                   File.WriteAllText(
                       Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "GeneratedLiveBundle.cs"),
                       bundleSource);
+                  File.WriteAllText(
+                      Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "GeneratedArgumentPatch.cs"),
+                      argumentSource);
+                  File.WriteAllText(
+                      Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "GeneratedFieldPatch.cs"),
+                      fieldSource);
 
                   Console.WriteLine("Live Harmony override smoke test passed.");
+                  Console.WriteLine("Live argument override smoke test passed.");
+                  Console.WriteLine("Live field mutation smoke test passed.");
                   Console.WriteLine("Generated live bundle source smoke test passed.");
+                  Console.WriteLine("Generated argument/field patch source smoke test passed.");
                   return 0;
               }
           }
@@ -247,8 +371,12 @@ jobs:
           }
 
           $generatedSource = Join-Path $out 'GeneratedLiveBundle.cs'
-          if (-not (Test-Path $generatedSource)) {
-            throw 'Generated live bundle source was not produced by the smoke test.'
+          $generatedArgumentSource = Join-Path $out 'GeneratedArgumentPatch.cs'
+          $generatedFieldSource = Join-Path $out 'GeneratedFieldPatch.cs'
+          foreach ($source in @($generatedSource, $generatedArgumentSource, $generatedFieldSource)) {
+            if (-not (Test-Path $source)) {
+              throw "Generated patch source was not produced by the smoke test: $source"
+            }
           }
 
           $generatedProject = Join-Path $test 'generated-bundle'
@@ -273,6 +401,8 @@ jobs:
             </PropertyGroup>
             <ItemGroup>
               <Compile Include="$generatedSource" />
+              <Compile Include="$generatedArgumentSource" />
+              <Compile Include="$generatedFieldSource" />
           $($refs -join [Environment]::NewLine)
             </ItemGroup>
           </Project>
