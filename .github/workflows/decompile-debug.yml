@@ -33,6 +33,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           dotnet tool install --global ilspycmd
           ilspycmd --version
+          if ($LASTEXITCODE -ne 0) { throw 'ilspycmd installation/version check failed.' }
 
       - name: Download ValheimDebug.tar.gz from draft release
         shell: pwsh
@@ -64,6 +65,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path extracted | Out-Null
           tar -xzf ValheimDebug.tar.gz -C extracted
+          if ($LASTEXITCODE -ne 0) { throw 'Could not extract ValheimDebug.tar.gz.' }
 
       - name: Discover Valheim assembly
         id: discover
@@ -72,29 +74,130 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $target = Get-ChildItem extracted -Recurse -File -Filter 'assembly_valheim.dll' | Select-Object -First 1
           if (-not $target) { throw 'Could not find assembly_valheim.dll in ValheimDebug.tar.gz.' }
+
+          $assembly = [System.Reflection.AssemblyName]::GetAssemblyName($target.FullName)
+          Write-Host "Valheim assembly: $($target.FullName) ($($assembly.Version))"
           "assembly=$($target.FullName)" >> $env:GITHUB_OUTPUT
           "refs=$($target.Directory.FullName)" >> $env:GITHUB_OUTPUT
 
-      - name: Decompile Valheim
+      - name: Decompile Valheim with complete Managed references
+        id: decompile
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $assembly = '${{ steps.discover.outputs.assembly }}'
+          $refs = '${{ steps.discover.outputs.refs }}'
           New-Item -ItemType Directory -Force -Path Result | Out-Null
-          ilspycmd '${{ steps.discover.outputs.assembly }}' -o Result -p -r '${{ steps.discover.outputs.refs }}' --disable-updatecheck --no-dead-code
-          if (-not (Get-ChildItem Result -Recurse -File | Select-Object -First 1)) { throw 'ILSpy produced no Valheim source.' }
 
-      - name: Audit decompiler diagnostics
+          $args = @($assembly, '-o', 'Result', '-p', '-r', $refs, '--disable-updatecheck', '--no-dead-code')
+          $pdb = [System.IO.Path]::ChangeExtension($assembly, '.pdb')
+          $pdbUsed = $false
+          if (Test-Path $pdb) {
+            Write-Host "Using original PDB variable names from $pdb"
+            $args += @('--use-varnames-from-pdb', $pdb)
+            $pdbUsed = $true
+          }
+
+          & ilspycmd @args
+          if ($LASTEXITCODE -ne 0) { throw "Valheim decompile failed (exit $LASTEXITCODE)." }
+
+          if (-not (Get-ChildItem Result -Recurse -File -Filter '*.cs' | Select-Object -First 1)) {
+            throw 'ILSpy produced no Valheim C# source.'
+          }
+          "pdb_used=$($pdbUsed.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+      - name: Make Valheim project self-contained
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $patterns = @('Unknown result type','got Unknown','DecompilerException','Could not decompile','Error near IL')
-          $files = Get-ChildItem Result -Recurse -File -Filter '*.cs'
+          $refs = '${{ steps.discover.outputs.refs }}'
+          $project = Get-ChildItem Result -File -Filter '*.csproj' | Select-Object -First 1
+          if (-not $project) { throw 'No Valheim .csproj was produced.' }
+
+          $referenceOutput = Join-Path (Resolve-Path Result) 'References'
+          New-Item -ItemType Directory -Force -Path $referenceOutput | Out-Null
+          Copy-Item (Join-Path $refs '*.dll') $referenceOutput -Force
+
+          [xml]$xml = Get-Content -Raw $project.FullName
+          foreach ($reference in @($xml.Project.ItemGroup.Reference)) {
+            if (-not $reference.HintPath) { continue }
+
+            $simpleName = ([string]$reference.Include).Split(',')[0]
+            $candidate = Join-Path $referenceOutput ($simpleName + '.dll')
+            if (-not (Test-Path $candidate)) {
+              $oldBase = [System.IO.Path]::GetFileName(([string]$reference.HintPath).Replace('\', '/'))
+              $candidate = Join-Path $referenceOutput $oldBase
+            }
+            if (-not (Test-Path $candidate)) {
+              throw "Could not make Valheim reference '$($reference.Include)' self-contained."
+            }
+
+            $reference.HintPath = 'References\' + [System.IO.Path]::GetFileName($candidate)
+          }
+          $xml.Save($project.FullName)
+
+          [xml]$check = Get-Content -Raw $project.FullName
+          foreach ($reference in @($check.Project.ItemGroup.Reference)) {
+            if (-not $reference.HintPath) { continue }
+            $resolved = Join-Path (Resolve-Path Result) ([string]$reference.HintPath)
+            if (-not (Test-Path $resolved)) {
+              throw "Generated Valheim project still contains a missing reference: $($reference.HintPath)"
+            }
+          }
+
+      - name: Audit decompiler output and record provenance
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $fatalPatterns = @(
+            'Unknown result type',
+            'got Unknown',
+            'DecompilerException',
+            'Could not decompile',
+            'Error near IL',
+            'An error occurred while decompiling'
+          )
+
+          $sourceFiles = Get-ChildItem Result -Recurse -File -Filter '*.cs'
           $bad = @()
-          if ($files) { $bad = Select-String -Path $files.FullName -Pattern $patterns -SimpleMatch }
+          if ($sourceFiles) {
+            $bad = Select-String -Path $sourceFiles.FullName -Pattern $fatalPatterns -SimpleMatch
+          }
           if ($bad.Count -gt 0) {
             $bad | Select-Object -First 100 | ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber): $($_.Line.Trim())" }
-            throw "Decompiler audit failed with $($bad.Count) suspicious diagnostics."
+            throw "Decompiler audit failed with $($bad.Count) fatal diagnostic marker(s)."
           }
+
+          $advisoryPatterns = @('Expected VT, but got Obj', 'Expected Obj, but got VT')
+          $advisories = @()
+          if ($sourceFiles) {
+            $advisories = Select-String -Path $sourceFiles.FullName -Pattern $advisoryPatterns -SimpleMatch
+          }
+
+          $assemblyPath = '${{ steps.discover.outputs.assembly }}'
+          $assemblyName = [System.Reflection.AssemblyName]::GetAssemblyName($assemblyPath)
+          $assemblyHash = (Get-FileHash $assemblyPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          $ilspyVersion = (& ilspycmd --version | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'Could not record ILSpy version.' }
+
+          $lines = @(
+            'Valheim decompile provenance',
+            "ILSpy: $($ilspyVersion -replace '[\r\n]+', ' / ')",
+            "Assembly: $($assemblyName.Name) $($assemblyName.Version)",
+            "Assembly SHA256: $assemblyHash",
+            "PDB variable names used: ${{ steps.decompile.outputs.pdb_used }}",
+            "C# files: $($sourceFiles.Count)",
+            "Managed reference DLLs bundled: $((Get-ChildItem Result/References -File -Filter '*.dll').Count)",
+            'Fatal decompiler diagnostics: 0',
+            "Advisory IL stack-type comments: $($advisories.Count)"
+          )
+          if ($advisories.Count -gt 0) {
+            $lines += 'Advisory comments are preserved because ILSpy still emitted valid C# and returned success; inspect these methods when exact IL-level reconstruction matters.'
+            Write-Warning "ILSpy emitted $($advisories.Count) advisory stack-type comment(s). They are recorded in DECOMP_INFO.txt."
+          }
+
+          $lines | Set-Content -Encoding UTF8 'Result/DECOMP_INFO.txt'
 
       - name: Package decompile
         shell: pwsh
@@ -104,6 +207,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $name = "ValheimDecomp-$env:JOB_ID.tar.gz"
           tar -czf $name -C Result .
+          if ($LASTEXITCODE -ne 0) { throw 'Could not package Valheim decompile.' }
           if ((Get-Item $name).Length -le 0) { throw 'Decompile archive is empty.' }
 
       - name: Upload decompile to draft release
