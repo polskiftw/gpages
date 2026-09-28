@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using HarmonyLib;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Jotunn.Utils
 {
@@ -140,6 +141,9 @@ namespace Jotunn.Managers
                 new Dictionary<
                     ByUsagePieceList,
                     Dictionary<int, CustomUsageTag>>();
+        private readonly Dictionary<Piece.PieceCategory, string> vanillaLabels =
+            new Dictionary<Piece.PieceCategory, string>();
+        private bool categoryRefreshNeeded = true;
 
         private PieceManager() { }
 
@@ -253,11 +257,13 @@ namespace Jotunn.Managers
 
             if (Enum.TryParse(name, true, out Piece.PieceCategory vanilla))
             {
+                categoryRefreshNeeded = true;
                 return vanilla;
             }
 
             if (categories.TryGetValue(name, out var existing))
             {
+                categoryRefreshNeeded = true;
                 return existing;
             }
 
@@ -283,6 +289,9 @@ namespace Jotunn.Managers
                 GetCategoryToken(name),
                 name,
                 false);
+
+            categoryRefreshNeeded = true;
+            CreateCategoryTabs();
             return category;
         }
 
@@ -368,7 +377,145 @@ namespace Jotunn.Managers
                 ref table.m_lastSelectedPiece,
                 table.m_availablePiecesByCategory.Count);
 
-            UpdatePieceTableCategories(table);
+            ReorderAllCategoryPieces(table);
+        }
+
+        internal void RefreshCategoriesIfNeeded()
+        {
+            if (!categoryRefreshNeeded)
+            {
+                return;
+            }
+
+            categoryRefreshNeeded = false;
+            RefreshCategories();
+        }
+
+        internal void RefreshCategories()
+        {
+            CreateCategoryTabs();
+
+            var player = Player.m_localPlayer;
+            var table = player ? player.m_buildPieces : null;
+            if (!table)
+            {
+                return;
+            }
+
+            UpdatePieceTableCategories(
+                table,
+                CategoriesInPieceTable(table));
+
+            var hud = Hud.instance;
+            if (!hud ||
+                hud.m_pieceCategoryTabs == null ||
+                hud.m_pieceCategoryTabs.Length == 0 ||
+                !hud.m_pieceCategoryRoot ||
+                !hud.m_pieceSelectionWindow)
+            {
+                return;
+            }
+
+            var firstTab =
+                hud.m_pieceCategoryTabs[0].GetComponent<RectTransform>();
+            var categoryRoot =
+                hud.m_pieceCategoryRoot.GetComponent<RectTransform>();
+            var selectionWindow =
+                hud.m_pieceSelectionWindow.GetComponent<RectTransform>();
+
+            if (!firstTab || !categoryRoot || !selectionWindow)
+            {
+                return;
+            }
+
+            var horizontal =
+                firstTab.parent.GetComponent<HorizontalLayoutGroup>();
+            if (horizontal)
+            {
+                horizontal.enabled = false;
+            }
+
+            const int verticalSpacing = 1;
+            var tabSize = firstTab.rect.size;
+            var maxHorizontalTabs = Math.Max(
+                (int)(categoryRoot.rect.width / Math.Max(tabSize.x, 1f)),
+                1);
+
+            var grid =
+                firstTab.parent.GetComponent<GridLayoutGroup>();
+            if (grid)
+            {
+                grid.constraintCount = maxHorizontalTabs;
+            }
+
+            var tabAnchorX =
+                (-tabSize.x * maxHorizontalTabs) / 2f +
+                tabSize.x / 2f;
+            var tabAnchorY =
+                (tabSize.y + verticalSpacing) *
+                Mathf.Floor(
+                    (float)(table.m_categories.Count - 1) /
+                    maxHorizontalTabs) +
+                5f;
+            var tabAnchor = new Vector2(tabAnchorX, tabAnchorY);
+
+            for (var i = 0; i < table.m_categories.Count &&
+                 i < hud.m_pieceCategoryTabs.Length; i++)
+            {
+                var rect =
+                    hud.m_pieceCategoryTabs[i]
+                        .GetComponent<RectTransform>();
+                if (!rect)
+                {
+                    continue;
+                }
+
+                var x = tabSize.x * (i % maxHorizontalTabs);
+                var y = -(tabSize.y + verticalSpacing) *
+                    (Mathf.Floor((float)i / maxHorizontalTabs) + 0.5f);
+                rect.anchoredPosition =
+                    tabAnchor + new Vector2(x, y);
+                rect.anchorMin = new Vector2(0.5f, 1f);
+                rect.anchorMax = new Vector2(0.5f, 1f);
+            }
+
+            var background =
+                selectionWindow.Find("Bkg2") as RectTransform;
+            if (background)
+            {
+                var height =
+                    (tabSize.y + verticalSpacing) *
+                    Mathf.Max(
+                        0,
+                        Mathf.FloorToInt(
+                            (float)(table.m_categories.Count - 1) /
+                            maxHorizontalTabs));
+                background.offsetMax =
+                    new Vector2(background.offsetMax.x, height);
+            }
+
+            var localize = hud.GetComponentInParent<Localize>();
+            if (localize)
+            {
+                localize.RefreshLocalization();
+            }
+        }
+
+        internal static Piece.UsageTagFlags SafeGetTagById(
+            ByUsagePieceList list,
+            int id)
+        {
+            if (list == null ||
+                id < 0 ||
+                id >= list.m_usageTags.Length)
+            {
+                // Vanilla checks HasFlag on this value. -1 means every
+                // vanilla flag matches while custom-category handling
+                // supplies the real custom result in the postfix.
+                return (Piece.UsageTagFlags)(-1);
+            }
+
+            return list.m_usageTags[id];
         }
 
         internal void UpdateCustomAvailableTags(
@@ -545,53 +692,156 @@ namespace Jotunn.Managers
             }
         }
 
-        private void UpdatePieceTableCategories(PieceTable table)
+        private static HashSet<Piece.PieceCategory>
+            CategoriesInPieceTable(PieceTable table)
         {
-            if (table.m_enabledPieces == null ||
+            var result = new HashSet<Piece.PieceCategory>();
+            if (!table || table.m_pieces == null)
+            {
+                return result;
+            }
+
+            foreach (var prefab in table.m_pieces)
+            {
+                var piece = prefab
+                    ? prefab.GetComponent<Piece>()
+                    : null;
+                if (piece)
+                {
+                    result.Add(piece.m_category);
+                }
+            }
+
+            return result;
+        }
+
+        private void CreateCategoryTabs()
+        {
+            var hud = Hud.instance;
+            if (!hud ||
+                hud.m_pieceCategoryTabs == null ||
+                hud.m_pieceCategoryTabs.Length == 0)
+            {
+                return;
+            }
+
+            var maxCategory = MaxCategory();
+            for (var i = hud.m_pieceCategoryTabs.Length;
+                 i < maxCategory;
+                 i++)
+            {
+                var first = hud.m_pieceCategoryTabs[0];
+                if (!first || !first.transform.parent)
+                {
+                    return;
+                }
+
+                var tab = UnityEngine.Object.Instantiate(
+                    first,
+                    first.transform.parent);
+                tab.SetActive(false);
+
+                var handler =
+                    tab.GetComponent<UIInputHandler>() ??
+                    tab.AddComponent<UIInputHandler>();
+                handler.m_onLeftDown += hud.OnLeftClickCategory;
+
+                var expanded = new GameObject[
+                    hud.m_pieceCategoryTabs.Length + 1];
+                Array.Copy(
+                    hud.m_pieceCategoryTabs,
+                    expanded,
+                    hud.m_pieceCategoryTabs.Length);
+                expanded[expanded.Length - 1] = tab;
+                hud.m_pieceCategoryTabs = expanded;
+            }
+
+            if (Player.m_localPlayer &&
+                Player.m_localPlayer.m_buildPieces)
+            {
+                Player.m_localPlayer.UpdateAvailablePiecesList();
+            }
+        }
+
+        private static void ReorderAllCategoryPieces(
+            PieceTable table)
+        {
+            if (!table ||
+                table.m_pieces == null ||
+                table.m_availablePiecesByCategory == null)
+            {
+                return;
+            }
+
+            var allPieces = table.m_pieces
+                .Select(prefab =>
+                    prefab ? prefab.GetComponent<Piece>() : null)
+                .Where(piece =>
+                    piece &&
+                    piece.m_category == Piece.PieceCategory.All)
+                .ToList();
+
+            foreach (var available in table.m_availablePiecesByCategory)
+            {
+                if (available == null)
+                {
+                    continue;
+                }
+
+                var position = 0;
+                foreach (var piece in allPieces)
+                {
+                    available.Remove(piece);
+                    available.Insert(
+                        Math.Min(position, available.Count),
+                        piece);
+                    position++;
+                }
+            }
+        }
+
+        private void UpdatePieceTableCategories(
+            PieceTable table,
+            HashSet<Piece.PieceCategory> visibleCategories)
+        {
+            if (!table ||
+                visibleCategories == null ||
                 table.m_categories == null ||
                 table.m_categoryLabels == null)
             {
                 return;
             }
 
-            var available = new List<Piece.PieceCategory>();
-            foreach (var piece in table.m_enabledPieces)
+            for (var i = table.m_categories.Count - 1;
+                 i >= 0;
+                 i--)
             {
-                if (piece &&
-                    piece.m_category != Piece.PieceCategory.All &&
-                    !available.Contains(piece.m_category))
+                if (!visibleCategories.Contains(
+                        table.m_categories[i]) ||
+                    table.m_categories[i] ==
+                        Piece.PieceCategory.All)
                 {
-                    available.Add(piece.m_category);
+                    table.m_categories.RemoveAt(i);
+                    if (i < table.m_categoryLabels.Count)
+                    {
+                        table.m_categoryLabels.RemoveAt(i);
+                    }
                 }
             }
 
-            available.Sort();
-            if (table.m_categories.SequenceEqual(available))
+            foreach (var category in visibleCategories
+                .Where(category =>
+                    category != Piece.PieceCategory.All)
+                .OrderBy(category => (int)category))
             {
-                return;
-            }
+                if (table.m_categories.Contains(category))
+                {
+                    continue;
+                }
 
-            var labels =
-                new Dictionary<Piece.PieceCategory, string>();
-            for (var i = 0;
-                 i < table.m_categories.Count &&
-                 i < table.m_categoryLabels.Count;
-                 i++)
-            {
-                labels[table.m_categories[i]] =
-                    table.m_categoryLabels[i];
-            }
-
-            table.m_categories.Clear();
-            table.m_categoryLabels.Clear();
-
-            foreach (var category in available)
-            {
                 table.m_categories.Add(category);
                 table.m_categoryLabels.Add(
-                    labels.TryGetValue(category, out var label)
-                        ? label
-                        : GetCategoryLabel(category));
+                    GetCategoryLabel(category));
             }
         }
 
@@ -606,7 +856,44 @@ namespace Jotunn.Managers
                 }
             }
 
-            return string.Empty;
+            if (!vanillaLabels.ContainsKey(category))
+            {
+                SearchVanillaLabels();
+            }
+
+            return vanillaLabels.TryGetValue(
+                category,
+                out var label)
+                ? label
+                : string.Empty;
+        }
+
+        private void SearchVanillaLabels()
+        {
+            foreach (var table in
+                Resources.FindObjectsOfTypeAll<PieceTable>())
+            {
+                if (!table ||
+                    table.m_categories == null ||
+                    table.m_categoryLabels == null)
+                {
+                    continue;
+                }
+
+                for (var i = 0;
+                     i < table.m_categories.Count &&
+                     i < table.m_categoryLabels.Count;
+                     i++)
+                {
+                    var category = table.m_categories[i];
+                    var label = table.m_categoryLabels[i];
+                    if (!vanillaLabels.ContainsKey(category) &&
+                        !string.IsNullOrEmpty(label))
+                    {
+                        vanillaLabels[category] = label;
+                    }
+                }
+            }
         }
 
         private static string GetCategoryToken(string value)
