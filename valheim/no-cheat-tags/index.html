@@ -19,22 +19,22 @@
 <div class="card">
   <a class="download" href="NoCheatTags.dll">Download NoCheatTags.dll</a>
   <p class="buildstamp"><strong>Hosted build:</strong> <time id="hosted-build" data-build-id="3dfa529014d6f5feb45f59f3307695f2ec424eca6de1f313f96eb684a2dbd6ae" datetime="2026-09-28T14:30:26Z">2026-09-28 14:30:26 UTC</time></p>
-  <p class="note">BepInEx 5 + Harmony. Version <span class="plugin-version">1.2.0</span>.</p>
+  <p class="note">BepInEx 5 + Harmony. Version <span class="plugin-version">1.3.0</span>. Audited against the refreshed Valheim 1.0.16 decompile.</p>
 </div>
 
 <div class="card">
   <div class="title">What it forces</div>
-  <p class="meta"><strong>ItemData.m_cheated:</strong> cleared on load, before save, through inventory load/save/add paths, before tooltip rendering, and by a periodic sweep of the live local-player inventory. Version 1.2.0 also falls back to directly scanning Inventory's enumerable fields when <code>GetAllItems()</code> is unavailable or insufficient.<br><strong>cheated arguments:</strong> every boolean parameter literally named <code>cheated</code> in the Valheim gameplay assembly is forced to false.<br><strong>ItemCheated(...):</strong> every bool-returning method with that name returns false.<br><strong>PlayerProfile.s_bypassCheatChecks:</strong> returns true in memory without invoking the vanilla command or writing its saved <code>bypasscheatchecks</code> key.<br><strong>PlayerProfile.m_usedCheats:</strong> existing values are cleared on profile load/save paths, the vanilla console write is removed from <code>Terminal.ConsoleCommand.RunAction</code>, and the active profile is scrubbed around command execution as a fallback.<br><strong>PlayerStatType.Cheats:</strong> <code>PlayerProfile.IncrementStat</code> ignores this one stat and existing values are reset to zero across the profile's player-stat tracks.<br><strong>ZDO cheat markers:</strong> <code>s_cheated</code> and the eight queued cheat slots cannot be written true and are read as false.</p>
+  <p class="meta"><strong>ItemData.m_cheated:</strong> every current vanilla direct write identified in the Valheim 1.0.16 decompile is forced to store false, including current-format item deserialization, Inventory.AddItem paths, ItemDrop.OnCreateNew, CharacterDrop drops, piece/container returns, and old-world conversion. Inventory.Load also performs one final cleanup pass after deserialization, and ItemData.Save cleans before serialization.<br><strong>cheated arguments:</strong> every boolean parameter literally named <code>cheated</code> in the Valheim gameplay assembly is forced to false.<br><strong>ItemCheated(...):</strong> every bool-returning method with that name returns false.<br><strong>PlayerProfile.s_bypassCheatChecks:</strong> returns true in memory without invoking the vanilla command or writing its saved <code>bypasscheatchecks</code> key.<br><strong>PlayerProfile.m_usedCheats:</strong> existing values are cleared on profile load/save paths, the vanilla console write is removed from <code>Terminal.ConsoleCommand.RunAction</code>, and the active profile is scrubbed around command execution as a fallback.<br><strong>PlayerStatType.Cheats:</strong> <code>PlayerProfile.IncrementStat</code> ignores this one stat and existing values are reset to zero across the profile's player-stat tracks.<br><strong>ZDO cheat markers:</strong> <code>s_cheated</code> and the eight queued cheat slots cannot be written true and are read as false.</p>
 </div>
 
 <div class="card">
   <div class="title">Existing inventory cleanup</div>
-  <p class="meta">Version 1.2.0 explicitly sweeps the already-live local player's inventory every 500 ms. This closes the hole where an inventory could already be in memory without passing through one of the patched load/add paths. When an existing <code>m_cheated=true</code> item is found, the actual field is set to false immediately and the plugin logs how many items it cleaned.</p>
+  <p class="meta">Version 1.3.0 removes the 1.2 polling approach entirely. The current player-load path calls <code>Inventory.Load</code>, which deserializes each item through <code>ItemDrop.ItemData.Load</code>. The plugin forces that exact <code>m_cheated</code> store to false, then performs a one-time post-load pass over the real <code>Inventory.m_inventory</code> list as a defensive check. There is no 500 ms scan and no continuous inventory polling.</p>
 </div>
 
 <div class="card">
   <div class="title">Persistence</div>
-  <p class="meta">Loaded item flags are actually cleared in memory and are clean when those items are next saved. Existing raw world-ZDO cheat bits are neutralized on read and new true writes are blocked; this first version does not bulk-rewrite untouched historical ZDO records just to remove dormant bits from the world file.</p>
+  <p class="meta">Loaded item flags are actually cleared in memory and are clean when those items are next saved. World ItemDrop data uses the same <code>ItemData.Load</code>/<code>ItemData.Save</code> serialization path, so loaded world items receive the same treatment. Existing raw world-ZDO cheat bits are neutralized on read and new true writes are blocked; the mod does not bulk-rewrite untouched dormant ZDO records just for cosmetic cleanup.</p>
 </div>
 
 <div class="card">
