@@ -49,3 +49,19 @@ Runtime code in `valheim-jotunn-compat` must therefore:
 **MoreWorldLocations_All is the first compatibility target/canary, not a runtime dependency or special case.**
 
 When a target exposes a missing Jotunn behavior, fix the underlying generic compatibility layer so that target and other mods using the same behavior benefit automatically.
+
+
+# Hosted Artifact Timestamp Integrity
+
+When a gpages download page displays a **hosted build**, **published build**, **last updated**, or equivalent timestamp for a generated/downloadable artifact, that timestamp must describe the artifact itself, not merely the latest CI run, packaging pass, page deployment, or unrelated repository change.
+
+Therefore:
+
+- only advance the displayed artifact timestamp when the actual hosted artifact meaningfully changes;
+- prefer comparing the primary built binary or another stable content hash, rather than ZIP/container bytes whose metadata may change between otherwise identical builds;
+- do not advance an artifact timestamp because CI reran, GitHub Pages redeployed, an unrelated artifact was published, or an archive was recreated with different internal file timestamps;
+- when a package contains a primary binary plus support files, use the primary binary as the default change detector unless the package's support-file changes are independently meaningful to users;
+- keep the displayed timestamp tied to the exact artifact currently served by the page;
+- use an unambiguous machine-readable UTC value in the page/source, and it may be rendered in the viewer's local timezone for readability.
+
+**Thus is the law: a hosted-build timestamp changes when the hosted build changes, not when automation happens to run.**
