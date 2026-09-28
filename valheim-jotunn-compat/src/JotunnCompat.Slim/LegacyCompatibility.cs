@@ -349,33 +349,36 @@ namespace Jotunn.Managers
 
         internal void ExpandAvailablePieces(PieceTable table)
         {
-            if (!table || table.m_availablePiecesByCategory == null ||
-                table.m_availablePiecesByCategory.Count == 0)
+            var byCategory =
+                GameInternals.AvailablePiecesByCategory(table);
+            if (!table || byCategory == null ||
+                byCategory.Count == 0)
             {
                 return;
             }
 
-            var missing =
-                MaxCategory() - table.m_availablePiecesByCategory.Count;
+            var missing = MaxCategory() - byCategory.Count;
             for (var i = 0; i < missing; i++)
             {
-                table.m_availablePiecesByCategory.Add(new List<Piece>());
+                byCategory.Add(new List<Piece>());
             }
         }
 
         internal void AdjustPieceTable(PieceTable table)
         {
-            if (!table || table.m_availablePiecesByCategory == null)
+            var byCategory =
+                GameInternals.AvailablePiecesByCategory(table);
+            if (!table || byCategory == null)
             {
                 return;
             }
 
             Array.Resize(
                 ref table.m_selectedPiece,
-                table.m_availablePiecesByCategory.Count);
+                byCategory.Count);
             Array.Resize(
                 ref table.m_lastSelectedPiece,
-                table.m_availablePiecesByCategory.Count);
+                byCategory.Count);
 
             ReorderAllCategoryPieces(table);
         }
@@ -396,7 +399,7 @@ namespace Jotunn.Managers
             CreateCategoryTabs();
 
             var player = Player.m_localPlayer;
-            var table = player ? player.m_buildPieces : null;
+            var table = GameInternals.BuildPieces(player);
             if (!table)
             {
                 return;
@@ -505,9 +508,10 @@ namespace Jotunn.Managers
             ByUsagePieceList list,
             int id)
         {
-            if (list == null ||
+            var usageTags = GameInternals.UsageTags(list);
+            if (usageTags == null ||
                 id < 0 ||
-                id >= list.m_usageTags.Length)
+                id >= usageTags.Length)
             {
                 // Vanilla checks HasFlag on this value. -1 means every
                 // vanilla flag matches while custom-category handling
@@ -515,15 +519,19 @@ namespace Jotunn.Managers
                 return (Piece.UsageTagFlags)(-1);
             }
 
-            return list.m_usageTags[id];
+            return usageTags[id];
         }
 
         internal void UpdateCustomAvailableTags(
             ByUsagePieceList list,
             PieceTable table)
         {
+            var usageTags = GameInternals.UsageTags(list);
+            var availableTags = GameInternals.AvailableTags(list);
             if (list == null || !table ||
-                table.m_availablePieces == null)
+                table.m_availablePieces == null ||
+                usageTags == null ||
+                availableTags == null)
             {
                 return;
             }
@@ -551,10 +559,10 @@ namespace Jotunn.Managers
                 }
 
                 var tagIndex =
-                    list.m_usageTags.Length +
-                    list.m_availableTags.Count;
+                    usageTags.Length +
+                    availableTags.Count;
                 tagIndexByCategory[piece.m_category] = tagIndex;
-                list.m_availableTags.Add(tagIndex);
+                availableTags.Add(tagIndex);
                 tags[tagIndex] =
                     new CustomUsageTag(
                         categoryName,
@@ -570,15 +578,17 @@ namespace Jotunn.Managers
             out string result)
         {
             result = null;
+            var availableTags = GameInternals.AvailableTags(list);
             if (list == null ||
+                availableTags == null ||
                 index < 0 ||
-                index >= list.m_availableTags.Count ||
+                index >= availableTags.Count ||
                 !customAvailableTags.TryGetValue(list, out var tags))
             {
                 return false;
             }
 
-            var tagId = list.m_availableTags[index];
+            var tagId = availableTags[index];
             if (!tags.TryGetValue(tagId, out var tag))
             {
                 return false;
@@ -618,9 +628,10 @@ namespace Jotunn.Managers
             out Piece.UsageTagFlags result)
         {
             result = default;
-            if (list == null ||
+            var usageTags = GameInternals.UsageTags(list);
+            if (usageTags == null ||
                 id < 0 ||
-                id >= list.m_usageTags.Length)
+                id >= usageTags.Length)
             {
                 result = (Piece.UsageTagFlags)(-1);
                 return true;
@@ -744,7 +755,7 @@ namespace Jotunn.Managers
                 var handler =
                     tab.GetComponent<UIInputHandler>() ??
                     tab.AddComponent<UIInputHandler>();
-                handler.m_onLeftDown += hud.OnLeftClickCategory;
+                GameInternals.WireCategoryClick(hud, handler);
 
                 var expanded = new GameObject[
                     hud.m_pieceCategoryTabs.Length + 1];
@@ -756,19 +767,21 @@ namespace Jotunn.Managers
                 hud.m_pieceCategoryTabs = expanded;
             }
 
-            if (Player.m_localPlayer &&
-                Player.m_localPlayer.m_buildPieces)
+            var player = Player.m_localPlayer;
+            if (player && GameInternals.BuildPieces(player))
             {
-                Player.m_localPlayer.UpdateAvailablePiecesList();
+                GameInternals.UpdateAvailablePiecesList(player);
             }
         }
 
         private static void ReorderAllCategoryPieces(
             PieceTable table)
         {
+            var byCategory =
+                GameInternals.AvailablePiecesByCategory(table);
             if (!table ||
                 table.m_pieces == null ||
-                table.m_availablePiecesByCategory == null)
+                byCategory == null)
             {
                 return;
             }
@@ -781,7 +794,7 @@ namespace Jotunn.Managers
                     piece.m_category == Piece.PieceCategory.All)
                 .ToList();
 
-            foreach (var available in table.m_availablePiecesByCategory)
+            foreach (var available in byCategory)
             {
                 if (available == null)
                 {
