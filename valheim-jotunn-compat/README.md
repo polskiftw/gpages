@@ -47,12 +47,12 @@ A Cecil contract checker verifies the private Valheim and SoftReferenceableAsset
 
 ## More World Locations canary
 
-More World Locations AIO 5.1.1 is the first broad compatibility canary.
+More World Locations AIO 5.1.4 is the first broad compatibility canary.
 
 CI checks every DLL in the downloaded MWL package against the source-built slim `Jotunn.dll`. The main MWL assembly currently references:
 
 - 26 Jotunn types
-- 91 Jotunn members
+- 92 Jotunn members
 
 All of those references resolve against the slim build.
 
@@ -60,13 +60,13 @@ This proves binary/API compatibility for the exercised surface. It does not repl
 
 ## ValheimRAFT canary
 
-ValheimRAFT 4.3.5 is the second broad compatibility canary. CI probes every DLL in the Thunderstore package against the same source-built slim `Jotunn.dll`.
+ValheimRAFT 5.0.7 is the second broad compatibility canary. CI probes every DLL in the Thunderstore package against the same source-built slim `Jotunn.dll`.
 
 Jotunn-dependent assemblies currently resolve completely:
 
 - `DynamicLocations.dll`: 10 Jotunn types / 19 Jotunn members
 - `ValheimRAFT.dll`: 9 Jotunn types / 9 Jotunn members
-- `ValheimVehicles.dll`: 26 Jotunn types / 103 Jotunn members
+- `ValheimVehicles.dll`: 25 Jotunn types / 101 Jotunn members
 - `ZdoWatcher.dll`: 8 Jotunn types / 13 Jotunn members
 
 `ServerSync.dll` and `Zolantris.Shared.dll` have no Jotunn assembly reference.
