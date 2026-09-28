@@ -1,6 +1,6 @@
 # Assembly Inspector
 
-Current plugin version: **1.2.1**.
+Current plugin version: **1.3.0**.
 
 A BepInEx 5 + Harmony Valheim development/debug tool for browsing the live `assembly_valheim` managed assembly and forcing selected scalar method/property return values.
 
@@ -22,10 +22,37 @@ The browser shows:
 - property types and their getter methods
 - field types and static field values
 - filtering by class name, member name, and return type
+- assembly-wide global member search without selecting a class first
 - optional inherited members
 - optional property getter/setter methods in the method list
 - copyable C#-style signatures
 - copyable reflection targeting information
+
+## Assembly-wide member search
+
+Version 1.3.0 adds a **Global search** box above the browser. It searches declared methods, properties, and fields across every loaded class at once, so you do not need to know or select the owning class first.
+
+Plain search terms are ANDed together and can match:
+
+- class names / full type names
+- method, property, and field names
+- method signatures
+- return/property/field types
+- method and indexer parameter names/types
+
+Useful filters can be mixed with ordinary terms:
+
+```text
+method:CanBuild type:bool
+field:stamina class:Player
+property:health
+param:ItemDrop method:
+class:Inventory name:Add
+```
+
+Supported filter prefixes are `method:`, `property:`, `field:`, `class:`, `name:`, `type:` (or `return:`), `param:` (or `parameter:`), and `kind:`.
+
+Selecting a global result immediately selects its owning class and opens the normal detail/edit panel. Property accessor methods are omitted from the global *method* index to avoid duplicate results because the property itself is indexed directly; the existing per-class **Show getters/setters** toggle still exposes them when needed.
 
 ## Live return overrides
 

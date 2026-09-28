@@ -17,7 +17,7 @@ namespace AssemblyInspectorMod
     {
         public const string PluginGuid = "claire.valheim.assemblyinspector";
         public const string PluginName = "Assembly Inspector";
-        public const string PluginVersion = "1.2.1";
+        public const string PluginVersion = "1.3.0";
         private const string HarmonyId = PluginGuid + ".live-overrides";
         private const string UiHarmonyId = PluginGuid + ".ui-input";
         private const int WindowId = 845112;
@@ -48,6 +48,8 @@ namespace AssemblyInspectorMod
         private Harmony _uiHarmony;
         private Assembly _targetAssembly;
         private List<Type> _types = new List<Type>();
+        private readonly List<GlobalMemberEntry> _globalMembers = new List<GlobalMemberEntry>();
+        private const int MaxGlobalSearchResults = 300;
 
         private Type _selectedType;
         private MethodInfo _selectedMethod;
@@ -57,6 +59,7 @@ namespace AssemblyInspectorMod
         private string _typeSearch = string.Empty;
         private string _memberSearch = string.Empty;
         private string _returnSearch = string.Empty;
+        private string _globalSearch = string.Empty;
         private string _overrideText = string.Empty;
         private string _status = "Open in game after Valheim has loaded its managed assemblies.";
 
@@ -68,6 +71,7 @@ namespace AssemblyInspectorMod
         private Rect _windowRect = new Rect(24f, 24f, 1650f, 960f);
         private Vector2 _typeScroll;
         private Vector2 _memberScroll;
+        private Vector2 _globalSearchScroll;
         private Vector2 _detailScroll;
 
         private bool _cursorSaved;
@@ -101,6 +105,21 @@ namespace AssemblyInspectorMod
             Methods,
             Properties,
             Fields
+        }
+
+        private sealed class GlobalMemberEntry
+        {
+            public Type DeclaringType;
+            public MethodInfo Method;
+            public PropertyInfo Property;
+            public FieldInfo Field;
+            public string Kind;
+            public string Label;
+            public string ClassText;
+            public string NameText;
+            public string TypeText;
+            public string ParameterText;
+            public string SearchText;
         }
 
         private void Awake()
@@ -686,6 +705,23 @@ namespace AssemblyInspectorMod
                 SetVisible(false);
             GUILayout.EndHorizontal();
 
+            GUILayout.Space(4f);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Global search:", GUILayout.Width(92f));
+            string nextGlobalSearch = GUILayout.TextField(_globalSearch ?? string.Empty);
+            if (!string.Equals(nextGlobalSearch, _globalSearch, StringComparison.Ordinal))
+            {
+                _globalSearch = nextGlobalSearch;
+                _globalSearchScroll = Vector2.zero;
+            }
+
+            if (!string.IsNullOrWhiteSpace(_globalSearch) && GUILayout.Button("Clear", GUILayout.Width(64f)))
+            {
+                _globalSearch = string.Empty;
+                _globalSearchScroll = Vector2.zero;
+            }
+            GUILayout.EndHorizontal();
+            GUILayout.Label("Search all classes at once. Terms match class/member/signature/type/parameters. Filters: method:, field:, property:, class:, name:, type:, param:");
             GUILayout.Space(6f);
             GUILayout.BeginHorizontal();
 
@@ -738,9 +774,17 @@ namespace AssemblyInspectorMod
         {
             GUILayout.BeginVertical(GUILayout.Width(560f));
 
+            string globalQuery = (_globalSearch ?? string.Empty).Trim();
+            if (globalQuery.Length != 0)
+            {
+                DrawGlobalSearchResults(globalQuery);
+                GUILayout.EndVertical();
+                return;
+            }
+
             if (_selectedType == null)
             {
-                GUILayout.Label("Select a class.");
+                GUILayout.Label("Select a class, or use Global search above.");
                 GUILayout.EndVertical();
                 return;
             }
@@ -792,6 +836,68 @@ namespace AssemblyInspectorMod
             GUILayout.EndScrollView();
 
             GUILayout.EndVertical();
+        }
+
+        private void DrawGlobalSearchResults(string query)
+        {
+            GUILayout.Label("Global members");
+            GUILayout.Label("Searching " + _globalMembers.Count + " declared methods/properties/fields.");
+
+            int matches = 0;
+            int shown = 0;
+
+            _globalSearchScroll = GUILayout.BeginScrollView(_globalSearchScroll);
+            foreach (GlobalMemberEntry entry in _globalMembers)
+            {
+                if (!MatchesGlobalSearch(entry, query))
+                    continue;
+
+                matches++;
+                if (shown >= MaxGlobalSearchResults)
+                    continue;
+
+                string label = IsGlobalEntrySelected(entry) ? "> " + entry.Label : entry.Label;
+                if (GUILayout.Button(label, GUILayout.Height(42f)))
+                    SelectGlobalMember(entry);
+
+                shown++;
+            }
+            GUILayout.EndScrollView();
+
+            if (matches > MaxGlobalSearchResults)
+                GUILayout.Label("Showing first " + MaxGlobalSearchResults + " / " + matches + " matches. Add another term or filter to narrow it.");
+            else
+                GUILayout.Label("Showing " + matches + " match" + (matches == 1 ? "." : "es."));
+        }
+
+        private bool IsGlobalEntrySelected(GlobalMemberEntry entry)
+        {
+            if (entry.Method != null)
+                return ReferenceEquals(entry.Method, _selectedMethod) && _selectedProperty == null;
+            if (entry.Property != null)
+                return ReferenceEquals(entry.Property, _selectedProperty);
+            return entry.Field != null && ReferenceEquals(entry.Field, _selectedField);
+        }
+
+        private void SelectGlobalMember(GlobalMemberEntry entry)
+        {
+            SelectType(entry.DeclaringType);
+
+            if (entry.Method != null)
+            {
+                _tab = MemberTab.Methods;
+                SelectMethod(entry.Method);
+            }
+            else if (entry.Property != null)
+            {
+                _tab = MemberTab.Properties;
+                SelectProperty(entry.Property);
+            }
+            else if (entry.Field != null)
+            {
+                _tab = MemberTab.Fields;
+                SelectField(entry.Field);
+            }
         }
 
         private void DrawMethodList()
@@ -1078,6 +1184,7 @@ namespace AssemblyInspectorMod
         {
             _targetAssembly = null;
             _types.Clear();
+            _globalMembers.Clear();
             _selectedType = null;
             ClearMemberSelection();
 
@@ -1104,7 +1211,176 @@ namespace AssemblyInspectorMod
                 .OrderBy(DisplayTypeName, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            _status = "Loaded " + _types.Count + " classes from " + _targetAssembly.GetName().Name + ".";
+            BuildGlobalMemberIndex();
+            _status = "Loaded " + _types.Count + " classes and " + _globalMembers.Count +
+                " searchable members from " + _targetAssembly.GetName().Name + ".";
+        }
+
+        private void BuildGlobalMemberIndex()
+        {
+            _globalMembers.Clear();
+
+            foreach (Type type in _types)
+            {
+                string classText = DisplayTypeName(type) + " " + (type.FullName ?? string.Empty);
+
+                try
+                {
+                    foreach (MethodInfo method in type.GetMethods(DeclaredMembers))
+                    {
+                        // Properties are indexed separately, so omit accessor methods from the
+                        // global method index to keep common searches from returning duplicates.
+                        if (method.IsSpecialName)
+                            continue;
+
+                        string parameterText = string.Join(" ", method.GetParameters()
+                            .Select(parameter =>
+                                (parameter.Name ?? string.Empty) + " " +
+                                FriendlyType(parameter.ParameterType) + " " +
+                                (parameter.ParameterType.FullName ?? string.Empty))
+                            .ToArray());
+                        string typeText = FriendlyType(method.ReturnType) + " " +
+                            (method.ReturnType.FullName ?? string.Empty);
+
+                        _globalMembers.Add(new GlobalMemberEntry
+                        {
+                            DeclaringType = type,
+                            Method = method,
+                            Kind = "method",
+                            Label = "[METHOD] " + DisplayTypeName(type) + "." + FormatMethodShort(method),
+                            ClassText = classText,
+                            NameText = method.Name,
+                            TypeText = typeText,
+                            ParameterText = parameterText,
+                            SearchText = "method " + classText + " " + method.Name + " " +
+                                FormatMethodSignature(method) + " " + typeText + " " + parameterText
+                        });
+                    }
+
+                    foreach (PropertyInfo property in type.GetProperties(DeclaredMembers))
+                    {
+                        string parameterText = string.Join(" ", property.GetIndexParameters()
+                            .Select(parameter =>
+                                (parameter.Name ?? string.Empty) + " " +
+                                FriendlyType(parameter.ParameterType) + " " +
+                                (parameter.ParameterType.FullName ?? string.Empty))
+                            .ToArray());
+                        string typeText = FriendlyType(property.PropertyType) + " " +
+                            (property.PropertyType.FullName ?? string.Empty);
+
+                        _globalMembers.Add(new GlobalMemberEntry
+                        {
+                            DeclaringType = type,
+                            Property = property,
+                            Kind = "property",
+                            Label = "[PROPERTY] " + DisplayTypeName(type) + "." + property.Name +
+                                " -> " + FriendlyType(property.PropertyType),
+                            ClassText = classText,
+                            NameText = property.Name,
+                            TypeText = typeText,
+                            ParameterText = parameterText,
+                            SearchText = "property " + classText + " " + property.Name + " " +
+                                typeText + " " + parameterText
+                        });
+                    }
+
+                    foreach (FieldInfo field in type.GetFields(DeclaredMembers))
+                    {
+                        string typeText = FriendlyType(field.FieldType) + " " +
+                            (field.FieldType.FullName ?? string.Empty);
+
+                        _globalMembers.Add(new GlobalMemberEntry
+                        {
+                            DeclaringType = type,
+                            Field = field,
+                            Kind = "field",
+                            Label = "[FIELD] " + DisplayTypeName(type) + "." + field.Name +
+                                " : " + FriendlyType(field.FieldType),
+                            ClassText = classText,
+                            NameText = field.Name,
+                            TypeText = typeText,
+                            ParameterText = string.Empty,
+                            SearchText = "field " + classText + " " + field.Name + " " + typeText
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogDebug("Could not index all members of " + type.FullName + ": " + ex.Message);
+                }
+            }
+
+            _globalMembers.Sort((left, right) =>
+            {
+                int byName = StringComparer.OrdinalIgnoreCase.Compare(left.NameText, right.NameText);
+                if (byName != 0)
+                    return byName;
+
+                int byClass = StringComparer.OrdinalIgnoreCase.Compare(left.ClassText, right.ClassText);
+                if (byClass != 0)
+                    return byClass;
+
+                return StringComparer.OrdinalIgnoreCase.Compare(left.Kind, right.Kind);
+            });
+        }
+
+        private static bool MatchesGlobalSearch(GlobalMemberEntry entry, string query)
+        {
+            string[] tokens = (query ?? string.Empty)
+                .Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (string rawToken in tokens)
+            {
+                int colon = rawToken.IndexOf(':');
+                if (colon > 0)
+                {
+                    string prefix = rawToken.Substring(0, colon).ToLowerInvariant();
+                    string value = rawToken.Substring(colon + 1);
+
+                    switch (prefix)
+                    {
+                        case "method":
+                            if (entry.Method == null || value.Length != 0 && !ContainsIgnoreCase(entry.SearchText, value))
+                                return false;
+                            continue;
+                        case "property":
+                            if (entry.Property == null || value.Length != 0 && !ContainsIgnoreCase(entry.SearchText, value))
+                                return false;
+                            continue;
+                        case "field":
+                            if (entry.Field == null || value.Length != 0 && !ContainsIgnoreCase(entry.SearchText, value))
+                                return false;
+                            continue;
+                        case "class":
+                            if (!ContainsIgnoreCase(entry.ClassText, value))
+                                return false;
+                            continue;
+                        case "name":
+                            if (!ContainsIgnoreCase(entry.NameText, value))
+                                return false;
+                            continue;
+                        case "type":
+                        case "return":
+                            if (!ContainsIgnoreCase(entry.TypeText, value))
+                                return false;
+                            continue;
+                        case "param":
+                        case "parameter":
+                            if (!ContainsIgnoreCase(entry.ParameterText, value))
+                                return false;
+                            continue;
+                        case "kind":
+                            if (!ContainsIgnoreCase(entry.Kind, value))
+                                return false;
+                            continue;
+                    }
+                }
+
+                if (!ContainsIgnoreCase(entry.SearchText, rawToken))
+                    return false;
+            }
+
+            return true;
         }
 
         private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
