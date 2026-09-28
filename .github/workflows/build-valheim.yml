@@ -44,7 +44,7 @@ jobs:
           }
           New-Item -ItemType Directory -Force -Path $stubDir | Out-Null
 
-          $url = 'https://thunderstore.io/package/download/denikson/BepInExPack_Valheim/5.4.2350/'
+          $url = 'https://thunderstore.io/package/download/denikson/BepInExPack_Valheim/5.4.2351/'
           $bepZip = "$env:RUNNER_TEMP\bepinex.zip"
           $downloaded = $false
           for ($attempt = 1; $attempt -le 4; $attempt++) {
@@ -318,7 +318,7 @@ jobs:
 
           # First compatibility canary. Target-specific knowledge lives only in CI/tests;
           # production runtime code remains completely generic.
-          $mwlVersion = '5.1.1'
+          $mwlVersion = '5.1.4'
           $mwlUrl = "https://thunderstore.io/package/download/warpalicious/More_World_Locations_AIO/$mwlVersion/"
           $mwlZip = Join-Path $env:RUNNER_TEMP "More_World_Locations_AIO-$mwlVersion.zip"
           $mwlExtract = Join-Path $env:RUNNER_TEMP "More_World_Locations_AIO-$mwlVersion"
