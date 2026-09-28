@@ -19,7 +19,7 @@
 <div class="card">
   <a class="download" href="NoCheatTags.dll">Download NoCheatTags.dll</a>
   <p class="buildstamp"><strong>Hosted build:</strong> <time id="hosted-build" data-build-id="de9e4a641e8d39277361eb4552abcc0d70cf34b6534c09cc0619a5039c07a3d9" datetime="2026-09-28T15:03:07Z">2026-09-28 15:03:07 UTC</time></p>
-  <p class="note">BepInEx 5 + Harmony. Version <span class="plugin-version">1.3.1</span>. Audited against the refreshed Valheim 1.0.16 decompile.</p>
+  <p class="note">BepInEx 5 + Harmony. Version <span class="plugin-version">1.3.2</span>. Audited against the refreshed Valheim 1.0.16 decompile and raw Managed assemblies.</p>
 </div>
 
 <div class="card">
@@ -28,8 +28,8 @@
 </div>
 
 <div class="card">
-  <div class="title">Linux resolver fix in 1.3.1</div>
-  <p class="meta">The 1.3.0 Linux build could abort before installing any Harmony patches because its fallback assembly-wide type enumeration did not resolve the nested runtime type <code>ItemDrop+ItemData</code>. Version 1.3.1 resolves <code>ItemDrop.ItemData</code> directly through the known enclosing <code>ItemDrop</code> type first, with direct runtime-name and enumeration fallbacks only afterward.</p>
+  <div class="title">Linux resolver fix in 1.3.2</div>
+  <p class="meta">The raw 1.0.16 Managed files contain both <code>assembly_valheim.dll</code> and a small <code>Assembly-CSharp.dll</code>. The gameplay classes <code>ItemDrop</code> and <code>ItemDrop+ItemData</code> are in <code>assembly_valheim.dll</code>; <code>Assembly-CSharp.dll</code> contains neither. Earlier builds used one OR-based first-match lookup, so Linux/Mono could select <code>Assembly-CSharp</code> first and then fail every gameplay-type lookup. Version 1.3.2 explicitly prefers <code>assembly_valheim</code>, only falling back to <code>Assembly-CSharp</code> if the gameplay assembly is absent.</p>
 </div>
 
 <div class="card">
