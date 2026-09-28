@@ -111,15 +111,33 @@ namespace Jotunn.Managers
                         binder: null,
                         args: new object[] { bundleName, string.Empty },
                         culture: null);
-                    AccessTools.Method(bundleLoaderType, "HoldReference")?.Invoke(bundleLoader, Array.Empty<object>());
-                    AccessTools.Method(bundleLoaderType, "SetDependencies")?.Invoke(bundleLoader, new object[] { Array.Empty<string>() });
+                    AccessTools.Method(bundleLoaderType, "HoldReference")?.Invoke(
+                        bundleLoader,
+                        Array.Empty<object>());
 
+                    // Match upstream Jotunn's ordering exactly. SetDependencies
+                    // consults the loader's bundle-name map, so the synthetic
+                    // bundle must already exist in the map/array before it is
+                    // asked to resolve dependencies.
                     bundleIndex = bundleLoaders.Length;
-                    var expandedBundles = Array.CreateInstance(bundleLoaderType, bundleIndex + 1);
+                    bundleMap.Add(bundleName, bundleIndex);
+
+                    var expandedBundles = Array.CreateInstance(
+                        bundleLoaderType,
+                        bundleIndex + 1);
                     Array.Copy(bundleLoaders, expandedBundles, bundleIndex);
                     expandedBundles.SetValue(bundleLoader, bundleIndex);
                     bundleLoadersField.SetValue(loader, expandedBundles);
-                    bundleMap.Add(bundleName, bundleIndex);
+
+                    AccessTools.Method(bundleLoaderType, "SetDependencies")?.Invoke(
+                        bundleLoader,
+                        new object[] { Array.Empty<string>() });
+
+                    // BundleLoader is a value type in current Valheim. Reflection
+                    // mutates the boxed copy, so write it back after dependencies
+                    // have been assigned.
+                    expandedBundles.SetValue(bundleLoader, bundleIndex);
+                    bundleLoadersField.SetValue(loader, expandedBundles);
                 }
 
                 var assetLocationType = AccessTools.TypeByName("SoftReferenceableAssets.AssetLocation");
@@ -140,8 +158,9 @@ namespace Jotunn.Managers
                     culture: null);
 
                 AccessTools.Field(assetLoaderType, "m_asset")?.SetValue(assetLoader, asset);
-                AccessTools.Field(assetLoaderType, "m_bundleLoaderIndex")?.SetValue(assetLoader, bundleIndex);
-                AccessTools.Method(assetLoaderType, "HoldReference")?.Invoke(assetLoader, Array.Empty<object>());
+                AccessTools.Method(assetLoaderType, "HoldReference")?.Invoke(
+                    assetLoader,
+                    Array.Empty<object>());
 
                 var assetLoaders = (Array)assetLoadersField.GetValue(loader);
                 int assetIndex = assetLoaders.Length;
@@ -155,7 +174,16 @@ namespace Jotunn.Managers
             }
             catch (Exception ex)
             {
-                Logger.LogWarning("Could not register runtime soft-reference asset '" + asset.name + "': " + ex.Message);
+                var detail = ex;
+                while (detail is TargetInvocationException &&
+                       detail.InnerException != null)
+                {
+                    detail = detail.InnerException;
+                }
+
+                Logger.LogWarning(
+                    "Could not register runtime soft-reference asset '" +
+                    asset.name + "': " + detail);
             }
         }
 
