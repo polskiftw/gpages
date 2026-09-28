@@ -623,6 +623,38 @@ namespace Jotunn.Managers
         [HarmonyPostfix]
         private static void LocalizationSetup() => LocalizationManager.Instance.Apply();
 
+        [HarmonyPatch(typeof(Player), nameof(Player.SetPlaceMode))]
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Low)]
+        private static void PlayerSetPlaceModePostfix()
+        {
+            PieceManager.Instance.RefreshCategories();
+        }
+
+        [HarmonyPatch(typeof(Hud), nameof(Hud.Awake))]
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Low)]
+        private static void HudAwakePostfix()
+        {
+            PieceManager.Instance.RefreshCategories();
+        }
+
+        [HarmonyPatch(typeof(Hud), nameof(Hud.UpdateBuild))]
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.Low)]
+        private static void HudUpdateBuildPrefix()
+        {
+            PieceManager.Instance.RefreshCategoriesIfNeeded();
+        }
+
+        [HarmonyPatch(typeof(Hud), nameof(Hud.LateUpdate))]
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Low)]
+        private static void HudLateUpdatePostfix()
+        {
+            PieceManager.Instance.RefreshCategoriesIfNeeded();
+        }
+
         [HarmonyPatch(typeof(PieceTable), nameof(PieceTable.UpdateAvailable))]
         [HarmonyPrefix]
         private static void PieceTableUpdateAvailablePrefix(
@@ -744,6 +776,35 @@ namespace Jotunn.Managers
                 tagId,
                 pieceTable,
                 resultOut);
+        }
+
+        [HarmonyPatch(
+            typeof(ByUsagePieceList),
+            nameof(ByUsagePieceList.GetAvailablePiecesWithTag))]
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction>
+            GetAvailablePiecesWithTagTranspiler(
+                IEnumerable<CodeInstruction> instructions)
+        {
+            var original = AccessTools.Method(
+                typeof(ByUsagePieceList),
+                nameof(ByUsagePieceList.GetTagById));
+            var replacement = AccessTools.Method(
+                typeof(PieceManager),
+                nameof(PieceManager.SafeGetTagById));
+
+            foreach (var instruction in instructions)
+            {
+                if (original != null &&
+                    replacement != null &&
+                    instruction.Calls(original))
+                {
+                    instruction.opcode = OpCodes.Call;
+                    instruction.operand = replacement;
+                }
+
+                yield return instruction;
+            }
         }
 
         [HarmonyPatch(
