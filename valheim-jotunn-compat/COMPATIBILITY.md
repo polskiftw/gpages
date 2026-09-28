@@ -125,6 +125,8 @@ Jotunn-referencing assemblies:
 
 All referenced Jotunn symbols in every Jotunn-dependent DLL resolve against the slim build.
 
+The generic runtime has also been advanced beyond the original static milestone with the relevant upstream Jotunn 2.30.2 behavior fixes for custom build-menu categories and ambiguous Deep North prefab names. The build-menu path now refreshes legacy category tabs on HUD/place-mode lifecycle points and protects out-of-range usage-tag lookups used by custom categories.
+
 ### Current-game binary validation
 
 The same CI run compiles the slim runtime against the SHA-256-pinned unpublished-draft `Managed.zip` from the current Valheim installation. The Cecil contract checker also verifies current private/version-sensitive bridges used for:
