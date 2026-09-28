@@ -118,6 +118,19 @@ namespace Jotunn
 {
     public static class ExposedGameObjectExtension
     {
+        public static T GetOrAddComponent<T>(
+            this GameObject gameObject)
+            where T : Component
+        {
+            if (!gameObject)
+            {
+                return null;
+            }
+
+            return gameObject.GetComponent<T>() ??
+                gameObject.AddComponent<T>();
+        }
+
         public static Transform FindDeepChild(
             this GameObject gameObject,
             string childName,
