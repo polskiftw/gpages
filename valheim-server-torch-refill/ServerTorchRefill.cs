@@ -147,7 +147,7 @@ namespace ServerTorchRefillMod
                 return result;
 
             float targetFuel = Mathf.Min(maxFuel, maxFuel * refillTo);
-            int fuelNeeded = Mathf.CeilToInt(targetFuel - currentFuel);
+            int fuelNeeded = Mathf.FloorToInt(targetFuel - currentFuel);
             if (fuelNeeded <= 0)
                 return result;
 
