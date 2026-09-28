@@ -359,7 +359,7 @@ jobs:
 
             Set-Content -Path $pagePath -Value $page -Encoding utf8NoBOM
             $builtHash = (Get-FileHash $builtDll -Algorithm SHA256).Hash
-            Write-Host "Publishing meaningful Assembly Inspector build $buildId: $builtHash (version $pluginVersion)"
+            Write-Host "Publishing meaningful Assembly Inspector build ${buildId}: $builtHash (version $pluginVersion)"
           }
           else {
             Write-Host "Assembly Inspector build identity unchanged ($buildId); keeping the exact hosted DLL and timestamp."
