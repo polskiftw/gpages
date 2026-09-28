@@ -14,7 +14,7 @@ namespace NoCheatTagsMod
     {
         public const string PluginGuid = "claire.valheim.nocheattags";
         public const string PluginName = "No Cheat Tags";
-        public const string PluginVersion = "1.3.0";
+        public const string PluginVersion = "1.3.1";
 
         private const BindingFlags Declared =
             BindingFlags.Instance | BindingFlags.Static |
@@ -85,6 +85,8 @@ namespace NoCheatTagsMod
                     "PlayerProfile.m_usedCheats is suppressed/cleared and PlayerStatType.Cheats is held at zero; known command history is left alone.");
                 Logger.LogInfo(
                     "Item cheat cleanup is event-driven: vanilla m_cheated writes are forced false and inventories are checked once when loaded; no periodic polling is used.");
+                Logger.LogInfo(
+                    "ItemData resolver used exact nested-type lookup first (ItemDrop+ItemData), avoiding partial assembly type-enumeration issues on Mono.");
             }
             catch (Exception ex)
             {
@@ -122,9 +124,9 @@ namespace NoCheatTagsMod
             if (_gameAssembly == null)
                 throw new InvalidOperationException("Valheim gameplay assembly is not loaded.");
 
-            _itemDataType = FindTypeWithField("ItemData", "m_cheated", typeof(bool));
-            _inventoryType = FindType("Inventory");
             _itemDropType = FindType("ItemDrop");
+            _itemDataType = ResolveItemDataType();
+            _inventoryType = FindType("Inventory");
             _characterDropType = FindType("CharacterDrop");
             _zdoType = FindType("ZDO");
             _zdoVarsType = FindType("ZDOVars");
@@ -159,9 +161,49 @@ namespace NoCheatTagsMod
                 Logger.LogWarning("Inventory.m_inventory was not found; event-boundary inventory cleanup is unavailable.");
 
             Logger.LogInfo(
-                "Resolved current Valheim cheat fields: " +
+                "Resolved current Valheim cheat fields from assembly " +
+                _gameAssembly.GetName().Name + ": " +
                 _itemDataType.FullName + ".m_cheated" +
                 (_characterDropCheatedField != null ? " and CharacterDrop.m_cheated." : "."));
+        }
+
+
+        private Type ResolveItemDataType()
+        {
+            // In current Valheim this is the nested type ItemDrop.ItemData
+            // (runtime name ItemDrop+ItemData). Prefer exact nested/direct lookup
+            // before any assembly-wide type enumeration. On some Linux Mono
+            // setups GetTypes() can return a partial list even though the nested
+            // gameplay type itself is fully usable.
+            Type nested = null;
+
+            if (_itemDropType != null)
+            {
+                try
+                {
+                    nested = _itemDropType.GetNestedType(
+                        "ItemData",
+                        BindingFlags.Public | BindingFlags.NonPublic);
+                }
+                catch
+                {
+                }
+
+                if (nested != null && HasField(nested, "m_cheated", typeof(bool)))
+                    return nested;
+            }
+
+            try
+            {
+                Type direct = _gameAssembly.GetType("ItemDrop+ItemData", false, false);
+                if (direct != null && HasField(direct, "m_cheated", typeof(bool)))
+                    return direct;
+            }
+            catch
+            {
+            }
+
+            return FindTypeWithField("ItemData", "m_cheated", typeof(bool));
         }
 
 
