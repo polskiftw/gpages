@@ -12,6 +12,11 @@ on:
 permissions:
   contents: write
 
+env:
+  BEPINEX_PACK_VERSION: '5.4.2350'
+  VALHEIM_MANAGED_SHA256: 'b81c940eb8d1d751b3a5b12d1e9dbc9309fa508014e2d22c1a5065212c1234ed'
+  ASSEMBLY_INSPECTOR_BUILD_RECIPE: 'net472-dotnet-build-v1'
+
 concurrency:
   group: valheim-assembly-inspector-main
   cancel-in-progress: true
@@ -32,7 +37,7 @@ jobs:
           $lib = Join-Path $project 'lib'
           New-Item -ItemType Directory -Force -Path $lib | Out-Null
 
-          $bepUrl = 'https://thunderstore.io/package/download/denikson/BepInExPack_Valheim/5.4.2350/'
+          $bepUrl = "https://thunderstore.io/package/download/denikson/BepInExPack_Valheim/$env:BEPINEX_PACK_VERSION/"
           $bepZip = Join-Path $env:RUNNER_TEMP 'bepinex.zip'
           Invoke-WebRequest -Uri $bepUrl -OutFile $bepZip
           Expand-Archive -Path $bepZip -DestinationPath (Join-Path $env:RUNNER_TEMP 'bepinex')
@@ -47,7 +52,7 @@ jobs:
 
           # Same pinned current Valheim Managed snapshot used by the other Valheim builds.
           $managedAssetId = 574482997
-          $managedExpectedSha256 = 'b81c940eb8d1d751b3a5b12d1e9dbc9309fa508014e2d22c1a5065212c1234ed'
+          $managedExpectedSha256 = $env:VALHEIM_MANAGED_SHA256
           $managedZip = Join-Path $env:RUNNER_TEMP 'valheim-managed.zip'
           $managedExtract = Join-Path $env:RUNNER_TEMP 'valheim-managed'
           $managedAssetUrl = "https://api.github.com/repos/polskiftw/gpages/releases/assets/$managedAssetId"
@@ -295,16 +300,37 @@ jobs:
           $hostedDll = '.\valheim\assembly-inspector\AssemblyInspector.dll'
           $pagePath = '.\valheim\assembly-inspector\index.html'
           $sourcePath = '.\valheim-assembly-inspector\AssemblyInspector.cs'
+          $projectPath = '.\valheim-assembly-inspector\AssemblyInspector.csproj'
 
-          $builtHash = (Get-FileHash $builtDll -Algorithm SHA256).Hash
-          $hostedHash = if (Test-Path $hostedDll) {
-            (Get-FileHash $hostedDll -Algorithm SHA256).Hash
+          # Use a stable build identity instead of rebuilt PE bytes. Some compiler/toolchain
+          # details can perturb otherwise equivalent DLL bytes; those rebuilds must not
+          # replace the hosted artifact or advance its timestamp.
+          $sourceBlob = (git hash-object -- $sourcePath).Trim()
+          $projectBlob = (git hash-object -- $projectPath).Trim()
+          $identitySeed = @(
+            $sourceBlob,
+            $projectBlob,
+            $env:VALHEIM_MANAGED_SHA256,
+            $env:BEPINEX_PACK_VERSION,
+            $env:ASSEMBLY_INSPECTOR_BUILD_RECIPE
+          ) -join [char]10
+          $sha256 = [System.Security.Cryptography.SHA256]::Create()
+          try {
+            $identityBytes = [System.Text.Encoding]::UTF8.GetBytes($identitySeed)
+            $buildId = ([BitConverter]::ToString($sha256.ComputeHash($identityBytes))).Replace('-', '').ToLowerInvariant()
           }
-          else {
-            ''
+          finally {
+            $sha256.Dispose()
           }
 
-          $artifactChanged = $builtHash -ne $hostedHash
+          $page = Get-Content -Raw $pagePath
+          $buildIdPattern = '<time id="hosted-build" data-build-id="([^"]*)" datetime="[^"]*">.*?</time>'
+          $hostedIdentityMatch = [regex]::Match($page, $buildIdPattern)
+          if (-not $hostedIdentityMatch.Success) {
+            throw "Could not find hosted-build identity/timestamp marker in $pagePath"
+          }
+          $hostedBuildId = $hostedIdentityMatch.Groups[1].Value
+          $artifactChanged = $buildId -ne $hostedBuildId
 
           if ($artifactChanged) {
             Copy-Item -Force $builtDll $hostedDll
@@ -316,7 +342,6 @@ jobs:
             }
             $pluginVersion = $versionMatch.Groups[1].Value
 
-            $page = Get-Content -Raw $pagePath
             $versionPattern = '<span class="plugin-version">[^<]*</span>'
             if (-not [regex]::IsMatch($page, $versionPattern)) {
               throw "Could not find plugin-version marker in $pagePath"
@@ -329,19 +354,17 @@ jobs:
             $utcNow = [DateTimeOffset]::UtcNow
             $isoStamp = $utcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
             $fallbackStamp = $utcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'")
-            $timestampPattern = '<time id="hosted-build" datetime="[^"]*">.*?</time>'
-            if (-not [regex]::IsMatch($page, $timestampPattern)) {
-              throw "Could not find hosted-build timestamp marker in $pagePath"
-            }
-            $timestampReplacement = "<time id=`"hosted-build`" datetime=`"$isoStamp`">$fallbackStamp</time>"
-            $page = [regex]::Replace($page, $timestampPattern, $timestampReplacement, 1)
+            $timestampReplacement = "<time id=`"hosted-build`" data-build-id=`"$buildId`" datetime=`"$isoStamp`">$fallbackStamp</time>"
+            $page = [regex]::Replace($page, $buildIdPattern, $timestampReplacement, 1)
 
             Set-Content -Path $pagePath -Value $page -Encoding utf8NoBOM
-            Write-Host "Publishing new Assembly Inspector build: $builtHash (version $pluginVersion)"
+            $builtHash = (Get-FileHash $builtDll -Algorithm SHA256).Hash
+            Write-Host "Publishing meaningful Assembly Inspector build $buildId: $builtHash (version $pluginVersion)"
           }
           else {
-            Write-Host "AssemblyInspector.dll unchanged ($builtHash); keeping the existing hosted timestamp."
+            Write-Host "Assembly Inspector build identity unchanged ($buildId); keeping the exact hosted DLL and timestamp."
           }
+
 
           git add -- 'valheim/assembly-inspector/AssemblyInspector.dll' 'valheim/assembly-inspector/index.html'
           git diff --cached --quiet
