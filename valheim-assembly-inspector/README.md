@@ -1,8 +1,8 @@
 # Assembly Inspector
 
-Current plugin version: **1.3.0**.
+Current plugin version: **1.4.0**.
 
-A BepInEx 5 + Harmony Valheim development/debug tool for browsing the live `assembly_valheim` managed assembly and forcing selected scalar method/property return values.
+A BepInEx 5 + Harmony Valheim development/debug tool for browsing the live `assembly_valheim` managed assembly, forcing scalar return/argument values, and applying targeted scalar field mutations around selected methods.
 
 ## What it does
 
@@ -27,6 +27,8 @@ The browser shows:
 - optional property getter/setter methods in the method list
 - copyable C#-style signatures
 - copyable reflection targeting information
+- live scalar argument overrides for selected method parameters
+- live prefix/postfix field mutations using `this.field` or `argument.field` targets
 
 ## Assembly-wide member search
 
@@ -75,9 +77,46 @@ The original Valheim method still runs normally. After it returns, Assembly Insp
 
 That is deliberately the default because it preserves side effects in the original method.
 
-Every live override can be removed individually, and **Clear all live overrides** removes all patches owned by Assembly Inspector.
+Every live override can be removed individually, and **Clear all live patches** removes all patches owned by Assembly Inspector.
 
 Version 1.1.1 routes generated typed `DynamicMethod` postfixes through Harmony's patch-factory mechanism instead of registering a dynamic method directly. CI smoke-tests the factory contract and a generated bool postfix that changes `false` to `true`.
+
+## Argument overrides
+
+Version 1.4.0 adds scalar argument overrides. For each supported parameter on the selected method, enter the forced value and choose **Apply live**. Assembly Inspector installs a Harmony prefix and replaces that argument in `__args` before the original Valheim method receives it.
+
+This is useful for signatures such as:
+
+```text
+ItemDrop.OnCreateNew(ItemDrop, bool cheated)
+CharacterDrop.DropItems(..., bool cheated)
+```
+
+For example, forcing the `cheated` argument to `false` changes the incoming flag without skipping the original method.
+
+**Copy argument mod** produces a standalone generated BepInEx/Harmony patch for that exact overloaded method and argument index.
+
+## Field mutation patches
+
+Version 1.4.0 also adds targeted scalar field mutation patches tied to a selected method. Enter a one-level target path:
+
+```text
+this.m_cheated
+item.m_cheated
+arg0.m_cheated
+```
+
+- `this.field` targets the selected method's instance.
+- `parameterName.field` targets an object passed to that method.
+- `argN.field` is an index-based fallback when parameter names are inconvenient.
+- Static fields are detected automatically after the path resolves.
+
+Choose whether the mutation runs as a **prefix** (before the original method) or **postfix** (after it). Prefix is useful for sanitizing an object before save/consumption; postfix is useful for clearing a field after a load/create method sets it.
+
+Only writable scalar fields are synthesized automatically: primitive values, strings, chars, enums, and decimals. Readonly/constants and instance fields on value-type arguments are rejected instead of generating a patch that would silently fail.
+
+**Copy field-mutation mod** produces a standalone generated patch using reflection for the field write, so private fields and private declaring types do not need to be referenced directly in generated source.
+
 
 ## Generate standalone override mods
 
@@ -86,7 +125,7 @@ For supported scalar return types, the selected member has:
 - **Copy postfix mod** — complete BepInEx/Harmony source that lets the original run, then replaces the return value
 - **Copy hard override mod** — complete source that sets the return value and skips the original method entirely
 
-Version 1.2.0 also adds **Copy live bundle (N)** to the top bar. You can force several methods/properties live at once, then copy one complete postfix mod containing every active override and its current forced value.
+Version 1.2.0 added **Copy live bundle (N)** to the top bar. In 1.4.0 that bundle now includes every active return override, argument override, and field mutation, not just postfix return overrides.
 
 Example:
 
@@ -98,9 +137,9 @@ ThingC.MaxCount() = 99
 Copy live bundle (3)
 ```
 
-The generated bundle uses one shared reflection resolver plus one small typed postfix per override, keeping the source compact enough for the repository's browser DLL Generator workflow.
+The generated bundle uses one shared reflection resolver plus compact Harmony prefix/postfix methods for the active patches, keeping the source suitable for the repository's browser DLL Generator workflow.
 
-Version 1.2.1 gives each bundle a deterministic content-derived identity. The sorted target methods, exact parameter/return type identities, and forced values are hashed with SHA-256; the first 16 lowercase hex characters become the bundle suffix.
+Version 1.2.1 gives each bundle a deterministic content-derived identity. The sorted patch kind, exact target method/parameter identities, field target/timing where applicable, and forced values are hashed with SHA-256; the first 16 lowercase hex characters become the bundle suffix.
 
 For example:
 
@@ -128,9 +167,14 @@ The assembly name field is editable if you want to inspect another already-loade
 
 ## Safety / scope
 
-Assembly Inspector is deliberately focused on **return-value inspection and override**. It does not provide arbitrary method invocation or arbitrary memory/field editing.
+Assembly Inspector does not provide arbitrary method invocation or unrestricted memory editing. Its mutation tools are deliberately narrow and declarative:
 
-Live return forcing is limited to scalar values that can be converted safely in the inspector UI.
+- return overrides are limited to supported scalar return values
+- argument overrides are limited to supported scalar parameters
+- field mutation patches require an explicit selected method plus a one-level `this.field` / `argument.field` target
+- field writes are limited to writable scalar fields
+
+That keeps generated patches inspectable and deterministic while covering common Harmony prefix/postfix modding patterns.
 
 ## Build
 
