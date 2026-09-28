@@ -438,17 +438,21 @@ jobs:
           Copy-Item -Force '.\valheim-ward-hit-sound\bin\Release\net472\WardHitSoundToggle.dll' '.\valheim\ward-hit-sound\WardHitSoundToggle.dll'
           Copy-Item -Force '.\valheim-gear-inspector\bin\Release\net472\GearInspector.dll' '.\valheim\gear-inspector\GearInspector.dll'
           Copy-Item -Force '.\valheim-hammer-everything\bin\Release\net472\HammerEverything.dll' '.\valheim\hammer-everything\HammerEverything.dll'
-          Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\package\BepInEx\plugins\JotunnCompat\Jotunn.dll' '.\valheim\jotunn-compat\Jotunn.dll'
-          git rm -f --ignore-unmatch "valheim/jotunn-compat/JotunnCompat.Preloader.dll"
-          Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\JotunnCompat.zip' '.\valheim\jotunn-compat\JotunnCompat.zip'
-
-          # Only advance the visible hosted-build timestamp when the Jotunn
-          # artifact itself changed. Unrelated Valheim artifact publishes must
-          # not make this page look newer than the DLL/ZIP it serves.
-          git diff --quiet -- "valheim/jotunn-compat/Jotunn.dll" "valheim/jotunn-compat/JotunnCompat.zip"
-          $jotunnChanged = $LASTEXITCODE -ne 0
+          $builtJotunn = '.\valheim-jotunn-compat\bin\Release\package\BepInEx\plugins\JotunnCompat\Jotunn.dll'
+          $hostedJotunn = '.\valheim\jotunn-compat\Jotunn.dll'
+          $builtJotunnHash = (Get-FileHash $builtJotunn -Algorithm SHA256).Hash
+          $hostedJotunnHash = if (Test-Path $hostedJotunn) {
+            (Get-FileHash $hostedJotunn -Algorithm SHA256).Hash
+          }
+          else {
+            ''
+          }
+          $jotunnChanged = $builtJotunnHash -ne $hostedJotunnHash
 
           if ($jotunnChanged) {
+            Copy-Item -Force $builtJotunn $hostedJotunn
+            Copy-Item -Force '.\valheim-jotunn-compat\bin\Release\JotunnCompat.zip' '.\valheim\jotunn-compat\JotunnCompat.zip'
+
             $pagePath = '.\valheim\jotunn-compat\index.html'
             $utcNow = [DateTimeOffset]::UtcNow
             $isoStamp = $utcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
@@ -463,7 +467,13 @@ jobs:
             $replacement = "<time id=`"hosted-build`" datetime=`"$isoStamp`">$fallbackStamp</time>"
             $page = [regex]::Replace($page, $pattern, $replacement, 1)
             Set-Content -Path $pagePath -Value $page -Encoding utf8NoBOM
+            Write-Host "Publishing new Jotunn build: $builtJotunnHash"
           }
+          else {
+            Write-Host "Jotunn.dll unchanged ($builtJotunnHash); keeping the existing hosted ZIP and timestamp."
+          }
+
+          git rm -f --ignore-unmatch "valheim/jotunn-compat/JotunnCompat.Preloader.dll"
 
           git rm -f --ignore-unmatch "valheim/jotunn-compat/JotunnCompat.FastPath.dll"
           git add -- "valheim/ward-hit-sound/WardHitSoundToggle.dll" "valheim/gear-inspector/GearInspector.dll" "valheim/hammer-everything/HammerEverything.dll" "valheim/jotunn-compat/Jotunn.dll" "valheim/jotunn-compat/JotunnCompat.zip" "valheim/jotunn-compat/index.html"
