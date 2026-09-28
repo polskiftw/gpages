@@ -111,7 +111,7 @@ jobs:
 
           # Exact current Valheim managed binaries live in an unpublished draft release.
           # They are never committed or copied into the public artifact.
-          $managedZip = Join-Path $env:RUNNER_TEMP 'valheim-managed.zip'
+          $managedZip = Join-Path $env:RUNNER_TEMP 'ValheimDebug.tar.gz'
           $managedExtract = Join-Path $env:RUNNER_TEMP 'valheim-managed'
           $apiHeaders = @{
             Authorization = "Bearer $env:GITHUB_TOKEN"
@@ -126,11 +126,11 @@ jobs:
           if (-not $managedRelease) { throw 'Could not find draft release "valheim managed binaries".' }
 
           $managedAsset = $managedRelease.assets |
-            Where-Object { $_.name -eq 'Managed.zip' } |
+            Where-Object { $_.name -eq 'ValheimDebug.tar.gz' } |
             Select-Object -First 1
-          if (-not $managedAsset) { throw 'Draft release "valheim managed binaries" does not contain Managed.zip.' }
+          if (-not $managedAsset) { throw 'Draft release "valheim managed binaries" does not contain ValheimDebug.tar.gz.' }
           if (-not $managedAsset.digest -or -not $managedAsset.digest.StartsWith('sha256:')) {
-            throw 'Managed.zip does not expose a SHA-256 digest through the GitHub release API.'
+            throw 'ValheimDebug.tar.gz does not expose a SHA-256 digest through the GitHub release API.'
           }
 
           $managedExpectedSha256 = $managedAsset.digest.Substring(7).ToLowerInvariant()
@@ -140,14 +140,15 @@ jobs:
 
           $managedActualSha256 = (Get-FileHash $managedZip -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($managedActualSha256 -ne $managedExpectedSha256) {
-            throw "Managed.zip SHA256 mismatch. Expected $managedExpectedSha256, got $managedActualSha256"
+            throw "ValheimDebug.tar.gz SHA256 mismatch. Expected $managedExpectedSha256, got $managedActualSha256"
           }
 
-          Expand-Archive -Path $managedZip -DestinationPath $managedExtract
+          New-Item -ItemType Directory -Path $managedExtract -Force | Out-Null
+          tar -xzf $managedZip -C $managedExtract
           $assemblyCSharp = Get-ChildItem -Path $managedExtract -Recurse -File -Filter 'Assembly-CSharp.dll' |
             Select-Object -First 1
           if (-not $assemblyCSharp) {
-            throw 'Managed.zip does not contain Assembly-CSharp.dll'
+            throw 'ValheimDebug.tar.gz does not contain Assembly-CSharp.dll'
           }
 
           $managedDir = $assemblyCSharp.Directory.FullName
@@ -157,7 +158,7 @@ jobs:
             'UnityEngine.CoreModule.dll'
           )) {
             if (-not (Test-Path (Join-Path $managedDir $required))) {
-              throw "Managed.zip is missing required assembly $required"
+              throw "ValheimDebug.tar.gz is missing required assembly $required"
             }
           }
 
@@ -172,7 +173,7 @@ jobs:
           )) {
             $unitySource = Join-Path $managedDir $unityAssembly
             if (-not (Test-Path $unitySource)) {
-              throw "Managed.zip is missing Gear Inspector build reference $unityAssembly"
+              throw "ValheimDebug.tar.gz is missing Gear Inspector build reference $unityAssembly"
             }
             Copy-Item -Force $unitySource (Join-Path $gearLib $unityAssembly)
           }
@@ -180,7 +181,7 @@ jobs:
           "VALHEIM_MANAGED=$managedDir" |
             Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host "Current Valheim managed refs: $managedDir"
-          Write-Host "Managed.zip SHA256: $managedActualSha256"
+          Write-Host "ValheimDebug.tar.gz SHA256: $managedActualSha256"
 
       - name: Enforce generic Jotunn runtime
         shell: pwsh
