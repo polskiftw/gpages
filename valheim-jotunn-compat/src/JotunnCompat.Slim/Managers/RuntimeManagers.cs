@@ -623,7 +623,7 @@ namespace Jotunn.Managers
         [HarmonyPostfix]
         private static void LocalizationSetup() => LocalizationManager.Instance.Apply();
 
-        [HarmonyPatch(typeof(Player), nameof(Player.SetPlaceMode))]
+        [HarmonyPatch(typeof(Player), "SetPlaceMode")]
         [HarmonyPostfix]
         [HarmonyPriority(Priority.Low)]
         private static void PlayerSetPlaceModePostfix()
@@ -631,7 +631,7 @@ namespace Jotunn.Managers
             PieceManager.Instance.RefreshCategories();
         }
 
-        [HarmonyPatch(typeof(Hud), nameof(Hud.Awake))]
+        [HarmonyPatch(typeof(Hud), "Awake")]
         [HarmonyPostfix]
         [HarmonyPriority(Priority.Low)]
         private static void HudAwakePostfix()
@@ -639,7 +639,7 @@ namespace Jotunn.Managers
             PieceManager.Instance.RefreshCategories();
         }
 
-        [HarmonyPatch(typeof(Hud), nameof(Hud.UpdateBuild))]
+        [HarmonyPatch(typeof(Hud), "UpdateBuild")]
         [HarmonyPrefix]
         [HarmonyPriority(Priority.Low)]
         private static void HudUpdateBuildPrefix()
@@ -647,7 +647,7 @@ namespace Jotunn.Managers
             PieceManager.Instance.RefreshCategoriesIfNeeded();
         }
 
-        [HarmonyPatch(typeof(Hud), nameof(Hud.LateUpdate))]
+        [HarmonyPatch(typeof(Hud), "LateUpdate")]
         [HarmonyPostfix]
         [HarmonyPriority(Priority.Low)]
         private static void HudLateUpdatePostfix()
