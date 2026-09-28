@@ -17,7 +17,6 @@ env:
   BEPINEX_PACK_VERSION: '5.4.2351'
   SERVERSIDE_QOL_VERSION: '2.1.1'
   YAMLDOTNET_VERSION: '16.3.1'
-  VALHEIM_MANAGED_SHA256: 'b81c940eb8d1d751b3a5b12d1e9dbc9309fa508014e2d22c1a5065212c1234ed'
 
 concurrency:
   group: valheim-server-torch-refill-main
@@ -70,27 +69,43 @@ jobs:
           Copy-Item -Force $yaml.FullName (Join-Path $lib 'YamlDotNet.dll')
 
           # Exact current Valheim managed binaries from the repository's private,
-          # SHA-256-pinned draft-release asset. They are compile references only
+          # current draft-release asset. GitHub's asset digest is verified before use.
           # and are never published by this workflow.
-          $managedAssetId = 574482997
           $managedZip = Join-Path $env:RUNNER_TEMP 'valheim-managed.zip'
           $managedExtract = Join-Path $env:RUNNER_TEMP 'valheim-managed'
-          $managedAssetUrl = "https://api.github.com/repos/polskiftw/gpages/releases/assets/$managedAssetId"
-          $headers = @{
+          $apiHeaders = @{
             Authorization = "Bearer $env:GITHUB_TOKEN"
-            Accept = 'application/octet-stream'
+            Accept = 'application/vnd.github+json'
             'X-GitHub-Api-Version' = '2022-11-28'
           }
 
-          Invoke-WebRequest -Uri $managedAssetUrl -Headers $headers -OutFile $managedZip
+          $releases = Invoke-RestMethod -Uri 'https://api.github.com/repos/polskiftw/gpages/releases?per_page=100' -Headers $apiHeaders
+          $managedRelease = $releases |
+            Where-Object { $_.draft -and $_.name -eq 'valheim managed binaries' } |
+            Select-Object -First 1
+          if (-not $managedRelease) { throw 'Could not find draft release "valheim managed binaries".' }
+
+          $managedAsset = $managedRelease.assets |
+            Where-Object { $_.name -eq 'Managed.zip' } |
+            Select-Object -First 1
+          if (-not $managedAsset) { throw 'Draft release "valheim managed binaries" does not contain Managed.zip.' }
+          if (-not $managedAsset.digest -or -not $managedAsset.digest.StartsWith('sha256:')) {
+            throw 'Managed.zip does not expose a SHA-256 digest through the GitHub release API.'
+          }
+
+          $managedExpectedSha256 = $managedAsset.digest.Substring(7).ToLowerInvariant()
+          $downloadHeaders = $apiHeaders.Clone()
+          $downloadHeaders['Accept'] = 'application/octet-stream'
+          Invoke-WebRequest -Uri $managedAsset.url -Headers $downloadHeaders -OutFile $managedZip
+
           $actual = (Get-FileHash $managedZip -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actual -ne $env:VALHEIM_MANAGED_SHA256) {
-            throw "Managed.zip SHA256 mismatch. Expected $env:VALHEIM_MANAGED_SHA256, got $actual"
+          if ($actual -ne $managedExpectedSha256) {
+            throw "Managed.zip SHA256 mismatch. Expected $managedExpectedSha256, got $actual"
           }
 
           Expand-Archive -Path $managedZip -DestinationPath $managedExtract
           $assemblyValheim = Get-ChildItem -Path $managedExtract -Recurse -File -Filter 'assembly_valheim.dll' | Select-Object -First 1
-          if (-not $assemblyValheim) { throw 'Pinned Managed snapshot does not contain assembly_valheim.dll' }
+          if (-not $assemblyValheim) { throw 'Current Managed snapshot does not contain assembly_valheim.dll' }
           $managedDir = $assemblyValheim.Directory.FullName
 
           foreach ($name in @(
@@ -102,12 +117,12 @@ jobs:
             'UnityEngine.CoreModule.dll'
           )) {
             $source = Join-Path $managedDir $name
-            if (-not (Test-Path $source)) { throw "Pinned Managed snapshot is missing $name" }
+            if (-not (Test-Path $source)) { throw "Current Managed snapshot is missing $name" }
             Copy-Item -Force $source (Join-Path $lib $name)
           }
 
           Write-Host "ServersideQoL: $($sqol.FullName)"
-          Write-Host "Pinned assembly_valheim: $($assemblyValheim.FullName)"
+          Write-Host "Current assembly_valheim: $($assemblyValheim.FullName)"
           Write-Host "Managed.zip SHA256: $actual"
 
       - name: Build Server Torch Refill
