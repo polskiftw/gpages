@@ -128,7 +128,14 @@ jobs:
           $managedAsset = $managedRelease.assets |
             Where-Object { $_.name -eq 'ValheimDebug.tar.gz' } |
             Select-Object -First 1
-          if (-not $managedAsset) { throw 'Draft release "valheim managed binaries" does not contain ValheimDebug.tar.gz.' }
+          if (-not $managedAsset) {
+            $managedAsset = $managedRelease.assets |
+              Where-Object { $_.name -eq 'Managed.zip' } |
+              Select-Object -First 1
+          }
+          if (-not $managedAsset) {
+            throw 'Draft release "valheim managed binaries" contains neither ValheimDebug.tar.gz nor legacy Managed.zip.'
+          }
           if (-not $managedAsset.digest -or -not $managedAsset.digest.StartsWith('sha256:')) {
             throw 'ValheimDebug.tar.gz does not expose a SHA-256 digest through the GitHub release API.'
           }
@@ -144,7 +151,11 @@ jobs:
           }
 
           New-Item -ItemType Directory -Path $managedExtract -Force | Out-Null
-          tar -xzf $managedZip -C $managedExtract
+          if ($managedAsset.name -eq 'Managed.zip') {
+            Expand-Archive -Path $managedZip -DestinationPath $managedExtract
+          } else {
+            tar -xzf $managedZip -C $managedExtract
+          }
           $assemblyCSharp = Get-ChildItem -Path $managedExtract -Recurse -File -Filter 'Assembly-CSharp.dll' |
             Select-Object -First 1
           if (-not $assemblyCSharp) {
