@@ -1,0 +1,177 @@
+name: Build Server Torch Refill
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'valheim-server-torch-refill/**'
+      - 'valheim/server-torch-refill/index.html'
+      - '.github/workflows/build-valheim-server-torch-refill.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  BEPINEX_PACK_VERSION: '5.4.2351'
+  SERVERSIDE_QOL_VERSION: '2.1.1'
+  YAMLDOTNET_VERSION: '16.3.1'
+  VALHEIM_MANAGED_SHA256: 'b81c940eb8d1d751b3a5b12d1e9dbc9309fa508014e2d22c1a5065212c1234ed'
+
+concurrency:
+  group: valheim-server-torch-refill-main
+  cancel-in-progress: true
+
+jobs:
+  build-and-publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare compile references
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $project = Join-Path $env:GITHUB_WORKSPACE 'valheim-server-torch-refill'
+          $lib = Join-Path $project 'lib'
+          New-Item -ItemType Directory -Force -Path $lib | Out-Null
+
+          $bepUrl = "https://thunderstore.io/package/download/denikson/BepInExPack_Valheim/$env:BEPINEX_PACK_VERSION/"
+          $bepZip = Join-Path $env:RUNNER_TEMP 'bepinex.zip'
+          $bepExtract = Join-Path $env:RUNNER_TEMP 'bepinex'
+          Invoke-WebRequest -Uri $bepUrl -OutFile $bepZip
+          Expand-Archive -Path $bepZip -DestinationPath $bepExtract
+
+          foreach ($name in @('BepInEx.dll','0Harmony.dll','Mono.Cecil.dll','MonoMod.Utils.dll')) {
+            $file = Get-ChildItem -Path $bepExtract -Recurse -File -Filter $name | Select-Object -First 1
+            if (-not $file) { throw "Could not find $name in BepInEx package" }
+            Copy-Item -Force $file.FullName (Join-Path $lib $name)
+          }
+
+          $sqolUrl = "https://thunderstore.io/package/download/ArgusMagnus/ServersideQoL/$env:SERVERSIDE_QOL_VERSION/"
+          $sqolZip = Join-Path $env:RUNNER_TEMP 'serversideqol.zip'
+          $sqolExtract = Join-Path $env:RUNNER_TEMP 'serversideqol'
+          Invoke-WebRequest -Uri $sqolUrl -OutFile $sqolZip
+          Expand-Archive -Path $sqolZip -DestinationPath $sqolExtract
+          $sqol = Get-ChildItem -Path $sqolExtract -Recurse -File -Filter 'ServersideQoL.dll' | Select-Object -First 1
+          if (-not $sqol) { throw 'Could not find ServersideQoL.dll in ServersideQoL package' }
+          Copy-Item -Force $sqol.FullName (Join-Path $lib 'ServersideQoL.dll')
+
+          $yamlUrl = "https://thunderstore.io/package/download/ValheimModding/YamlDotNet/$env:YAMLDOTNET_VERSION/"
+          $yamlZip = Join-Path $env:RUNNER_TEMP 'yamldotnet.zip'
+          $yamlExtract = Join-Path $env:RUNNER_TEMP 'yamldotnet'
+          Invoke-WebRequest -Uri $yamlUrl -OutFile $yamlZip
+          Expand-Archive -Path $yamlZip -DestinationPath $yamlExtract
+          $yaml = Get-ChildItem -Path $yamlExtract -Recurse -File -Filter 'YamlDotNet.dll' | Select-Object -First 1
+          if (-not $yaml) { throw 'Could not find YamlDotNet.dll in YamlDotNet package' }
+          Copy-Item -Force $yaml.FullName (Join-Path $lib 'YamlDotNet.dll')
+
+          # Exact current Valheim managed binaries from the repository's private,
+          # SHA-256-pinned draft-release asset. They are compile references only
+          # and are never published by this workflow.
+          $managedAssetId = 574482997
+          $managedZip = Join-Path $env:RUNNER_TEMP 'valheim-managed.zip'
+          $managedExtract = Join-Path $env:RUNNER_TEMP 'valheim-managed'
+          $managedAssetUrl = "https://api.github.com/repos/polskiftw/gpages/releases/assets/$managedAssetId"
+          $headers = @{
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            Accept = 'application/octet-stream'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+
+          Invoke-WebRequest -Uri $managedAssetUrl -Headers $headers -OutFile $managedZip
+          $actual = (Get-FileHash $managedZip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $env:VALHEIM_MANAGED_SHA256) {
+            throw "Managed.zip SHA256 mismatch. Expected $env:VALHEIM_MANAGED_SHA256, got $actual"
+          }
+
+          Expand-Archive -Path $managedZip -DestinationPath $managedExtract
+          $assemblyValheim = Get-ChildItem -Path $managedExtract -Recurse -File -Filter 'assembly_valheim.dll' | Select-Object -First 1
+          if (-not $assemblyValheim) { throw 'Pinned Managed snapshot does not contain assembly_valheim.dll' }
+          $managedDir = $assemblyValheim.Directory.FullName
+
+          foreach ($name in @(
+            'assembly_valheim.dll',
+            'assembly_utils.dll',
+            'assembly_guiutils.dll',
+            'SoftReferenceableAssets.dll',
+            'UnityEngine.dll',
+            'UnityEngine.CoreModule.dll'
+          )) {
+            $source = Join-Path $managedDir $name
+            if (-not (Test-Path $source)) { throw "Pinned Managed snapshot is missing $name" }
+            Copy-Item -Force $source (Join-Path $lib $name)
+          }
+
+          Write-Host "ServersideQoL: $($sqol.FullName)"
+          Write-Host "Pinned assembly_valheim: $($assemblyValheim.FullName)"
+          Write-Host "Managed.zip SHA256: $actual"
+
+      - name: Build Server Torch Refill
+        shell: pwsh
+        run: dotnet build .\valheim-server-torch-refill\ServerTorchRefill.csproj -c Release --nologo
+
+      - name: Verify output
+        shell: pwsh
+        run: |
+          $dll = '.\valheim-server-torch-refill\bin\Release\netstandard2.1\ServerTorchRefill.dll'
+          if (-not (Test-Path $dll)) { throw "Build output missing: $dll" }
+          Get-FileHash $dll -Algorithm SHA256
+
+      - name: Publish Server Torch Refill
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+
+          $builtDll = '.\valheim-server-torch-refill\bin\Release\netstandard2.1\ServerTorchRefill.dll'
+          $hostedDir = '.\valheim\server-torch-refill'
+          $hostedDll = Join-Path $hostedDir 'ServerTorchRefill.dll'
+          $pagePath = Join-Path $hostedDir 'index.html'
+          New-Item -ItemType Directory -Force -Path $hostedDir | Out-Null
+
+          $builtHash = (Get-FileHash $builtDll -Algorithm SHA256).Hash.ToLowerInvariant()
+          $hostedHash = if (Test-Path $hostedDll) {
+            (Get-FileHash $hostedDll -Algorithm SHA256).Hash.ToLowerInvariant()
+          }
+          else {
+            ''
+          }
+
+          if ($builtHash -ne $hostedHash) {
+            Copy-Item -Force $builtDll $hostedDll
+
+            $page = Get-Content -Raw $pagePath
+            $pattern = '<time id="hosted-build" data-build-id="[^"]*" datetime="[^"]*">.*?</time>'
+            if (-not [regex]::IsMatch($page, $pattern)) {
+              throw "Could not find hosted-build marker in $pagePath"
+            }
+
+            $utcNow = [DateTimeOffset]::UtcNow
+            $isoStamp = $utcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+            $fallbackStamp = $utcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'")
+            $replacement = "<time id=`"hosted-build`" data-build-id=`"$builtHash`" datetime=`"$isoStamp`">$fallbackStamp</time>"
+            $page = [regex]::Replace($page, $pattern, $replacement, 1)
+            Set-Content -Path $pagePath -Value $page -Encoding utf8NoBOM
+
+            Write-Host "Publishing ServerTorchRefill.dll: $builtHash"
+          }
+          else {
+            Write-Host "ServerTorchRefill.dll unchanged ($builtHash); preserving hosted timestamp."
+          }
+
+          git add -- 'valheim/server-torch-refill/ServerTorchRefill.dll' 'valheim/server-torch-refill/index.html'
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host 'Published Server Torch Refill artifact is already current.'
+            exit 0
+          }
+
+          git commit -m "Publish Server Torch Refill artifact"
+          git push

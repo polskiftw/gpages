@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2f2f7">
+<title>Server Torch Refill — gpages</title>
+<style>
+:root{color-scheme:light dark;--bg:#f2f2f7;--card:#fff;--text:#111;--muted:#6e6e73;--border:rgba(60,60,67,.18);--accent:#007aff;--button:#007aff;--buttonText:#fff}
+@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#f5f5f7;--muted:#98989d;--border:rgba(84,84,88,.65);--accent:#0a84ff;--button:#0a84ff;--buttonText:#fff}}
+*{box-sizing:border-box}body{margin:0;padding:max(28px,env(safe-area-inset-top)) 16px max(28px,env(safe-area-inset-bottom));background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}main{width:min(100%,680px);margin:0 auto}.back{display:inline-block;color:var(--accent);text-decoration:none;margin:0 0 18px}h1{font-size:32px;margin:4px 0 8px;letter-spacing:-.7px}.sub{color:var(--muted);margin:0 0 22px;line-height:1.45}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;margin-bottom:14px}.download{display:block;width:100%;text-align:center;text-decoration:none;background:var(--button);color:var(--buttonText);font-weight:700;border-radius:14px;padding:14px 16px;margin:4px 0 10px}.buildstamp{font-size:13px;color:var(--muted);text-align:center;margin:0 0 12px}.buildstamp strong{color:var(--text)}.note{font-size:13px;color:var(--muted);line-height:1.45;margin:0}.title{font-size:17px;font-weight:700;margin:0 0 8px}.steps{margin:0;padding-left:22px;line-height:1.6}.meta{font-size:14px;color:var(--muted);line-height:1.55;margin:0}.meta strong{color:var(--text)}code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}
+</style>
+</head>
+<body><main>
+<a class="back" href="../">‹ Valheim</a>
+<h1>Server Torch Refill</h1>
+<p class="sub">True server-side Valheim light maintenance: refill torches, sconces, braziers and similar lights from nearby storage while vanilla and console clients install nothing.</p>
+
+<div class="card">
+  <a class="download" href="ServerTorchRefill.dll">Download ServerTorchRefill.dll</a>
+  <p class="buildstamp"><strong>Hosted build:</strong> <time id="hosted-build" data-build-id="" datetime="">pending first build</time></p>
+  <p class="note">The DLL is installed only on the dedicated server. It requires ServersideQoL 2.1.1 or newer.</p>
+</div>
+
+<div class="card">
+  <div class="title">Install</div>
+  <ol class="steps">
+    <li>Install BepInEx 5 on the Valheim dedicated server.</li>
+    <li>Install <strong>ServersideQoL 2.1.1+</strong> and its required dependencies on the server.</li>
+    <li>Download <code>ServerTorchRefill.dll</code>.</li>
+    <li>Put it in the server's <code>BepInEx/plugins/</code> folder.</li>
+    <li>Restart the server. Clients do not install this mod.</li>
+  </ol>
+</div>
+
+<div class="card">
+  <div class="title">Default behavior</div>
+  <p class="meta"><strong>Storage range:</strong> 10 m<br><strong>Refill trigger:</strong> 25% fuel or lower<br><strong>Refill target:</strong> 100%<br><strong>Fuel left behind:</strong> 0<br><strong>Fallback check:</strong> every 30 seconds, plus immediate checks after nearby chest changes<br><strong>Open chests:</strong> never modified<br><strong>Fuel type:</strong> read from each Fireplace's real <code>m_fuelItem</code>; never hardcoded</p>
+</div>
+
+<div class="card">
+  <div class="title">What gets refilled</div>
+  <p class="meta">By default the processor handles refillable Fireplace prefabs whose prefab/localized names look like lighting: <code>torch</code>, <code>sconce</code>, <code>brazier</code>, <code>candle</code>, <code>jackoturnip</code>, or <code>lantern</code>. Infinite-fuel and non-refillable fireplaces are ignored. Set <code>IncludeAllFireplaces = true</code> if you also want campfires, hearths, bonfires and other refillable fireplaces fed from storage.</p>
+</div>
+
+<div class="card">
+  <div class="title">Server/network behavior</div>
+  <p class="meta">Uses the ServersideQoL container registry and ownership handoff instead of pretending the dedicated server always owns loaded objects. If a client currently owns a fuel chest, the server requests ownership and retries. The chest inventory is serialized back through the framework after fuel is removed, and the light's fuel is written to its authoritative ZDO.</p>
+</div>
+
+<div class="card">
+  <p class="meta"><strong>Plugin:</strong> Server Torch Refill 1.0.0<br><strong>BepInEx GUID:</strong> <code>claire.valheim.servertorchrefill</code><br><strong>Config:</strong> <code>BepInEx/config/claire.valheim.servertorchrefill.cfg</code> unless ServersideQoL unified/per-world config is enabled<br><strong>Required server framework:</strong> ServersideQoL 2.1.1+<br><strong>Client install:</strong> none</p>
+</div>
+</main>
+<script>
+(() => {
+  const stamp = document.getElementById("hosted-build");
+  if (!stamp || !stamp.dateTime) return;
+  const date = new Date(stamp.dateTime);
+  if (Number.isNaN(date.getTime())) return;
+  stamp.textContent = date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZoneName: "short"
+  });
+})();
+</script>
+</body>
+</html>
