@@ -8,17 +8,18 @@
 <style>
 :root{color-scheme:light dark;--bg:#f2f2f7;--card:#fff;--text:#111;--muted:#6e6e73;--border:rgba(60,60,67,.18);--accent:#007aff;--button:#007aff;--buttonText:#fff}
 @media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#f5f5f7;--muted:#98989d;--border:rgba(84,84,88,.65);--accent:#0a84ff;--button:#0a84ff;--buttonText:#fff}}
-*{box-sizing:border-box}body{margin:0;padding:max(28px,env(safe-area-inset-top)) 16px max(28px,env(safe-area-inset-bottom));background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}main{width:min(100%,680px);margin:0 auto}.back{display:inline-block;color:var(--accent);text-decoration:none;margin:0 0 18px}h1{font-size:32px;margin:4px 0 8px;letter-spacing:-.7px}.sub{color:var(--muted);margin:0 0 22px;line-height:1.45}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;margin-bottom:14px}.download{display:block;width:100%;text-align:center;text-decoration:none;background:var(--button);color:var(--buttonText);font-weight:700;border-radius:14px;padding:14px 16px;margin:4px 0 12px}.note{font-size:13px;color:var(--muted);line-height:1.45;margin:0}.title{font-size:17px;font-weight:700;margin:0 0 8px}.steps{margin:0;padding-left:22px;line-height:1.6}.meta{font-size:14px;color:var(--muted);line-height:1.55;margin:0}.meta strong{color:var(--text)}code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}
+*{box-sizing:border-box}body{margin:0;padding:max(28px,env(safe-area-inset-top)) 16px max(28px,env(safe-area-inset-bottom));background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}main{width:min(100%,680px);margin:0 auto}.back{display:inline-block;color:var(--accent);text-decoration:none;margin:0 0 18px}h1{font-size:32px;margin:4px 0 8px;letter-spacing:-.7px}.sub{color:var(--muted);margin:0 0 22px;line-height:1.45}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;margin-bottom:14px}.download{display:block;width:100%;text-align:center;text-decoration:none;background:var(--button);color:var(--buttonText);font-weight:700;border-radius:14px;padding:14px 16px;margin:4px 0 10px}.buildstamp{font-size:13px;color:var(--muted);text-align:center;margin:0 0 12px}.buildstamp strong{color:var(--text)}.note{font-size:13px;color:var(--muted);line-height:1.45;margin:0}.title{font-size:17px;font-weight:700;margin:0 0 8px}.steps{margin:0;padding-left:22px;line-height:1.6}.meta{font-size:14px;color:var(--muted);line-height:1.55;margin:0}.meta strong{color:var(--text)}code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}
 </style>
 </head>
 <body><main>
 <a class="back" href="../">‹ Valheim</a>
 <h1>Assembly Inspector</h1>
-<p class="sub">Browse Valheim's live <code>assembly_valheim</code> classes and return types, experiment with forced scalar return values, and generate standalone Harmony override mods directly from the method you found.</p>
+<p class="sub">Search Valheim's live <code>assembly_valheim</code> across classes, methods, properties, fields, signatures, types, and parameters; experiment with forced scalar return values; and generate standalone Harmony override mods directly from the member you found.</p>
 
 <div class="card">
   <a class="download" href="AssemblyInspector.dll">Download AssemblyInspector.dll</a>
-  <p class="note">BepInEx 5 + Harmony. Default hotkey: F9. Version 1.2.1 gives each exported live bundle a deterministic content-derived plugin identity, so different generated bundles can coexist.</p>
+  <p class="buildstamp"><strong>Hosted build:</strong> <time id="hosted-build" datetime="2026-09-28T02:38:48Z">2026-09-28 02:38:48 UTC</time></p>
+  <p class="note">BepInEx 5 + Harmony. Default hotkey: F9. Version <span class="plugin-version">1.3.0</span> adds assembly-wide member search while keeping deterministic content-derived identities for exported live bundles.</p>
 </div>
 
 <div class="card">
@@ -27,8 +28,8 @@
 </div>
 
 <div class="card">
-  <div class="title">Browse</div>
-  <p class="meta">Search classes, methods, properties, and fields. Filter methods/properties by return type. See full parameter lists, visibility, static/virtual/abstract status, generic arity, metadata token, property getter targets, field types, and static field values.</p>
+  <div class="title">Assembly-wide search</div>
+  <p class="meta">Use <strong>Global search</strong> without selecting a class first. Plain terms search class/member names, method signatures, return/property/field types, and parameter names/types. Narrow results with filters such as <code>method:</code>, <code>field:</code>, <code>property:</code>, <code>class:</code>, <code>name:</code>, <code>type:</code>, and <code>param:</code>. Selecting a result jumps directly to its owning class and normal detail panel.</p>
 </div>
 
 <div class="card">
@@ -57,7 +58,25 @@
 </div>
 
 <div class="card">
-  <p class="meta"><strong>Version:</strong> 1.2.1<br><strong>Default assembly:</strong> assembly_valheim<br><strong>Default key:</strong> F9<br><strong>Harmony:</strong> required (included with the normal BepInEx Valheim pack)<br><strong>Jotunn:</strong> not required</p>
+  <p class="meta"><strong>Version:</strong> <span class="plugin-version">1.3.0</span><br><strong>Default assembly:</strong> assembly_valheim<br><strong>Default key:</strong> F9<br><strong>Harmony:</strong> required (included with the normal BepInEx Valheim pack)<br><strong>Jotunn:</strong> not required</p>
 </div>
-</main></body>
+</main>
+<script>
+(() => {
+  const stamp = document.getElementById("hosted-build");
+  if (!stamp || !stamp.dateTime) return;
+  const date = new Date(stamp.dateTime);
+  if (Number.isNaN(date.getTime())) return;
+  stamp.textContent = date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZoneName: "short"
+  });
+})();
+</script>
+</body>
 </html>

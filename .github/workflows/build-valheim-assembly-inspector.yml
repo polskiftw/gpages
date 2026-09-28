@@ -290,9 +290,60 @@ jobs:
           git pull --rebase origin main
 
           New-Item -ItemType Directory -Force -Path '.\valheim\assembly-inspector' | Out-Null
-          Copy-Item -Force '.\valheim-assembly-inspector\bin\Release\net472\AssemblyInspector.dll' '.\valheim\assembly-inspector\AssemblyInspector.dll'
 
-          git add -- 'valheim/assembly-inspector/AssemblyInspector.dll'
+          $builtDll = '.\valheim-assembly-inspector\bin\Release\net472\AssemblyInspector.dll'
+          $hostedDll = '.\valheim\assembly-inspector\AssemblyInspector.dll'
+          $pagePath = '.\valheim\assembly-inspector\index.html'
+          $sourcePath = '.\valheim-assembly-inspector\AssemblyInspector.cs'
+
+          $builtHash = (Get-FileHash $builtDll -Algorithm SHA256).Hash
+          $hostedHash = if (Test-Path $hostedDll) {
+            (Get-FileHash $hostedDll -Algorithm SHA256).Hash
+          }
+          else {
+            ''
+          }
+
+          $artifactChanged = $builtHash -ne $hostedHash
+
+          if ($artifactChanged) {
+            Copy-Item -Force $builtDll $hostedDll
+
+            $source = Get-Content -Raw $sourcePath
+            $versionMatch = [regex]::Match($source, 'public const string PluginVersion = "([^"]+)";')
+            if (-not $versionMatch.Success) {
+              throw "Could not read PluginVersion from $sourcePath"
+            }
+            $pluginVersion = $versionMatch.Groups[1].Value
+
+            $page = Get-Content -Raw $pagePath
+            $versionPattern = '<span class="plugin-version">[^<]*</span>'
+            if (-not [regex]::IsMatch($page, $versionPattern)) {
+              throw "Could not find plugin-version marker in $pagePath"
+            }
+            $page = [regex]::Replace(
+              $page,
+              $versionPattern,
+              "<span class=`"plugin-version`">$pluginVersion</span>")
+
+            $utcNow = [DateTimeOffset]::UtcNow
+            $isoStamp = $utcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+            $fallbackStamp = $utcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'")
+            $timestampPattern = '<time id="hosted-build" datetime="[^"]*">.*?</time>'
+            if (-not [regex]::IsMatch($page, $timestampPattern)) {
+              throw "Could not find hosted-build timestamp marker in $pagePath"
+            }
+            $timestampReplacement = "<time id=`"hosted-build`" datetime=`"$isoStamp`">$fallbackStamp</time>"
+            $page = [regex]::Replace($page, $timestampPattern, $timestampReplacement, 1)
+
+            Set-Content -Path $pagePath -Value $page -Encoding utf8NoBOM
+            Write-Host "Publishing new Assembly Inspector build: $builtHash (version $pluginVersion)"
+          }
+          else {
+            Write-Host "AssemblyInspector.dll unchanged ($builtHash); keeping the existing hosted timestamp."
+          }
+
+          git add -- 'valheim/assembly-inspector/AssemblyInspector.dll' 'valheim/assembly-inspector/index.html'
           git diff --cached --quiet
           if ($LASTEXITCODE -eq 0) {
             Write-Host 'Published Assembly Inspector artifact is already current.'
