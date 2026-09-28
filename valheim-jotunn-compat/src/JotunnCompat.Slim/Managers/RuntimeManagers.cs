@@ -511,6 +511,7 @@ namespace Jotunn.Managers
         private static LocalizationManager instance;
         public static LocalizationManager Instance => instance ??= new LocalizationManager();
         private readonly CustomLocalization localization = new CustomLocalization();
+        private bool applying;
         private LocalizationManager() { }
         public CustomLocalization GetLocalization() => localization;
 
@@ -519,7 +520,25 @@ namespace Jotunn.Managers
             localization.AddToken(token, value, force);
         }
 
-        internal void Apply() => localization.ApplyCurrent();
+        internal void Apply(Localization target, string language)
+        {
+            // SetupLanguage can trigger mod/game callbacks. Never allow those
+            // callbacks to recursively start another translation application.
+            if (applying || target == null)
+            {
+                return;
+            }
+
+            applying = true;
+            try
+            {
+                localization.Apply(target, language);
+            }
+            finally
+            {
+                applying = false;
+            }
+        }
     }
 
     public sealed class NetworkManager
@@ -621,7 +640,12 @@ namespace Jotunn.Managers
 
         [HarmonyPatch(typeof(Localization), nameof(Localization.SetupLanguage))]
         [HarmonyPostfix]
-        private static void LocalizationSetup() => LocalizationManager.Instance.Apply();
+        private static void LocalizationSetup(
+            Localization __instance,
+            string __0)
+        {
+            LocalizationManager.Instance.Apply(__instance, __0);
+        }
 
         [HarmonyPatch(typeof(Player), "SetPlaceMode")]
         [HarmonyPostfix]
