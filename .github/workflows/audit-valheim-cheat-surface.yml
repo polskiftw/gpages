@@ -1,0 +1,226 @@
+name: Audit Valheim Cheat Surface
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/audit-valheim-cheat-surface.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Download latest Valheim debug draft
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+
+          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases?per_page=100" -Headers $headers
+          $release = $releases |
+            Where-Object { $_.draft -and $_.name -eq 'Valheim Debug' } |
+            Sort-Object updated_at -Descending |
+            Select-Object -First 1
+          if (-not $release) { throw 'No Valheim Debug draft release found.' }
+
+          $asset = $release.assets |
+            Where-Object { $_.name -eq 'ValheimDebug.tar.gz' } |
+            Sort-Object updated_at -Descending |
+            Select-Object -First 1
+          if (-not $asset) { throw 'ValheimDebug.tar.gz not found in latest Valheim Debug draft.' }
+
+          Write-Host "AUDIT_RELEASE_ID=$($release.id)"
+          Write-Host "AUDIT_RELEASE_UPDATED=$($release.updated_at)"
+          Write-Host "AUDIT_ASSET_ID=$($asset.id)"
+          Write-Host "AUDIT_ASSET_UPDATED=$($asset.updated_at)"
+          Write-Host "AUDIT_ASSET_SHA256=$($asset.digest)"
+
+          $downloadHeaders = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = 'application/octet-stream'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+          Invoke-WebRequest -Uri $asset.url -Headers $downloadHeaders -OutFile ValheimDebug.tar.gz
+
+          New-Item -ItemType Directory -Force -Path debug | Out-Null
+          tar -xzf ValheimDebug.tar.gz -C debug
+          if ($LASTEXITCODE -ne 0) { throw 'Could not extract ValheimDebug.tar.gz.' }
+          if (-not (Test-Path debug/Decomp)) { throw 'Debug bundle has no Decomp directory.' }
+
+      - name: Audit cheat and developer-state surface
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          @'
+          import os
+          import re
+          from pathlib import Path
+
+          root = Path("debug/Decomp")
+          files = sorted(root.rglob("*.cs"))
+          if not files:
+              raise SystemExit("No decompiled C# sources found")
+
+          # Broad enough to catch cheat/dev-state persistence without drowning in
+          # generic console-command implementation details.
+          token_re = re.compile(
+              r"(?i)(cheat(?:ed|ing|s)?|"
+              r"bypasscheatchecks?|"
+              r"usedcheats?|"
+              r"knowncommands?|"
+              r"devcommands?|"
+              r"debugmode|"
+              r"noplacementcost|"
+              r"godmode|"
+              r"ghostmode|"
+              r"freefly|"
+              r"ismod(?:ded)?|"
+              r"modded)"
+          )
+          field_re = re.compile(
+              r"\b(?:public|private|protected|internal)?\s*(?:static\s+)?"
+              r"(?:readonly\s+)?[A-Za-z0-9_<>,.\[\]?]+\s+"
+              r"([A-Za-z_][A-Za-z0-9_]*)\s*(?:[=;,{])"
+          )
+          method_re = re.compile(
+              r"\b(?:public|private|protected|internal)\s+"
+              r"(?:static\s+)?(?:virtual\s+|override\s+|sealed\s+|async\s+)*"
+              r"[A-Za-z0-9_<>,.\[\]?]+\s+([A-Za-z_][A-Za-z0-9_]*)\s*\("
+          )
+          class_re = re.compile(r"\b(?:class|struct|enum)\s+([A-Za-z_][A-Za-z0-9_]*)")
+
+          hits = []
+          unique_identifiers = set()
+          string_literals = set()
+          persistence_hits = []
+          class_name = ""
+          method_name = ""
+
+          for path in files:
+              try:
+                  lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+              except Exception:
+                  continue
+              class_name = ""
+              method_name = ""
+              for i, line in enumerate(lines, 1):
+                  cm = class_re.search(line)
+                  if cm:
+                      class_name = cm.group(1)
+                  mm = method_re.search(line)
+                  if mm:
+                      method_name = mm.group(1)
+
+                  if not token_re.search(line):
+                      continue
+
+                  stripped = line.strip()
+                  rel = path.relative_to(root).as_posix()
+                  hits.append((rel, i, class_name, method_name, stripped))
+
+                  for ident in re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", line):
+                      if token_re.search(ident):
+                          unique_identifiers.add(ident)
+
+                  for literal in re.findall(r'"([^"\\]*(?:\\.[^"\\]*)*)"', line):
+                      if token_re.search(literal):
+                          string_literals.add(literal)
+
+                  low_method = method_name.lower()
+                  if any(x in low_method for x in ("save", "load", "serialize", "deserialize", "write", "read", "profile", "stat")):
+                      persistence_hits.append((rel, i, class_name, method_name, stripped))
+
+          def section(title, rows):
+              out.append("")
+              out.append("=== " + title + " ===")
+              if not rows:
+                  out.append("(none)")
+                  return
+              out.extend(rows)
+
+          out = []
+          out.append("Valheim cheat/dev-state decompile audit")
+          out.append(f"C# files scanned: {len(files)}")
+          out.append(f"Matched source lines: {len(hits)}")
+          out.append(f"Unique matching identifiers: {len(unique_identifiers)}")
+          out.append(f"Matching string literals: {len(string_literals)}")
+          out.append(f"Persistence-adjacent hits: {len(persistence_hits)}")
+
+          section("UNIQUE IDENTIFIERS", sorted(unique_identifiers, key=str.lower))
+          section("MATCHING STRING LITERALS", sorted(string_literals, key=str.lower))
+          section(
+              "PERSISTENCE-ADJACENT HITS",
+              [
+                  f"{rel}:{line} class={cls or '-'} method={method or '-'} :: {text}"
+                  for rel, line, cls, method, text in persistence_hits
+              ],
+          )
+          section(
+              "ALL MATCHED LINES",
+              [
+                  f"{rel}:{line} class={cls or '-'} method={method or '-'} :: {text}"
+                  for rel, line, cls, method, text in hits
+              ],
+          )
+
+          Path("valheim-cheat-surface-audit.txt").write_text("\n".join(out) + "\n", encoding="utf-8")
+          print("\n".join(out))
+          '@ | Set-Content -Encoding UTF8 audit.py
+
+          python audit.py
+
+      - name: Audit raw assembly strings
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $assembly = Get-ChildItem debug -Recurse -File -Filter 'assembly_valheim.dll' |
+            Where-Object { $_.FullName -notmatch '[\\/]Decomp[\\/]' } |
+            Select-Object -First 1
+          if (-not $assembly) { throw 'Raw assembly_valheim.dll not found.' }
+
+          @'
+          from pathlib import Path
+          import re
+          import sys
+
+          p = Path(sys.argv[1])
+          data = p.read_bytes()
+          # Pull printable ASCII and UTF-16LE runs, then keep only cheat/dev-state tokens.
+          runs = []
+          runs += [m.group().decode("ascii", "ignore") for m in re.finditer(rb"[ -~]{4,}", data)]
+          try:
+              text16 = data.decode("utf-16le", "ignore")
+              runs += re.findall(r"[ -~]{4,}", text16)
+          except Exception:
+              pass
+
+          pat = re.compile(r"(?i)(cheat|bypasscheat|usedcheat|knowncommand|devcommand|debugmode|noplacementcost|godmode|ghostmode|freefly|ismod|modded)")
+          vals = sorted({x for x in runs if pat.search(x)}, key=str.lower)
+          Path("valheim-cheat-surface-raw-strings.txt").write_text("\n".join(vals) + "\n", encoding="utf-8")
+          print(f"Raw assembly matching strings: {len(vals)}")
+          for x in vals[:500]:
+              print(x)
+          '@ | Set-Content -Encoding UTF8 rawscan.py
+
+          python rawscan.py "$($assembly.FullName)"
+
+      - name: Upload audit reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: valheim-cheat-surface-audit
+          path: |
+            valheim-cheat-surface-audit.txt
+            valheim-cheat-surface-raw-strings.txt
+          retention-days: 1
+          if-no-files-found: error
