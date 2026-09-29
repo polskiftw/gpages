@@ -14,7 +14,7 @@ namespace NoCheatTagsMod
     {
         public const string PluginGuid = "claire.valheim.nocheattags";
         public const string PluginName = "No Cheat Tags";
-        public const string PluginVersion = "1.3.2";
+        public const string PluginVersion = "1.4.0";
 
         private const BindingFlags Declared =
             BindingFlags.Instance | BindingFlags.Static |
@@ -85,6 +85,8 @@ namespace NoCheatTagsMod
                     "PlayerProfile.m_usedCheats is suppressed/cleared and PlayerStatType.Cheats is held at zero; known command history is left alone.");
                 Logger.LogInfo(
                     "Item cheat cleanup is event-driven: vanilla m_cheated writes are forced false and inventories are checked once when loaded; no periodic polling is used.");
+                Logger.LogInfo(
+                    "Persisted world starting keys are left intact, but Valheim's world-cheat classifier is forced clean in memory.");
                 Logger.LogInfo(
                     "ItemData resolver used exact nested-type lookup first (ItemDrop+ItemData).");
             }
@@ -330,6 +332,7 @@ namespace NoCheatTagsMod
             PatchSerializationBoundaries();
             PatchInventoryIngress();
             PatchWorldCheatFlags();
+            PatchWorldCheatClassification();
         }
 
         private void PatchNativeBypassGetter()
@@ -706,6 +709,68 @@ namespace NoCheatTagsMod
                 }
             }
         }
+
+        private void PatchWorldCheatClassification()
+        {
+            Type achievementsType = FindType("Achievements");
+            if (achievementsType != null)
+            {
+                MethodInfo isWorldCheated = achievementsType.GetMethod(
+                    "IsWorldCheated",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
+                    binder: null,
+                    types: Type.EmptyTypes,
+                    modifiers: null);
+
+                if (isWorldCheated != null && isWorldCheated.ReturnType == typeof(bool))
+                {
+                    Patch(
+                        isWorldCheated,
+                        prefix: HarmonyMethod(nameof(ForceFalseAndSkip)),
+                        postfix: null,
+                        "Achievements.IsWorldCheated -> false");
+                }
+                else
+                {
+                    Logger.LogWarning("Achievements.IsWorldCheated was not found; world cheat classification fallback is unavailable.");
+                }
+            }
+            else
+            {
+                Logger.LogWarning("Achievements was not found; world cheat classification fallback is unavailable.");
+            }
+
+            Type serverOptionsGuiType = FindType("ServerOptionsGUI");
+            if (serverOptionsGuiType == null)
+            {
+                Logger.LogWarning("ServerOptionsGUI was not found; persisted starting-key cheat classification was not patched.");
+                return;
+            }
+
+            bool patchedClassifier = false;
+            foreach (MethodInfo method in SafeMethods(serverOptionsGuiType))
+            {
+                if (method.IsAbstract ||
+                    method.ContainsGenericParameters ||
+                    !method.IsStatic ||
+                    method.ReturnType != typeof(bool) ||
+                    !string.Equals(method.Name, "WorldContainsCheatedModifiers", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                Patch(
+                    method,
+                    prefix: HarmonyMethod(nameof(ForceFalseAndSkip)),
+                    postfix: null,
+                    "ServerOptionsGUI.WorldContainsCheatedModifiers -> false");
+                patchedClassifier = true;
+            }
+
+            if (!patchedClassifier)
+                Logger.LogWarning("ServerOptionsGUI.WorldContainsCheatedModifiers was not found.");
+        }
+
 
         private HarmonyMethod HarmonyMethod(string name)
         {
