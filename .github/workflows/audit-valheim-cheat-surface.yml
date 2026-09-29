@@ -199,6 +199,10 @@ jobs:
               ("Terminal.cs", "m_usedCheats = true"),
               ("Terminal.cs", "m_knownCommands.IncrementOrSet"),
               ("InventoryGui.cs", "UpdateAchievementsList"),
+              ("InventoryGui.cs", "achievements_permanently_cheated_world"),
+              ("ServerOptionsGUI.cs", "ReadKeys"),
+              ("Terminal.cs", "SetKeyAndValueIsCheat"),
+              ("World.cs", "m_startingGlobalKeys"),
           ]
 
           out = []
