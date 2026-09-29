@@ -180,6 +180,54 @@ jobs:
 
           python audit.py
 
+      - name: Extract targeted cheat-state contexts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          @'
+          from pathlib import Path
+
+          root = Path("debug/Decomp")
+          targets = [
+              ("Achievements.cs", "CanGetAchievements"),
+              ("Achievements.cs", "IsCheatedAtAll"),
+              ("Achievements.cs", "IsWorldCheated"),
+              ("ServerOptionsGUI.cs", "WorldContainsCheatedModifiers"),
+              ("ServerOptionsGUI.cs", "SetKeyAndValueIsCheat"),
+              ("PlayerProfile.cs", "s_bypassCheatChecks"),
+              ("Terminal.cs", "yesiuseddevcommandsbutiwantmyachievementsanyway"),
+              ("Terminal.cs", "m_usedCheats = true"),
+              ("Terminal.cs", "m_knownCommands.IncrementOrSet"),
+              ("InventoryGui.cs", "UpdateAchievementsList"),
+          ]
+
+          out = []
+          for filename, needle in targets:
+              candidates = list(root.rglob(filename))
+              if not candidates:
+                  out += [f"=== {filename} :: {needle} ===", "(file not found)", ""]
+                  continue
+              path = candidates[0]
+              lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+              indexes = [i for i, line in enumerate(lines) if needle in line]
+              out.append(f"=== {filename} :: {needle} ===")
+              if not indexes:
+                  out.append("(not found)")
+                  out.append("")
+                  continue
+              for idx in indexes:
+                  start = max(0, idx - 18)
+                  end = min(len(lines), idx + 42)
+                  for n in range(start, end):
+                      out.append(f"{n+1:5}: {lines[n]}")
+                  out.append("---")
+              out.append("")
+
+          Path("valheim-cheat-target-contexts.txt").write_text("\n".join(out) + "\n", encoding="utf-8")
+          print("Targeted cheat-state contexts captured:", len(targets))
+          '@ | Set-Content -Encoding UTF8 contexts.py
+          python contexts.py
+
       - name: Audit raw assembly strings
         shell: pwsh
         run: |
@@ -222,5 +270,6 @@ jobs:
           path: |
             valheim-cheat-surface-audit.txt
             valheim-cheat-surface-raw-strings.txt
+            valheim-cheat-target-contexts.txt
           retention-days: 1
           if-no-files-found: error
