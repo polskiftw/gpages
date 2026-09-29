@@ -65,3 +65,18 @@ Therefore:
 - use an unambiguous machine-readable UTC value in the page/source, and it may be rendered in the viewer's local timezone for readability.
 
 **Thus is the law: a hosted-build timestamp changes when the hosted build changes, not when automation happens to run.**
+
+
+# Valheim Debug Draft Ground Truth
+
+For Valheim debugging, reverse engineering, compatibility work, and gameplay-contract audits, the repository's **latest draft release named `Valheim Debug`** is the primary local-game reference. Do not assume an old public decompile or stale internet documentation is more authoritative than this refreshed bundle.
+
+- The stable draft asset is `ValheimDebug.tar.gz`.
+- It is refreshed from Claire's **local native Linux Valheim installation** and contains the raw game/debug inputs needed for inspection, including the current Managed binaries such as `assembly_valheim.dll`.
+- The same archive also contains a top-level **`Decomp/`** directory generated from that refreshed assembly by `.github/workflows/decompile-debug.yml`.
+- The decompile is produced with ILSpy using the complete Managed reference set; when a matching PDB is present, original PDB variable names are requested. The self-contained decompile includes its bundled `References/` plus `DECOMP_INFO.txt` provenance/audit information.
+- When exact behavior, fields, method signatures, serialization, or game-version compatibility matters, inspect the **raw Managed binaries and the matching `Decomp/` together**. Runtime binary truth wins over decompiler presentation when they disagree.
+- The `Valheim Debug` release and its game/decompile contents are private working inputs and **must remain a draft**. Do not publish or commit proprietary game binaries or decompiled game source merely to make them easier to inspect.
+- A debug refresh can replace `ValheimDebug.tar.gz` in place, so always use the newest relevant `Valheim Debug` draft/asset rather than assuming an earlier downloaded copy is current.
+
+**Thus is the law: for Valheim internals, check the refreshed debug bundle and its `Decomp/` before guessing.**
