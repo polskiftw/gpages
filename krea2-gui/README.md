@@ -5,7 +5,7 @@ A small native Qt 6 front end for Claire's existing local `krea2` CLI. It does *
 ## What it exposes
 
 - Prompt editor
-- Optional LoRA, with strength (`file.safetensors:0.8` syntax underneath)
+- Up to two optional LoRAs, each with its own strength (`file.safetensors:0.8` syntax underneath)
 - Seed field with `Random` mode
 - Image count wired to `-q`
 - Rebalance modes: none, subtle, balanced, aggressive
@@ -59,13 +59,20 @@ KREA2_ROOT=/some/other/krea2 KREA2_CLI=/path/to/krea2 ./krea2_gui.py
 
 ## LoRA discovery
 
-The LoRA box is editable, so any value accepted by the CLI can be typed manually. At startup the GUI also looks for `*.safetensors` directly in:
+Both LoRA boxes are editable, so any value accepted by the CLI can be typed manually. If only LoRA 2 is selected, the GUI shifts it into the first CLI LoRA position automatically. At startup the GUI also looks for `*.safetensors` directly in:
 
 - `~/ai/krea2/`
 - `~/ai/krea2/lora/`
 - `~/ai/krea2/loras/`
 
 The GUI does not recursively crawl the whole model tree.
+
+The corresponding CLI accepts the two LoRAs as optional positional arguments, so existing one-LoRA commands remain valid:
+
+```sh
+krea2 "prompt" first.safetensors:0.8
+krea2 "prompt" first.safetensors:0.8 second.safetensors:0.45
+```
 
 ## Cancellation
 
