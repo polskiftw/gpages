@@ -77,6 +77,8 @@ class GenerationMeta:
     seed: Optional[int]
     lora: Optional[str]
     lora_strength: float
+    lora2: Optional[str]
+    lora2_strength: float
     rebalance: Optional[str]
     queue_index: int
     queue_total: int
@@ -267,6 +269,8 @@ class Krea2Window(QMainWindow):
         self._run_prompt = ""
         self._run_lora: Optional[str] = None
         self._run_strength = 1.0
+        self._run_lora2: Optional[str] = None
+        self._run_strength2 = 1.0
         self._run_rebalance: Optional[str] = None
         self._run_queue_total = 1
         self._cancel_requested = False
@@ -327,6 +331,17 @@ class Krea2Window(QMainWindow):
         self.strength.setSingleStep(0.05)
         self.strength.setValue(1.0)
 
+        self.lora2 = QComboBox()
+        self.lora2.setEditable(True)
+        self.lora2.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self.lora2.currentTextChanged.connect(self._update_lora_enabled)
+
+        self.strength2 = QDoubleSpinBox()
+        self.strength2.setRange(-10.0, 10.0)
+        self.strength2.setDecimals(2)
+        self.strength2.setSingleStep(0.05)
+        self.strength2.setValue(1.0)
+
         self.seed = QComboBox()
         self.seed.setEditable(True)
         self.seed.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
@@ -352,7 +367,7 @@ class Krea2Window(QMainWindow):
         self.rebalance.addItem("Aggressive", "aggressive")
         self.rebalance.setCurrentIndex(0)
 
-        controls.addWidget(QLabel("LoRA"), 0, 0)
+        controls.addWidget(QLabel("LoRA 1"), 0, 0)
         controls.addWidget(QLabel("Strength"), 0, 1)
         controls.addWidget(QLabel("Seed"), 0, 2)
         controls.addWidget(QLabel("Images"), 0, 4)
@@ -361,8 +376,12 @@ class Krea2Window(QMainWindow):
         controls.addWidget(self.seed, 1, 2)
         controls.addWidget(self.random_seed, 1, 3)
         controls.addWidget(self.queue, 1, 4)
-        controls.addWidget(QLabel("Rebalance"), 2, 0)
-        controls.addWidget(self.rebalance, 3, 0)
+        controls.addWidget(QLabel("LoRA 2"), 2, 0)
+        controls.addWidget(QLabel("Strength"), 2, 1)
+        controls.addWidget(QLabel("Rebalance"), 2, 2)
+        controls.addWidget(self.lora2, 3, 0)
+        controls.addWidget(self.strength2, 3, 1)
+        controls.addWidget(self.rebalance, 3, 2)
         controls.setColumnStretch(0, 3)
         controls.setColumnStretch(1, 1)
         controls.setColumnStretch(2, 2)
@@ -446,8 +465,9 @@ class Krea2Window(QMainWindow):
         root_layout.addWidget(self.status)
 
     def _load_loras(self) -> None:
-        self.lora.clear()
-        self.lora.addItem("None")
+        for combo in (self.lora, self.lora2):
+            combo.clear()
+            combo.addItem("None")
         candidates: set[Path] = set()
         search_dirs = [self.krea2_root, self.krea2_root / "lora", self.krea2_root / "loras"]
         for directory in search_dirs:
@@ -464,6 +484,7 @@ class Krea2Window(QMainWindow):
             except ValueError:
                 display = str(path)
             self.lora.addItem(display)
+            self.lora2.addItem(display)
 
     def _prepare_output_watcher(self) -> None:
         try:
@@ -503,6 +524,14 @@ class Krea2Window(QMainWindow):
         except (TypeError, ValueError):
             self.strength.setValue(1.0)
 
+        lora2 = self.settings.value("controls/lora2", "None")
+        self.lora2.setCurrentText(str(lora2) if lora2 is not None else "None")
+
+        try:
+            self.strength2.setValue(float(self.settings.value("controls/strength2", 1.0)))
+        except (TypeError, ValueError):
+            self.strength2.setValue(1.0)
+
         seed = self.settings.value("controls/seed", "Random")
         self.seed.setCurrentText(str(seed) if seed is not None else "Random")
 
@@ -523,6 +552,8 @@ class Krea2Window(QMainWindow):
         self.settings.setValue("controls/prompt", self.prompt.toPlainText())
         self.settings.setValue("controls/lora", self.lora.currentText())
         self.settings.setValue("controls/strength", self.strength.value())
+        self.settings.setValue("controls/lora2", self.lora2.currentText())
+        self.settings.setValue("controls/strength2", self.strength2.value())
         self.settings.setValue("controls/seed", self.seed.currentText())
         self.settings.setValue("controls/queue", self.queue.value())
         self.settings.setValue("controls/rebalance", self.rebalance.currentData())
@@ -554,8 +585,9 @@ class Krea2Window(QMainWindow):
 
     def _update_lora_enabled(self) -> None:
         selected = self.lora.currentText().strip()
-        enabled = bool(selected and selected.casefold() != "none")
-        self.strength.setEnabled(enabled)
+        selected2 = self.lora2.currentText().strip()
+        self.strength.setEnabled(bool(selected and selected.casefold() != "none"))
+        self.strength2.setEnabled(bool(selected2 and selected2.casefold() != "none"))
 
     def _refresh_generate_text(self) -> None:
         if self.process is not None and self.process.state() != QProcess.ProcessState.NotRunning:
@@ -607,11 +639,26 @@ class Krea2Window(QMainWindow):
 
         args: list[str] = [prompt]
         lora_text = self.lora.currentText().strip()
+        lora_text2 = self.lora2.currentText().strip()
         lora_value: Optional[str] = None
+        lora_value2: Optional[str] = None
         strength = self.strength.value()
+        strength2 = self.strength2.value()
+
+        selected_loras: list[tuple[str, float]] = []
         if lora_text and lora_text.casefold() != "none":
             lora_value = lora_text
-            args.append(lora_text if abs(strength - 1.0) < 1e-9 else f"{lora_text}:{strength:g}")
+            selected_loras.append((lora_text, strength))
+        if lora_text2 and lora_text2.casefold() != "none":
+            lora_value2 = lora_text2
+            selected_loras.append((lora_text2, strength2))
+
+        for selected_lora, selected_strength in selected_loras:
+            args.append(
+                selected_lora
+                if abs(selected_strength - 1.0) < 1e-9
+                else f"{selected_lora}:{selected_strength:g}"
+            )
 
         if explicit_seed is not None:
             args.extend(["--seed", str(explicit_seed)])
@@ -630,6 +677,8 @@ class Krea2Window(QMainWindow):
         self._run_prompt = prompt
         self._run_lora = lora_value
         self._run_strength = strength
+        self._run_lora2 = lora_value2
+        self._run_strength2 = strength2
         self._run_rebalance = str(rebalance_value) if rebalance_value else None
         self._run_queue_total = queue_total
         self._cancel_requested = False
@@ -775,6 +824,8 @@ class Krea2Window(QMainWindow):
             self.prompt,
             self.lora,
             self.strength,
+            self.lora2,
+            self.strength2,
             self.seed,
             self.random_seed,
             self.queue,
@@ -815,6 +866,8 @@ class Krea2Window(QMainWindow):
             seed=seed,
             lora=self._run_lora,
             lora_strength=self._run_strength,
+            lora2=self._run_lora2,
+            lora2_strength=self._run_strength2,
             rebalance=self._run_rebalance,
             queue_index=idx,
             queue_total=self._run_queue_total,
