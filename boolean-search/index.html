@@ -158,7 +158,7 @@
     </div>
     <div id="rules" class="rules"></div>
     <div id="emptyRules" class="empty-rules">No conditional rules yet.</div>
-    <div class="logic"><strong>Available rules:</strong> A requires B, both-or-neither, cannot both appear, at least one, all, exactly one, and the original blocked-unless-exception rule.</div>
+    <div class="logic"><strong>Available rules:</strong> find A only with B, conditional A→B, both-or-neither, cannot both appear, at least one, all, exactly one, and the original blocked-unless-exception rule.</div>
   </section>
 
   <section class="card">
@@ -438,9 +438,14 @@
   editors.set('excluded', excludedEditor);
 
   const RULE_TYPES = {
+    wantedWith: {
+      label: 'Find A only with B',
+      help: 'A is required, and B must be present with it. This is a self-contained A + B search.',
+      mode: 'pair', relation: 'only with'
+    },
     requires: {
-      label: 'A requires B',
-      help: 'A may be absent. If A is present, B must also be present.',
+      label: 'If A appears, require B',
+      help: 'Constraint only: A may be absent. If A is present, B must also be present. Add a positive/required tag elsewhere to define what to search for.',
       mode: 'pair', relation: 'requires'
     },
     together: {
@@ -702,6 +707,9 @@
   }
 
   function alternativesForRule(rule) {
+    if (rule.type === 'wantedWith') {
+      return [assignment([[rule.left[0], true], [rule.right[0], true]])];
+    }
     if (rule.type === 'requires') {
       return [assignment([[rule.left[0], false]]), assignment([[rule.right[0], true]])];
     }
@@ -768,6 +776,14 @@
       }
     }
     branches = simplifyBranches(branches);
+
+    const negativeOnly = branches.filter(branch => ![...branch.values()].some(Boolean));
+    if (negativeOnly.length) {
+      output.value = '';
+      status.textContent = 'This rule set creates a branch made only of exclusions, which the target site cannot use as a standalone search. Add a Required tag that applies to every result, or use “Find A only with B” when A itself must be present.';
+      status.className = 'error';
+      return;
+    }
 
     const strings = branches.map(branch => [...branch.entries()].map(([tag, value]) => value ? tag : `-${tag}`).join(' '));
     if (!strings.length || (strings.length === 1 && !strings[0])) {
