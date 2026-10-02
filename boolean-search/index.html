@@ -184,7 +184,7 @@
   const DB_KEY = 'active';
   const STATE_KEY = 'boolean-search-builder-state-v2';
   const MAX_BRANCHES = 512;
-  const MAX_SUGGGESTIONS = 12;
+  const MAX_SUGGESTIONS = 12;
 
   const output = document.getElementById('output');
   const status = document.getElementById('status');
@@ -387,7 +387,7 @@
     renderSuggestions() {
       this.suggestions.replaceChildren();
       if (!this.matches.length) {
-        this.closeSugggestions();
+        this.closeSuggestions();
         return;
       }
       this.matches.forEach((item, index) => {
