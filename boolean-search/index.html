@@ -206,6 +206,22 @@
     return String(value || '').trim().toLowerCase().replace(/^[!-]+/, '').trim();
   }
 
+  function normalizeImportedTag(value) {
+    return normalizeTag(value).replace(/\*+\s*$/, '').trim();
+  }
+
+  function normalizeTagIndex(items) {
+    const byName = new Map();
+    for (const item of items || []) {
+      const name = normalizeImportedTag(item?.name);
+      if (!name) continue;
+      const uses = Number(item?.uses || 0);
+      const existing = byName.get(name);
+      if (!existing || uses > existing.uses) byName.set(name, {name, uses});
+    }
+    return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   function formatUses(value) {
     const n = Number(value || 0);
     return Number.isFinite(n) ? n.toLocaleString() : '0';
@@ -1069,7 +1085,7 @@
     const imported = [];
     const seen = new Set();
     walkTable(tagsRoot, record => {
-      const name = normalizeTag(record[1]);
+      const name = normalizeImportedTag(record[1]);
       if (!name || seen.has(name)) return;
       seen.add(name);
       imported.push({name, uses:Number(record[2] || 0)});
@@ -1085,20 +1101,20 @@
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const imported = readTagGremlinSqlite(bytes);
-      tagIndex = imported;
+      tagIndex = normalizeTagIndex(imported);
       const cached = {
         sourceName:file.name,
         sourceSize:file.size,
         sourceModified:file.lastModified || 0,
         importedAt:Date.now(),
-        tags:imported
+        tags:tagIndex
       };
       try {
         await idbSet(DB_KEY, cached);
-        dbStatus.textContent = imported.length.toLocaleString() + ' tags loaded from ' + file.name + ' and cached locally.';
+        dbStatus.textContent = tagIndex.length.toLocaleString() + ' tags loaded from ' + file.name + ' and cached locally.';
       } catch (cacheError) {
         console.warn(cacheError);
-        dbStatus.textContent = imported.length.toLocaleString() + ' tags loaded from ' + file.name + '; browser storage refused the cache, so this session only.';
+        dbStatus.textContent = tagIndex.length.toLocaleString() + ' tags loaded from ' + file.name + '; browser storage refused the cache, so this session only.';
       }
       forgetDbBtn.disabled = false;
     } catch (error) {
@@ -1115,9 +1131,12 @@
     try {
       const cached = await idbGet(DB_KEY);
       if (!cached?.tags?.length) return;
-      tagIndex = cached.tags;
+      tagIndex = normalizeTagIndex(cached.tags);
       dbStatus.textContent = `${tagIndex.length.toLocaleString()} tags restored from local cache${cached.sourceName ? ` (${cached.sourceName})` : ''}.`;
       forgetDbBtn.disabled = false;
+      if (tagIndex.length !== cached.tags.length || tagIndex.some((item, index) => item.name !== cached.tags[index]?.name)) {
+        try { await idbSet(DB_KEY, {...cached, tags:tagIndex, normalizedAt:Date.now()}); } catch (_) {}
+      }
     } catch (error) {
       console.warn(error);
     }

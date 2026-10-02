@@ -19,7 +19,7 @@ FIXTURE = """
 
 <table>
 <tr><td>TagID</td><td>Tag</td><td>Uses</td><td colspan="2">Votes</td><td>Synonyms</td></tr>
-<tr><td>178</td><td>alpha</td><td>482,121</td><td>+3,704,177</td><td>-2,334</td><td>2 [+]</td></tr>
+<tr><td>178</td><td>alpha*</td><td>482,121</td><td>+3,704,177</td><td>-2,334</td><td>2 [+]</td></tr>
 <tr style="display:none"><td colspan="5">Synonyms: <a href="?q=a">alpha one</a>, <a href="?q=b">alpha.two</a></td></tr>
 <tr><td>18</td><td>beta</td><td>359113</td><td>+2623224</td><td>-3511</td><td>0 [+]</td></tr>
 <tr style="display:none"><td colspan="5">No synonyms.</td></tr>
@@ -70,6 +70,9 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(alpha.reported_synonym_count, 2)
         self.assertEqual(alpha.synonyms, ["alpha one", "alpha.two"])
         self.assertTrue(alpha.synonym_parse_ok)
+        # The site appends "*" to official tag names that have synonym/alias rows.
+        # It is a UI marker, not part of the searchable tag.
+        self.assertEqual(alpha.name, "alpha")
 
         beta = parsed.tags[1]
         self.assertEqual(beta.synonyms, [])

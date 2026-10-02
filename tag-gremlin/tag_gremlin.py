@@ -57,6 +57,11 @@ def clean_space(value: str) -> str:
     return re.sub(r"\s+", " ", value or "").strip()
 
 
+def clean_official_tag_name(value: str) -> str:
+    """Strip the site's trailing '*' synonym marker from an official tag name."""
+    return re.sub(r"\s*\*+\s*$", "", clean_space(value))
+
+
 def parse_int(value: str, *, absolute: bool = False) -> int | None:
     match = _INT_RE.search(value or "")
     if not match:
@@ -424,7 +429,7 @@ def parse_tags_page(html: str) -> ParsedPage:
                 i += 1
                 continue
 
-            name = clean_space(cells[1].text)
+            name = clean_official_tag_name(cells[1].text)
             detail: CellCapture | None = None
             if i + 1 < len(table) and _looks_like_detail_row(table[i + 1]):
                 detail = table[i + 1].cells[0]
