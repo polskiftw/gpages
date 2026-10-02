@@ -179,8 +179,6 @@
 (() => {
   'use strict';
 
-  const SQLJS_VERSION = '1.13.0';
-  const SQLJS_BASE = `https://cdn.jsdelivr.net/npm/sql.js@${SQLJS_VERSION}/dist/`;
   const DB_NAME = 'boolean-search-builder';
   const DB_STORE = 'tag-index';
   const DB_KEY = 'active';
@@ -199,7 +197,6 @@
   const dbFile = document.getElementById('dbFile');
 
   let tagIndex = [];
-  let sqlPromise = null;
   let saveTimer = null;
   let ruleCounter = 0;
   const editors = new Map();
@@ -898,56 +895,187 @@
     });
   }
 
-  function loadSqlJs() {
-    if (sqlPromise) return sqlPromise;
-    sqlPromise = new Promise((resolve, reject) => {
-      const start = () => {
-        window.initSqlJs({ locateFile: file => SQLJS_BASE + file }).then(resolve, reject);
-      };
-      if (window.initSqlJs) return start();
-      const script = document.createElement('script');
-      script.src = SQLJS_BASE + 'sql-wasm.js';
-      script.async = true;
-      script.onload = start;
-      script.onerror = () => reject(new Error('Could not load the SQLite reader library.'));
-      document.head.appendChild(script);
-    });
-    return sqlPromise;
-  }
+  function readTagGremlinSqlite(bytes) {
+    if (!(bytes instanceof Uint8Array) || bytes.length < 100) throw new Error('That file is too small to be a SQLite database.');
+    const signature = new TextDecoder('ascii').decode(bytes.subarray(0, 16));
+    if (signature !== 'SQLite format 3\\u0000') throw new Error('That file is not a SQLite 3 database.');
 
-  function tableColumns(db, table) {
-    const stmt = db.prepare(`PRAGMA table_info(${table})`);
-    const columns = [];
-    while (stmt.step()) columns.push(String(stmt.getAsObject().name || ''));
-    stmt.free();
-    return columns;
+    const u16 = off => (bytes[off] << 8) | bytes[off + 1];
+    const u32 = off => (((bytes[off] * 0x1000000) + (bytes[off + 1] << 16) + (bytes[off + 2] << 8) + bytes[off + 3]) >>> 0);
+    let pageSize = u16(16);
+    if (pageSize === 1) pageSize = 65536;
+    if (pageSize < 512 || pageSize > 65536 || (pageSize & (pageSize - 1)) !== 0) throw new Error('Unsupported SQLite page size: ' + pageSize + '.');
+    const reserved = bytes[20];
+    const usable = pageSize - reserved;
+    if (usable < 480) throw new Error('The SQLite usable page size is invalid.');
+    const pageCount = Math.floor(bytes.length / pageSize);
+    if (!pageCount) throw new Error('The SQLite database has no complete pages.');
+    const encoding = u32(56) || 1;
+
+    function pageStart(pageNo) {
+      if (!Number.isInteger(pageNo) || pageNo < 1 || pageNo > pageCount) throw new Error('SQLite page ' + pageNo + ' is outside the database.');
+      return (pageNo - 1) * pageSize;
+    }
+    function readU32(off) {
+      if (off < 0 || off + 4 > bytes.length) throw new Error('Unexpected end of SQLite file.');
+      return u32(off);
+    }
+    function readVarint(buf, offset) {
+      let value = 0;
+      for (let i = 0; i < 8; i++) {
+        if (offset + i >= buf.length) throw new Error('Truncated SQLite varint.');
+        const b = buf[offset + i];
+        value = value * 128 + (b & 0x7f);
+        if ((b & 0x80) === 0) return {value, length:i + 1};
+      }
+      if (offset + 8 >= buf.length) throw new Error('Truncated SQLite varint.');
+      value = value * 256 + buf[offset + 8];
+      return {value, length:9};
+    }
+    function signedInt(buf, offset, length) {
+      let value = 0n;
+      for (let i = 0; i < length; i++) value = (value << 8n) | BigInt(buf[offset + i]);
+      const bits = BigInt(length * 8);
+      if (value & (1n << (bits - 1n))) value -= 1n << bits;
+      return Number(value);
+    }
+    function decodeText(data) {
+      if (encoding === 1) return new TextDecoder('utf-8').decode(data);
+      if (encoding === 2) return new TextDecoder('utf-16le').decode(data);
+      if (encoding === 3) {
+        try { return new TextDecoder('utf-16be').decode(data); }
+        catch (_) {
+          const swapped = new Uint8Array(data.length);
+          for (let i = 0; i + 1 < data.length; i += 2) {
+            swapped[i] = data[i + 1];
+            swapped[i + 1] = data[i];
+          }
+          return new TextDecoder('utf-16le').decode(swapped);
+        }
+      }
+      throw new Error('Unsupported SQLite text encoding: ' + encoding + '.');
+    }
+    function decodeRecord(payload) {
+      const head = readVarint(payload, 0);
+      const headerSize = head.value;
+      if (headerSize < head.length || headerSize > payload.length) throw new Error('Invalid SQLite record header.');
+      const serials = [];
+      let hp = head.length;
+      while (hp < headerSize) {
+        const serial = readVarint(payload, hp);
+        serials.push(serial.value);
+        hp += serial.length;
+      }
+      let dp = headerSize;
+      const out = [];
+      for (const serial of serials) {
+        let size = 0;
+        if (serial === 0) { out.push(null); continue; }
+        if (serial >= 1 && serial <= 6) size = [0,1,2,3,4,6,8][serial];
+        else if (serial === 7) size = 8;
+        else if (serial === 8) { out.push(0); continue; }
+        else if (serial === 9) { out.push(1); continue; }
+        else if (serial === 10 || serial === 11) throw new Error('Reserved SQLite serial type encountered.');
+        else size = serial % 2 === 0 ? (serial - 12) / 2 : (serial - 13) / 2;
+        if (dp + size > payload.length) throw new Error('Truncated SQLite record payload.');
+        if (serial >= 1 && serial <= 6) out.push(signedInt(payload, dp, size));
+        else if (serial === 7) out.push(new DataView(payload.buffer, payload.byteOffset + dp, 8).getFloat64(0, false));
+        else if (serial >= 12 && serial % 2 === 0) out.push(payload.slice(dp, dp + size));
+        else if (serial >= 13) out.push(decodeText(payload.subarray(dp, dp + size)));
+        dp += size;
+      }
+      return out;
+    }
+    function leafPayload(pageNo, cellOffset) {
+      const start = pageStart(pageNo);
+      const pageEnd = start + usable;
+      const first = readVarint(bytes, cellOffset);
+      const payloadSize = first.value;
+      const second = readVarint(bytes, cellOffset + first.length);
+      const payloadOffset = cellOffset + first.length + second.length;
+      const maxLocal = usable - 35;
+      let local = payloadSize;
+      if (payloadSize > maxLocal) {
+        const minLocal = Math.floor(((usable - 12) * 32) / 255) - 23;
+        const candidate = minLocal + ((payloadSize - minLocal) % (usable - 4));
+        local = candidate <= maxLocal ? candidate : minLocal;
+      }
+      if (payloadOffset + local > pageEnd) throw new Error('SQLite cell payload exceeds its page.');
+      const payload = new Uint8Array(payloadSize);
+      payload.set(bytes.subarray(payloadOffset, payloadOffset + local), 0);
+      let copied = local;
+      if (copied < payloadSize) {
+        if (payloadOffset + local + 4 > pageEnd) throw new Error('SQLite overflow pointer exceeds its page.');
+        let overflow = readU32(payloadOffset + local);
+        const seenOverflow = new Set();
+        while (copied < payloadSize) {
+          if (!overflow || seenOverflow.has(overflow)) throw new Error('Broken SQLite overflow-page chain.');
+          seenOverflow.add(overflow);
+          const overflowStart = pageStart(overflow);
+          const next = readU32(overflowStart);
+          const take = Math.min(usable - 4, payloadSize - copied);
+          if (overflowStart + 4 + take > bytes.length) throw new Error('Truncated SQLite overflow page.');
+          payload.set(bytes.subarray(overflowStart + 4, overflowStart + 4 + take), copied);
+          copied += take;
+          overflow = next;
+        }
+      }
+      return payload;
+    }
+    function walkTable(rootPage, onRow) {
+      const visited = new Set();
+      const walk = pageNo => {
+        if (visited.has(pageNo)) throw new Error('SQLite b-tree contains a cycle.');
+        visited.add(pageNo);
+        const start = pageStart(pageNo);
+        const header = start + (pageNo === 1 ? 100 : 0);
+        const type = bytes[header];
+        if (type !== 0x05 && type !== 0x0d) throw new Error('SQLite page ' + pageNo + ' is not a table b-tree page.');
+        const cells = (bytes[header + 3] << 8) | bytes[header + 4];
+        const headerSize = type === 0x05 ? 12 : 8;
+        const pointerBase = header + headerSize;
+        if (pointerBase + cells * 2 > start + usable) throw new Error('Invalid SQLite cell pointer array.');
+        if (type === 0x05) {
+          for (let i = 0; i < cells; i++) {
+            const pointer = (bytes[pointerBase + i * 2] << 8) | bytes[pointerBase + i * 2 + 1];
+            walk(readU32(start + pointer));
+          }
+          walk(readU32(header + 8));
+        } else {
+          for (let i = 0; i < cells; i++) {
+            const pointer = (bytes[pointerBase + i * 2] << 8) | bytes[pointerBase + i * 2 + 1];
+            onRow(decodeRecord(leafPayload(pageNo, start + pointer)));
+          }
+        }
+      };
+      walk(rootPage);
+    }
+
+    let tagsRoot = 0;
+    walkTable(1, record => {
+      if (record[0] === 'table' && record[1] === 'tags') tagsRoot = Number(record[3] || 0);
+    });
+    if (!tagsRoot) throw new Error('This SQLite file does not contain a tags table.');
+
+    const imported = [];
+    const seen = new Set();
+    walkTable(tagsRoot, record => {
+      const name = normalizeTag(record[1]);
+      if (!name || seen.has(name)) return;
+      seen.add(name);
+      imported.push({name, uses:Number(record[2] || 0)});
+    });
+    if (!imported.length) throw new Error('The tags table is empty.');
+    imported.sort((a, b) => a.name.localeCompare(b.name));
+    return imported;
   }
 
   async function importSqlite(file) {
-    dbStatus.textContent = `Reading ${file.name} locally…`;
+    dbStatus.textContent = 'Reading ' + file.name + ' locally…';
     forgetDbBtn.disabled = true;
-    let db = null;
     try {
-      const SQL = await loadSqlJs();
       const bytes = new Uint8Array(await file.arrayBuffer());
-      db = new SQL.Database(bytes);
-      const tables = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='tags'");
-      if (!tables.length || !tables[0].values.length) throw new Error('This SQLite file does not contain a tags table.');
-      const columns = tableColumns(db, 'tags');
-      if (!columns.includes('name')) throw new Error('The tags table does not contain a name column.');
-      const usesExpr = columns.includes('uses') ? 'COALESCE(uses,0)' : '0';
-      const stmt = db.prepare(`SELECT name, ${usesExpr} AS uses FROM tags WHERE name IS NOT NULL ORDER BY name COLLATE NOCASE`);
-      const imported = [];
-      const seen = new Set();
-      while (stmt.step()) {
-        const row = stmt.get();
-        const name = normalizeTag(row[0]);
-        if (!name || seen.has(name)) continue;
-        seen.add(name);
-        imported.push({name, uses:Number(row[1] || 0)});
-      }
-      stmt.free();
-      if (!imported.length) throw new Error('The tags table is empty.');
+      const imported = readTagGremlinSqlite(bytes);
       tagIndex = imported;
       const cached = {
         sourceName:file.name,
@@ -958,10 +1086,10 @@
       };
       try {
         await idbSet(DB_KEY, cached);
-        dbStatus.textContent = `${imported.length.toLocalString()} tags loaded from ${file.name} and cached locally.`;
+        dbStatus.textContent = imported.length.toLocaleString() + ' tags loaded from ' + file.name + ' and cached locally.';
       } catch (cacheError) {
         console.warn(cacheError);
-        dbStatus.textContent = `${imported.length.toLocaleString()} tags loaded from ${file.name}; browser storage refused the cache, so this session only.`;
+        dbStatus.textContent = imported.length.toLocaleString() + ' tags loaded from ' + file.name + '; browser storage refused the cache, so this session only.';
       }
       forgetDbBtn.disabled = false;
     } catch (error) {
@@ -970,7 +1098,6 @@
       tagIndex = [];
       forgetDbBtn.disabled = true;
     } finally {
-      if (db) db.close();
       dbFile.value = '';
     }
   }
