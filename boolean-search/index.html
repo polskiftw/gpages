@@ -897,8 +897,17 @@
 
   function readTagGremlinSqlite(bytes) {
     if (!(bytes instanceof Uint8Array) || bytes.length < 100) throw new Error('That file is too small to be a SQLite database.');
-    const signature = new TextDecoder('ascii').decode(bytes.subarray(0, 16));
-    if (signature !== 'SQLite format 3\\u0000') throw new Error('That file is not a SQLite 3 database.');
+    const sqliteSignature = [83,81,76,105,116,101,32,102,111,114,109,97,116,32,51,0];
+    const isSqlite = sqliteSignature.every((value, index) => bytes[index] === value);
+    if (!isSqlite) {
+      const walMagic = bytes.length >= 4
+        ? ((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]) >>> 0
+        : 0;
+      if (walMagic === 0x377f0682 || walMagic === 0x377f0683) {
+        throw new Error('That is a SQLite WAL file. Choose the main tag-gremlin.sqlite3 file instead.');
+      }
+      throw new Error('That file does not have a SQLite 3 database header.');
+    }
 
     const u16 = off => (bytes[off] << 8) | bytes[off + 1];
     const u32 = off => (((bytes[off] * 0x1000000) + (bytes[off + 1] << 16) + (bytes[off + 2] << 8) + bytes[off + 3]) >>> 0);
