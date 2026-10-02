@@ -8,83 +8,1018 @@
 <meta name="theme-color" content="#f2f2f7">
 <title>Boolean Search Builder</title>
 <style>
-  :root { color-scheme: light dark; --bg:#f2f2f7; --card:#fff; --text:#111; --muted:#6e6e73; --border:rgba(60,60,67,.18); --accent:#007aff; --danger:#ff3b30; --field:#f7f7fa; --shadow:0 1px 2px rgba(0,0,0,.04),0 8px 28px rgba(0,0,0,.06); }
-  @media (prefers-color-scheme: dark) { :root { --bg:#000; --card:#1c1c1e; --text:#f5f5f7; --muted:#98989d; --border:rgba(84,84,88,.65); --accent:#0a84ff; --danger:#ff453a; --field:#2c2c2e; --shadow:none; } }
+  :root {
+    color-scheme: light dark;
+    --bg:#f2f2f7; --card:#fff; --text:#111; --muted:#6e6e73;
+    --border:rgba(60,60,67,.18); --accent:#007aff; --danger:#ff3b30;
+    --field:#f7f7fa; --chip:#e9e9ee; --shadow:0 1px 2px rgba(0,0,0,.04),0 8px 28px rgba(0,0,0,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#000; --card:#1c1c1e; --text:#f5f5f7; --muted:#98989d;
+      --border:rgba(84,84,88,.65); --accent:#0a84ff; --danger:#ff453a;
+      --field:#2c2c2e; --chip:#3a3a3c; --shadow:none;
+    }
+  }
   * { box-sizing:border-box; }
-  body { margin:0; padding:max(22px,env(safe-area-inset-top)) 16px max(28px,env(safe-area-inset-bottom)); background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif; -webkit-font-smoothing:antialiased; }
-  main { width:min(100%,680px); margin:0 auto; }
+  body {
+    margin:0; padding:max(22px,env(safe-area-inset-top)) 16px max(28px,env(safe-area-inset-bottom));
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  main { width:min(100%,760px); margin:0 auto; }
   h1 { margin:6px 2px 6px; font-size:30px; line-height:1.1; letter-spacing:-.6px; }
+  h2 { margin:0 0 5px; font-size:19px; letter-spacing:-.2px; }
   .subtitle { margin:0 2px 22px; color:var(--muted); font-size:15px; line-height:1.4; }
   .card { background:var(--card); border:1px solid var(--border); border-radius:18px; padding:16px; margin-bottom:14px; box-shadow:var(--shadow); }
-  label { display:block; font-weight:700; font-size:16px; margin-bottom:7px; }
-  .hint { color:var(--muted); font-size:13px; line-height:1.35; margin:-2px 0 9px; }
-  textarea { width:100%; min-height:78px; resize:vertical; border:1px solid var(--border); border-radius:12px; background:var(--field); color:var(--text); padding:12px; font:16px/1.35 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; outline:none; -webkit-appearance:none; }
-  textarea:focus { border-color:var(--accent); }
+  label { display:block; font-weight:700; font-size:15px; margin-bottom:7px; }
+  .hint { color:var(--muted); font-size:13px; line-height:1.4; margin:-2px 0 10px; }
   .field + .field { margin-top:18px; }
-  #output { min-height:150px; font-size:15px; }
-  .buttons { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
-  button { min-height:48px; border:0; border-radius:12px; font:700 16px/1 -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  input, select, textarea {
+    border:1px solid var(--border); border-radius:12px; background:var(--field); color:var(--text);
+    padding:11px 12px; font:16px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;
+    outline:none; -webkit-appearance:none;
+  }
+  input:focus, select:focus, textarea:focus, .token-editor:focus-within { border-color:var(--accent); }
+  textarea { width:100%; min-height:120px; resize:vertical; font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }
+  #output { min-height:170px; font-size:14px; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .row > .grow { flex:1 1 220px; min-width:0; }
+  button {
+    min-height:44px; border:0; border-radius:12px; padding:0 14px;
+    font:700 15px/1 -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;
+    cursor:pointer; -webkit-tap-highlight-color:transparent;
+  }
   button:active { transform:scale(.985); }
+  button:disabled { opacity:.48; cursor:default; transform:none; }
   .primary { background:var(--accent); color:#fff; }
   .secondary { background:var(--field); color:var(--accent); border:1px solid var(--border); }
+  .danger { background:var(--field); color:var(--danger); border:1px solid var(--border); }
+  .small { min-height:36px; padding:0 11px; font-size:13px; }
+  .buttons { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
   .full { grid-column:1 / -1; }
-  #status { min-height:20px; margin:10px 2px 0; font-size:14px; color:var(--muted); text-align:center; }
-  #status.ok { color:var(--accent); } #status.error { color:var(--danger); }
+  .dropzone {
+    border:2px dashed var(--border); border-radius:14px; padding:18px 14px; text-align:center;
+    background:var(--field); transition:border-color .15s, background .15s;
+  }
+  .dropzone.drag { border-color:var(--accent); }
+  .dropzone strong { display:block; margin-bottom:5px; }
+  .dropzone input { display:none; }
+  .db-meta { display:flex; gap:8px; align-items:center; justify-content:space-between; margin-top:10px; flex-wrap:wrap; }
+  .status-line { color:var(--muted); font-size:13px; line-height:1.35; }
+  .privacy { margin-top:10px; padding:10px 11px; background:var(--field); border-radius:11px; color:var(--muted); font-size:12px; line-height:1.4; }
+  .token-wrap { position:relative; }
+  .token-editor {
+    min-height:48px; border:1px solid var(--border); border-radius:12px; background:var(--field);
+    display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:7px;
+  }
+  .token-editor input {
+    flex:1 1 150px; min-width:110px; border:0; padding:4px 5px; background:transparent; border-radius:5px;
+  }
+  .token-editor input:focus { border:0; }
+  .chip { display:inline-flex; align-items:center; gap:5px; max-width:100%; padding:5px 7px; border-radius:8px; background:var(--chip); font:600 13px/1.1 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }
+  .chip span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chip button { min-height:auto; padding:0; background:transparent; color:var(--muted); font-size:17px; line-height:1; }
+  .suggestions {
+    display:none; position:absolute; z-index:30; left:0; right:0; top:calc(100% + 4px);
+    max-height:300px; overflow:auto; background:var(--card); border:1px solid var(--border); border-radius:12px;
+    box-shadow:0 12px 35px rgba(0,0,0,.18); padding:5px;
+  }
+  .suggestions.open { display:block; }
+  .suggestion { width:100%; min-height:38px; padding:7px 9px; display:flex; justify-content:space-between; gap:12px; align-items:center; background:transparent; color:var(--text); border-radius:8px; text-align:left; }
+  .suggestion.active { background:var(--field); }
+  .suggestion-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:600 13px/1.25 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }
+  .suggestion-uses { color:var(--muted); font-size:12px; white-space:nowrap; }
+  .rules-head { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:12px; }
+  .rules { display:grid; gap:10px; }
+  .rule { border:1px solid var(--border); border-radius:14px; padding:12px; background:var(--field); }
+  .rule-top { display:flex; gap:8px; align-items:center; margin-bottom:10px; }
+  .rule-top select { flex:1; min-width:0; background:var(--card); }
+  .rule-body { display:grid; gap:10px; }
+  .rule-pair { display:grid; grid-template-columns:1fr auto 1fr; gap:9px; align-items:start; }
+  .relation { padding-top:13px; color:var(--muted); font-weight:800; font-size:13px; text-align:center; min-width:72px; }
+  .rule-help { color:var(--muted); font-size:12px; line-height:1.35; margin-top:8px; }
+  .empty-rules { color:var(--muted); text-align:center; padding:15px 4px 5px; font-size:13px; }
   .logic { margin-top:11px; padding:11px 12px; border-radius:12px; background:var(--field); color:var(--muted); font-size:13px; line-height:1.45; }
   .logic strong { color:var(--text); }
-  footer { color:var(--muted); text-align:center; font-size:12px; line-height:1.4; margin:18px 8px 4px; }
+  #status { min-height:20px; margin:10px 2px 0; font-size:14px; color:var(--muted); text-align:center; }
+  #status.ok { color:var(--accent); } #status.error { color:var(--danger); }
+  footer { color:var(--muted); text-align:center; font-size:12px; line-height:1.5; margin:18px 8px 4px; }
+  @media (max-width:560px) {
+    .rule-pair { grid-template-columns:1fr; }
+    .relation { padding:0; min-width:0; text-align:left; }
+    .buttons { grid-template-columns:1fr; }
+    .full { grid-column:auto; }
+  }
 </style>
 </head>
 <body>
 <main>
   <h1>Boolean Search Builder</h1>
-  <p class="subtitle">Builds the expanded query format so normal exclusions can be overridden by exception tags.</p>
+  <p class="subtitle">Build conditional tag searches without hand-writing the Boolean expansion.</p>
+
   <section class="card">
-    <div class="field">
-      <label for="required">Required tags</label>
-      <div class="hint">Every result must contain these.</div>
-      <textarea id="required" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false">hst</textarea>
+    <h2>Tag Gremlin autocomplete</h2>
+    <p class="hint">Drop your Tag Gremlin SQLite database here. The page extracts the tag names locally and remembers the autocomplete index in this browser.</p>
+    <label class="dropzone" id="dropzone" for="dbFile">
+      <strong>Drop tag-gremlin.sqlite3 here</strong>
+      <span>or click to choose a SQLite file</span>
+      <input id="dbFile" type="file" accept=".sqlite,.sqlite3,.db,application/vnd.sqlite3,application/octet-stream">
+    </label>
+    <div class="db-meta">
+      <div id="dbStatus" class="status-line">No local tag index loaded.</div>
+      <button class="danger small" id="forgetDbBtn" type="button" disabled>Forget Local Index</button>
     </div>
-    <div class="field">
-      <label for="blocked">Normally blocked tags</label>
-      <div class="hint">These are excluded unless an exception tag is also present.</div>
-      <textarea id="blocked" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false">ns
-nn</textarea>
-    </div>
-    <div class="field">
-      <label for="exceptions">Exception tags</label>
-      <div class="hint">Any one of these allows the blocked tags.</div>
-      <textarea id="exceptions" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false">hc
-sr
-mp
-ofs</textarea>
-    </div>
-    <div class="logic"><strong>Input:</strong> separate tags with spaces, commas, or new lines.<br><strong>Rule:</strong> required tags + no blocked tags <em>OR</em> required tags + any exception.</div>
+    <div class="privacy"><strong>Local only:</strong> the SQLite file is opened in your browser. It is not uploaded to this site or committed to GitHub. Only tag names and use counts are cached in this browser's IndexedDB for autocomplete.</div>
   </section>
+
+  <section class="card">
+    <h2>Base filters</h2>
+    <div class="field">
+      <label>Required tags</label>
+      <div class="hint">Every result must contain all of these. Genre, year, actors, or any ordinary required tag can go here.</div>
+      <div id="requiredHost"></div>
+    </div>
+    <div class="field">
+      <label>Excluded tags</label>
+      <div class="hint">Every result must omit all of these. For exceptions, use the Blocked unless exception rule below.</div>
+      <div id="excludedHost"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="rules-head">
+      <div>
+        <h2>Conditional rules</h2>
+        <div class="hint" style="margin:0">Rules are independent and are ANDed together.</div>
+      </div>
+      <button class="secondary small" id="addRuleBtn" type="button">Add Rule</button>
+    </div>
+    <div id="rules" class="rules"></div>
+    <div id="emptyRules" class="empty-rules">No conditional rules yet.</div>
+    <div class="logic"><strong>Available rules:</strong> A requires B, both-or-neither, cannot both appear, at least one, all, exactly one, and the original blocked-unless-exception rule.</div>
+  </section>
+
   <section class="card">
     <label for="output">Search query</label>
     <textarea id="output" readonly spellcheck="false"></textarea>
     <div class="buttons">
       <button class="primary full" id="copyBtn" type="button">Copy to Clipboard</button>
-      <button class="secondary" id="exampleBtn" type="button">Reset Example</button>
-      <button class="secondary" id="clearBtn" type="button">Clear All</button>
+      <button class="secondary" id="exampleBtn" type="button">Load Example</button>
+      <button class="secondary" id="clearBtn" type="button">Clear Builder</button>
     </div>
     <div id="status" aria-live="polite"></div>
   </section>
-  <footer>Uses the documented syntax: implicit AND, <b>|</b> for OR, <b>-term</b> for NOT, and parentheses for grouping.</footer>
+
+  <footer>Output uses implicit AND, <b>|</b> for OR, <b>-term</b> for NOT, and parentheses for grouped branches. Autocomplete is optional; arbitrary tags still work.</footer>
 </main>
+
 <script>
 (() => {
-  const required=document.getElementById('required'), blocked=document.getElementById('blocked'), exceptions=document.getElementById('exceptions'), output=document.getElementById('output'), status=document.getElementById('status'), copyBtn=document.getElementById('copyBtn');
-  function normalizeField(el){ const start=el.selectionStart, end=el.selectionEnd, lower=el.value.toLowerCase(); if(el.value!==lower){ el.value=lower; try{el.setSelectionRange(start,end);}catch(_){} } }
-  function tokens(value){ const seen=new Set(); return value.toLowerCase().split(/[\s,]+/).map(s=>s.trim()).filter(Boolean).map(s=>s.replace(/^[!-]+/,'')).filter(Boolean).filter(s=>{ if(seen.has(s)) return false; seen.add(s); return true; }); }
-  function buildQuery(){ const req=tokens(required.value), ban=tokens(blocked.value), exc=tokens(exceptions.value); status.className=''; if(!req.length){ output.value=''; status.textContent='Add at least one required tag.'; status.className='error'; return; } const base=req.join(' '); if(!ban.length){ output.value=base; status.textContent='Ready.'; return; } const normalBranch=`${base} ${ban.map(t=>'-'+t).join(' ')}`.trim(); if(!exc.length){ output.value=normalBranch; status.textContent='Ready.'; return; } const branches=[`(${normalBranch})`,...exc.map(tag=>`(${base} ${tag})`)]; output.value=branches.join(' | '); status.textContent=`${branches.length} branches generated.`; }
-  async function copyText(){ buildQuery(); if(!output.value)return; let copied=false; if(navigator.clipboard&&window.isSecureContext){ try{await navigator.clipboard.writeText(output.value); copied=true;}catch(_){} } if(!copied){ output.removeAttribute('readonly'); output.focus(); output.select(); output.setSelectionRange(0,output.value.length); try{copied=document.execCommand('copy');}catch(_){copied=false;} output.setAttribute('readonly',''); window.getSelection()?.removeAllRanges(); } if(copied){ const old=copyBtn.textContent; copyBtn.textContent='Copied ✓'; status.textContent='Copied to clipboard.'; status.className='ok'; setTimeout(()=>{copyBtn.textContent=old;},1200);}else{ status.textContent='Could not auto-copy. Press and hold the query to copy it manually.'; status.className='error'; } }
-  [required,blocked,exceptions].forEach(el=>el.addEventListener('input',()=>{ normalizeField(el); buildQuery(); }));
-  copyBtn.addEventListener('click',copyText);
-  document.getElementById('exampleBtn').addEventListener('click',()=>{ required.value='hst'; blocked.value='ns\nnn'; exceptions.value='hc\nsr\nmp\nofs'; buildQuery(); });
-  document.getElementById('clearBtn').addEventListener('click',()=>{ required.value=''; blocked.value=''; exceptions.value=''; buildQuery(); required.focus(); });
-  buildQuery();
+  'use strict';
+
+  const SQLJS_VERSION = '1.13.0';
+  const SQLJS_BASE = `https://cdn.jsdelivr.net/npm/sql.js@${SQLJS_VERSION}/dist/`;
+  const DB_NAME = 'boolean-search-builder';
+  const DB_STORE = 'tag-index';
+  const DB_KEY = 'active';
+  const STATE_KEY = 'boolean-search-builder-state-v2';
+  const MAX_BRANCHES = 512;
+  const MAX_SUGGGESTIONS = 12;
+
+  const output = document.getElementById('output');
+  const status = document.getElementById('status');
+  const copyBtn = document.getElementById('copyBtn');
+  const rulesEl = document.getElementById('rules');
+  const emptyRules = document.getElementById('emptyRules');
+  const dbStatus = document.getElementById('dbStatus');
+  const forgetDbBtn = document.getElementById('forgetDbBtn');
+  const dropzone = document.getElementById('dropzone');
+  const dbFile = document.getElementById('dbFile');
+
+  let tagIndex = [];
+  let sqlPromise = null;
+  let saveTimer = null;
+  let ruleCounter = 0;
+  const editors = new Map();
+  const rules = [];
+
+  function normalizeTag(value) {
+    return String(value || '').trim().toLowerCase().replace(/^[!-]+/, '').trim();
+  }
+
+  function formatUses(value) {
+    const n = Number(value || 0);
+    return Number.isFinite(n) ? n.toLocaleString() : '0';
+  }
+
+  function parsePastedTags(value) {
+    return String(value || '')
+      .toLowerCase()
+      .split(/[\s,]+/)
+      .map(normalizeTag)
+      .filter(Boolean);
+  }
+
+  function debounceSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveState, 180);
+  }
+
+  class TokenEditor {
+    constructor(host, options = {}) {
+      this.host = host;
+      this.placeholder = options.placeholder || 'type a tag';
+      this.onChange = options.onChange || (() => {});
+      this.tokens = [];
+      this.activeIndex = -1;
+      this.matches = [];
+
+      this.wrap = document.createElement('div');
+      this.wrap.className = 'token-wrap';
+      this.editor = document.createElement('div');
+      this.editor.className = 'token-editor';
+      this.input = document.createElement('input');
+      this.input.type = 'text';
+      this.input.autocomplete = 'off';
+      this.input.autocapitalize = 'none';
+      this.input.autocorrect = 'off';
+      this.input.spellcheck = false;
+      this.input.placeholder = this.placeholder;
+      this.suggestions = document.createElement('div');
+      this.suggestions.className = 'suggestions';
+      this.editor.appendChild(this.input);
+      this.wrap.append(this.editor, this.suggestions);
+      host.replaceChildren(this.wrap);
+
+      this.input.addEventListener('input', () => this.updateSuggestions());
+      this.input.addEventListener('keydown', event => this.onKeyDown(event));
+      this.input.addEventListener('paste', event => this.onPaste(event));
+      this.input.addEventListener('blur', () => setTimeout(() => this.closeSuggestions(), 120));
+      this.editor.addEventListener('click', () => this.input.focus());
+    }
+
+    values() { return [...this.tokens]; }
+
+    setValues(values, notify = true) {
+      const seen = new Set();
+      this.tokens = (values || []).map(normalizeTag).filter(Boolean).filter(tag => {
+        if (seen.has(tag)) return false;
+        seen.add(tag);
+        return true;
+      });
+      this.renderTokens();
+      if (notify) this.changed();
+    }
+
+    add(value, notify = true) {
+      const tag = normalizeTag(value);
+      if (!tag || this.tokens.includes(tag)) return false;
+      this.tokens.push(tag);
+      this.input.value = '';
+      this.renderTokens();
+      this.closeSuggestions();
+      if (notify) this.changed();
+      return true;
+    }
+
+    remove(value) {
+      const i = this.tokens.indexOf(value);
+      if (i < 0) return;
+      this.tokens.splice(i, 1);
+      this.renderTokens();
+      this.changed();
+    }
+
+    changed() {
+      this.onChange(this.values());
+      buildQuery();
+      debounceSave();
+    }
+
+    renderTokens() {
+      this.editor.querySelectorAll('.chip').forEach(node => node.remove());
+      for (const tag of this.tokens) {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        const text = document.createElement('span');
+        text.textContent = tag;
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.setAttribute('aria-label', `Remove ${tag}`);
+        remove.textContent = '×';
+        remove.addEventListener('click', event => {
+          event.stopPropagation();
+          this.remove(tag);
+        });
+        chip.append(text, remove);
+        this.editor.insertBefore(chip, this.input);
+      }
+    }
+
+    onPaste(event) {
+      const text = event.clipboardData?.getData('text') || '';
+      const tags = parsePastedTags(text);
+      if (tags.length < 2) return;
+      event.preventDefault();
+      let changed = false;
+      for (const tag of tags) changed = this.add(tag, false) || changed;
+      if (changed) this.changed();
+    }
+
+    onKeyDown(event) {
+      if (this.suggestions.classList.contains('open')) {
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          this.activeIndex = Math.min(this.activeIndex + 1, this.matches.length - 1);
+          this.renderSuggestions();
+          return;
+        }
+        if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          this.activeIndex = Math.max(this.activeIndex - 1, 0);
+          this.renderSuggestions();
+          return;
+        }
+        if ((event.key === 'Enter' || event.key === 'Tab') && this.activeIndex >= 0) {
+          event.preventDefault();
+          this.add(this.matches[this.activeIndex].name);
+          return;
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          this.closeSuggestions();
+          return;
+        }
+      }
+
+      if (event.key === 'Enter' || event.key === ',' || event.key === 'Tab') {
+        const tag = normalizeTag(this.input.value);
+        if (tag) {
+          event.preventDefault();
+          this.add(tag);
+        }
+      } else if (event.key === 'Backspace' && !this.input.value && this.tokens.length) {
+        this.remove(this.tokens[this.tokens.length - 1]);
+      }
+    }
+
+    updateSuggestions() {
+      const q = normalizeTag(this.input.value);
+      if (!q || !tagIndex.length) {
+        this.closeSuggestions();
+        return;
+      }
+      const prefix = [];
+      const contains = [];
+      for (const item of tagIndex) {
+        if (this.tokens.includes(item.name)) continue;
+        if (item.name.startsWith(q)) prefix.push(item);
+        else if (item.name.includes(q)) contains.push(item);
+        if (prefix.length >= 80 && contains.length >= 80) break;
+      }
+      const byUses = (a, b) => (b.uses - a.uses) || a.name.localeCompare(b.name);
+      prefix.sort(byUses);
+      contains.sort(byUses);
+      this.matches = prefix.concat(contains).slice(0, MAX_SUGGESTIONS);
+      this.activeIndex = this.matches.length ? 0 : -1;
+      this.renderSuggestions();
+    }
+
+    renderSuggestions() {
+      this.suggestions.replaceChildren();
+      if (!this.matches.length) {
+        this.closeSugggestions();
+        return;
+      }
+      this.matches.forEach((item, index) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `suggestion${index === this.activeIndex ? ' active' : ''}`;
+        const name = document.createElement('span');
+        name.className = 'suggestion-name';
+        name.textContent = item.name;
+        const uses = document.createElement('span');
+        uses.className = 'suggestion-uses';
+        uses.textContent = `${formatUses(item.uses)} uses`;
+        button.append(name, uses);
+        button.addEventListener('mousedown', event => event.preventDefault());
+        button.addEventListener('click', () => this.add(item.name));
+        this.suggestions.appendChild(button);
+      });
+      this.suggestions.classList.add('open');
+    }
+
+    closeSuggestions() {
+      this.matches = [];
+      this.activeIndex = -1;
+      this.suggestions.classList.remove('open');
+      this.suggestions.replaceChildren();
+    }
+  }
+
+  const requiredEditor = new TokenEditor(document.getElementById('requiredHost'), {placeholder:'add required tag'});
+  const excludedEditor = new TokenEditor(document.getElementById('excludedHost'), {placeholder:'add excluded tag'});
+  editors.set('required', requiredEditor);
+  editors.set('excluded', excludedEditor);
+
+  const RULE_TYPES = {
+    requires: {
+      label: 'A requires B',
+      help: 'A may be absent. If A is present, B must also be present.',
+      mode: 'pair', relation: 'requires'
+    },
+    together: {
+      label: 'Both or neither',
+      help: 'A and B must either both appear or both be absent.',
+      mode: 'pair', relation: 'with'
+    },
+    incompatible: {
+      label: 'Cannot both appear',
+      help: 'A alone, B alone, or neither is allowed; A + B together is rejected.',
+      mode: 'pair', relation: 'not with'
+    },
+    any: {
+      label: 'At least one of',
+      help: 'At least one tag in this group must be present.',
+      mode: 'group', placeholder: 'add alternative tag'
+    },
+    all: {
+      label: 'All of',
+      help: 'Every tag in this group must be present.',
+      mode: 'group', placeholder: 'add required tag'
+    },
+    exactlyOne: {
+      label: 'Exactly one of',
+       help: 'One tag in this group must be present and all the others must be absent.',
+      mode: 'group', placeholder: 'add exclusive tag'
+    },
+    blockedUnless: {
+      label: 'Blocked unless exception',
+      help: 'All blocked tags are excluded normally. Any one exception tag allows them, matching the original builder.',
+      mode: 'doubleGroup'
+    }
+  };
+
+  function newRule(type = 'requires', data = null) {
+    const rule = { id: ++ruleCounter, type, left:[], right:[], group:[] };
+    if (data) {
+      rule.left = (data.left || []).map(normalizeTag).filter(Boolean);
+      rule.right = (data.right || []).map(normalizeTag).filter(Boolean);
+      rule.group = (data.group || []).map(normalizeTag).filter(Boolean);
+    }
+    rules.push(rule);
+    renderRule(rule);
+    updateEmptyRules();
+    buildQuery();
+    debounceSave();
+    return rule;
+  }
+
+  function removeRule(id) {
+    const index = rules.findIndex(rule => rule.id === id);
+    if (index >= 0) rules.splice(index, 1);
+    const node = document.querySelector(`[data-rule-id="${id}"]`);
+    if (node) node.remove();
+    updateEmptyRules();
+    buildQuery();
+    debounceSave();
+  }
+
+  function updateEmptyRules() {
+    emptyRules.style.display = rules.length ? 'none' : 'block';
+  }
+
+  function renderRule(rule) {
+    const card = document.createElement('div');
+    card.className = 'rule';
+    card.dataset.ruleId = String(rule.id);
+
+    const top = document.createElement('div');
+    top.className = 'rule-top';
+    const select = document.createElement('select');
+    for (const [value, spec] of Object.entries(RULE_TYPES)) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = spec.label;
+      if (value === rule.type) option.selected = true;
+      select.appendChild(option);
+    }
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'danger small';
+    remove.textContent = 'Remove';
+    remove.addEventListener('click', () => removeRule(rule.id));
+    top.append(select, remove);
+
+    const body = document.createElement('div');
+    body.className = 'rule-body';
+    const help = document.createElement('div');
+    help.className = 'rule-help';
+
+    card.append(top, body, help);
+    rulesEl.appendChild(card);
+
+    select.addEventListener('change', () => {
+      rule.type = select.value;
+      rule.left = [];
+      rule.right = [];
+      rule.group = [];
+      renderRuleBody(rule, body, help);
+      buildQuery();
+      debounceSave();
+    });
+
+    renderRuleBody(rule, body, help);
+  }
+
+  function editorHost() {
+    return document.createElement('div');
+  }
+
+  function renderRuleBody(rule, body, help) {
+    body.replaceChildren();
+    const spec = RULE_TYPES[rule.type];
+    help.textContent = spec.help;
+
+    if (spec.mode === 'pair') {
+      const pair = document.createElement('div');
+      pair.className = 'rule-pair';
+      const left = editorHost();
+      const relation = document.createElement('div');
+      relation.className = 'relation';
+      relation.textContent = spec.relation;
+      const right = editorHost();
+      pair.append(left, relation, right);
+      body.appendChild(pair);
+
+      const leftEditor = new TokenEditor(left, {
+        placeholder:'tag A',
+        onChange: values => { rule.left = values.slice(0, 1); }
+      });
+      const rightEditor = new TokenEditor(right, {
+        placeholder:'tag B',
+        onChange: values => { rule.right = values.slice(0, 1); }
+      });
+      leftEditor.setValues(rule.left.slice(0, 1), false);
+      rightEditor.setValues(rule.right.slice(0, 1), false);
+      const clamp = editor => {
+        const originalAdd = editor.add.bind(editor);
+        editor.add = (value, notify = true) => {
+          editor.setValues([value], notify);
+          editor.input.value = '';
+          editor.closeSuggestions();
+          return true;
+        };
+      };
+      clamp(leftEditor);
+      clamp(rightEditor);
+      return;
+    }
+
+    if (spec.mode === 'group') {
+      const group = editorHost();
+      body.appendChild(group);
+      const groupEditor = new TokenEditor(group, {
+        placeholder:spec.placeholder,
+        onChange: values => { rule.group = values; }
+      });
+      groupEditor.setValues(rule.group, false);
+      return;
+    }
+
+    if (spec.mode === 'doubleGroup') {
+      const blockedLabel = document.createElement('label');
+      blockedLabel.textContent = 'Normally blocked tags';
+      const blocked = editorHost();
+      const exceptionLabel = document.createElement('label');
+      exceptionLabel.textContent = 'Exception tags';
+      exceptionLabel.style.marginTop = '4px';
+      const exceptions = editorHost();
+      body.append(blockedLabel, blocked, exceptionLabel, exceptions);
+      const blockedEditor = new TokenEditor(blocked, {
+        placeholder:'add blocked tag',
+        onChange: values => { rule.left = values; }
+      });
+      const exceptionEditor = new TokenEditor(exceptions, {
+        placeholder:'add exception tag',
+        onChange: values => { rule.right = values; }
+      });
+      blockedEditor.setValues(rule.left, false);
+      exceptionEditor.setValues(rule.right, false);
+    }
+  }
+
+  function assignment(entries) {
+    const map = new Map();
+    for (const [tag, value] of entries) map.set(tag, value);
+    return map;
+  }
+
+  function mergeAssignment(a, b) {
+    const out = new Map(a);
+    for (const [tag, value] of b) {
+      if (out.has(tag) && out.get(tag) !== value) return null;
+      out.set(tag, value);
+    }
+    return out;
+  }
+
+  function andAlternatives(branches, alternatives) {
+    const out = [];
+    for (const branch of branches) {
+      for (const alt of alternatives) {
+        const merged = mergeAssignment(branch, alt);
+        if (merged) out.push(merged);
+        if (out.length > MAX_BRANCHES * 4) return out;
+      }
+    }
+    return simplifyBranches(out);
+  }
+
+  function branchKey(branch) {
+    return [...branch.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]) || Number(a[1]) - Number(b[1]))
+      .map(([tag, value]) => `${value ? '+' : '-'}${tag}`)
+      .join('\u0001');
+  }
+
+  function isSubsetBranch(a, b) {
+    if (a.size > b.size) return false;
+    for (const [tag, value] of a) if (!b.has(tag) || b.get(tag) !== value) return false;
+    return true;
+  }
+
+  function simplifyBranches(branches) {
+    const unique = [];
+    const seen = new Set();
+    for (const branch of branches) {
+      const key = branchKey(branch);
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(branch);
+      }
+    }
+    unique.sort((a, b) => a.size - b.size);
+    const kept = [];
+    for (const branch of unique) {
+      if (kept.some(existing => isSubsetBranch(existing, branch))) continue;
+      kept.push(branch);
+    }
+    return kept;
+  }
+
+  function validateRule(rule, index) {
+    const spec = RULE_TYPES[rule.type];
+    if (!spec) return `Rule ${index + 1} has an unknown type.`;
+    if (spec.mode === 'pair') {
+      const a = rule.left[0], b = rule.right[0];
+      if (!a || !b) return `Complete both sides of rule ${index + 1}.`;
+      if (a === b) return `Rule ${index + 1} needs two different tags.`;
+    }
+    if (spec.mode === 'group') {
+      if (!rule.group.length) return `Add tags to rule ${index + 1}.`;
+      if (rule.type === 'exactlyOne' && rule.group.length < 2) return `Exactly-one rule ${index + 1} needs at least two tags.`;
+    }
+    if (spec.mode === 'doubleGroup') {
+      if (!rule.left.length || !rule.right.length) return `Rule ${index + 1} needs blocked tags and at least one exception.`;
+    }
+    return null;
+  }
+
+  function alternativesForRule(rule) {
+    if (rule.type === 'requires') {
+      return [assignment([[rule.left[0], false]]), assignment([[rule.right[0], true]])];
+    }
+    if (rule.type === 'together') {
+      return [
+        assignment([[rule.left[0], true], [rule.right[0], true]]),
+        assignment([[rule.left[0], false], [rule.right[0], false]])
+      ];
+    }
+    if (rule.type === 'incompatible') {
+      return [assignment([[rule.left[0], false]]), assignment([[rule.right[0], false]])];
+    }
+    if (rule.type === 'any') {
+      return rule.group.map(tag => assignment([[tag, true]]));
+    }
+    if (rule.type === 'all') {
+      return [assignment(rule.group.map(tag => [tag, true]))];
+    }
+    if (rule.type === 'exactlyOne') {
+      return rule.group.map(chosen => assignment(rule.group.map(tag => [tag, tag === chosen])));
+    }
+    if (rule.type === 'blockedUnless') {
+      return [
+        assignment(rule.left.map(tag => [tag, false])),
+        ...rule.right.map(tag => assignment([[tag, true]]))
+      ];
+    }
+    return [new Map()];
+  }
+
+  function buildQuery() {
+    status.className = '';
+    for (let i = 0; i < rules.length; i++) {
+      const error = validateRule(rules[i], i);
+      if (error) {
+        output.value = '';
+        status.textContent = error;
+        status.className = 'error';
+        return;
+      }
+    }
+
+    let base = new Map();
+    for (const tag of requiredEditor.values()) {
+      const merged = mergeAssignment(base, assignment([[tag, true]]));
+      if (!merged) return impossible();
+      base = merged;
+    }
+    for (const tag of excludedEditor.values()) {
+      const merged = mergeAssignment(base, assignment([[tag, false]]));
+      if (!merged) return impossible();
+      base = merged;
+    }
+
+    let branches = [base];
+    for (const rule of rules) {
+      branches = andAlternatives(branches, alternativesForRule(rule));
+      if (!branches.length) return impossible();
+      if (branches.length > MAX_BRANCHES) {
+        output.value = '';
+        status.textContent = `This rule set expands past ${MAX_BRANCHES} branches. Simplify or split the search.`;
+        status.className = 'error';
+        return;
+      }
+    }
+    branches = simplifyBranches(branches);
+
+    const strings = branches.map(branch => [...branch.entries()].map(([tag, value]) => value ? tag : `-${tag}`).join(' '));
+    if (!strings.length || (strings.length === 1 && !strings[0])) {
+      output.value = '';
+      status.textContent = 'Add a filter or rule.';
+      return;
+    }
+    output.value = strings.length === 1 ? strings[0] : strings.map(text => `(${text})`).join(' | ');
+    status.textContent = strings.length === 1 ? '1 branch generated.' : `${strings.length} branches generated.`;
+    status.className = 'ok';
+  }
+
+  function impossible() {
+    output.value = '';
+    status.textContent = 'These rules contradict each other, so no result can satisfy them.';
+    status.className = 'error';
+  }
+
+  function serializeState() {
+    return {
+      required: requiredEditor.values(),
+      excluded: excludedEditor.values(),
+      rules: rules.map(({type, left, right, group}) => ({type, left, right, group}))
+    };
+  }
+
+  function saveState() {
+    try { localStorage.setItem(STATE_KEY, JSON.stringify(serializeState())); } catch (_) {}
+  }
+
+  function resetRules() {
+    rules.splice(0, rules.length);
+    rulesEl.replaceChildren();
+    updateEmptyRules();
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STATE_KEY);
+      if (!raw) return false;
+      const saved = JSON.parse(raw);
+      requiredEditor.setValues(saved.required || [], false);
+      excludedEditor.setValues(saved.excluded || [], false);
+      resetRules();
+      for (const rule of saved.rules || []) newRule(RULE_TYPES[rule.type] ? rule.type : 'requires', rule);
+      buildQuery();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function loadExample() {
+    requiredEditor.setValues(['horror', '1988']);
+    excludedEditor.setValues([]);
+    resetRules();
+    newRule('together', {left:['actor_a'], right:['actor_b']});
+    newRule('incompatible', {left:['actor_c'], right:['actor_d']});
+    newRule('all', {group:['actor_e']});
+    buildQuery();
+    saveState();
+  }
+
+  function clearBuilder() {
+    requiredEditor.setValues([], false);
+    excludedEditor.setValues([], false);
+    resetRules();
+    buildQuery();
+    saveState();
+    requiredEditor.input.focus();
+  }
+
+  async function copyText() {
+    buildQuery();
+    if (!output.value) return;
+    let copied = false;
+    if (navigator.clipboard && window.isSecureContext) {
+      try { await navigator.clipboard.writeText(output.value); copied = true; } catch (_) {}
+    }
+    if (!copied) {
+      output.removeAttribute('readonly');
+      output.focus();
+      output.select();
+      output.setSelectionRange(0, output.value.length);
+      try { copied = document.execCommand('copy'); } catch (_) { copied = false; }
+      output.setAttribute('readonly', '');
+      window.getSelection()?.removeAllRanges();
+    }
+    if (copied) {
+      const old = copyBtn.textContent;
+      copyBtn.textContent = 'Copied ✓';
+      status.textContent = 'Copied to clipboard.';
+      status.className = 'ok';
+      setTimeout(() => { copyBtn.textContent = old; }, 1200);
+    } else {
+      status.textContent = 'Could not auto-copy. Select the query and copy it manually.';
+      status.className = 'error';
+    }
+  }
+
+  function openIndexDb() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function idbGet(key) {
+    const db = await openIndexDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, 'readonly');
+      const req = tx.objectStore(DB_STORE).get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+      tx.oncomplete = () => db.close();
+    });
+  }
+
+  async function idbSet(key, value) {
+    const db = await openIndexDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, 'readwrite');
+      tx.objectStore(DB_STORE).put(value, key);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { const error = tx.error; db.close(); reject(error); };
+    });
+  }
+
+  async function idbDelete(key) {
+    const db = await openIndexDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, 'readwrite');
+      tx.objectStore(DB_STORE).delete(key);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { const error = tx.error; db.close(); reject(error); };
+    });
+  }
+
+  function loadSqlJs() {
+    if (sqlPromise) return sqlPromise;
+    sqlPromise = new Promise((resolve, reject) => {
+      const start = () => {
+        window.initSqlJs({ locateFile: file => SQLJS_BASE + file }).then(resolve, reject);
+      };
+      if (window.initSqlJs) return start();
+      const script = document.createElement('script');
+      script.src = SQLJS_BASE + 'sql-wasm.js';
+      script.async = true;
+      script.onload = start;
+      script.onerror = () => reject(new Error('Could not load the SQLite reader library.'));
+      document.head.appendChild(script);
+    });
+    return sqlPromise;
+  }
+
+  function tableColumns(db, table) {
+    const stmt = db.prepare(`PRAGMA table_info(${table})`);
+    const columns = [];
+    while (stmt.step()) columns.push(String(stmt.getAsObject().name || ''));
+    stmt.free();
+    return columns;
+  }
+
+  async function importSqlite(file) {
+    dbStatus.textContent = `Reading ${file.name} locally…`;
+    forgetDbBtn.disabled = true;
+    let db = null;
+    try {
+      const SQL = await loadSqlJs();
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      db = new SQL.Database(bytes);
+      const tables = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='tags'");
+      if (!tables.length || !tables[0].values.length) throw new Error('This SQLite file does not contain a tags table.');
+      const columns = tableColumns(db, 'tags');
+      if (!columns.includes('name')) throw new Error('The tags table does not contain a name column.');
+      const usesExpr = columns.includes('uses') ? 'COALESCE(uses,0)' : '0';
+      const stmt = db.prepare(`SELECT name, ${usesExpr} AS uses FROM tags WHERE name IS NOT NULL ORDER BY name COLLATE NOCASE`);
+      const imported = [];
+      const seen = new Set();
+      while (stmt.step()) {
+        const row = stmt.get();
+        const name = normalizeTag(row[0]);
+        if (!name || seen.has(name)) continue;
+        seen.add(name);
+        imported.push({name, uses:Number(row[1] || 0)});
+      }
+      stmt.free();
+      if (!imported.length) throw new Error('The tags table is empty.');
+      tagIndex = imported;
+      const cached = {
+        sourceName:file.name,
+        sourceSize:file.size,
+        sourceModified:file.lastModified || 0,
+        importedAt:Date.now(),
+        tags:imported
+      };
+      try {
+        await idbSet(DB_KEY, cached);
+        dbStatus.textContent = `${imported.length.toLocalString()} tags loaded from ${file.name} and cached locally.`;
+      } catch (cacheError) {
+        console.warn(cacheError);
+        dbStatus.textContent = `${imported.length.toLocaleString()} tags loaded from ${file.name}; browser storage refused the cache, so this session only.`;
+      }
+      forgetDbBtn.disabled = false;
+    } catch (error) {
+      console.error(error);
+      dbStatus.textContent = error?.message || 'Could not read that SQLite database.';
+      tagIndex = [];
+      forgetDbBtn.disabled = true;
+    } finally {
+      if (db) db.close();
+      dbFile.value = '';
+    }
+  }
+
+  async function restoreTagIndex() {
+    try {
+      const cached = await idbGet(DB_KEY);
+      if (!cached?.tags?.length) return;
+      tagIndex = cached.tags;
+      dbStatus.textContent = `${tagIndex.length.toLocaleString()} tags restored from local cache${cached.sourceName ? ` (${cached.sourceName})` : ''}.`;
+      forgetDbBtn.disabled = false;
+    } catch (error) {
+      console.warn(error);
+    }
+  }
+
+  async function forgetTagIndex() {
+    tagIndex = [];
+    try { await idbDelete(DB_KEY); } catch (error) { console.warn(error); }
+    dbStatus.textContent = 'No local tag index loaded.';
+    forgetDbBtn.disabled = true;
+  }
+
+  document.getElementById('addRuleBtn').addEventListener('click', () => newRule('requires'));
+  document.getElementById('exampleBtn').addEventListener('click', loadExample);
+  document.getElementById('clearBtn').addEventListener('click', clearBuilder);
+  copyBtn.addEventListener('click', copyText);
+  forgetDbBtn.addEventListener('click', forgetTagIndex);
+  dbFile.addEventListener('change', () => { if (dbFile.files?.[0]) importSqlite(dbFile.files[0]); });
+
+  for (const eventName of ['dragenter','dragover']) {
+    dropzone.addEventListener(eventName, event => {
+      event.preventDefault();
+      dropzone.classList.add('drag');
+    });
+  }
+  for (const eventName of ['dragleave','drop']) {
+    dropzone.addEventListener(eventName, event => {
+      event.preventDefault();
+      dropzone.classList.remove('drag');
+    });
+  }
+  dropzone.addEventListener('drop', event => {
+    const file = event.dataTransfer?.files?.[0];
+    if (file) importSqlite(file);
+  });
+
+  if (!loadState()) buildQuery();
+  restoreTagIndex();
 })();
 </script>
 </body>
