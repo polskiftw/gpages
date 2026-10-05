@@ -6,12 +6,14 @@ import hashlib
 import importlib.util
 import os
 import random
+import re
+import subprocess
 import sys
 import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-BACKEND_VERSION = "2026-10-05.4"
+BACKEND_VERSION = "2026-10-05.5"
 UPSTREAM_REVISION = "121fb0183944f1befeb712d92e9ca07d0e282088"
 UPSTREAM_BASE = f"https://huggingface.co/yijunwang2/krea2-reid/resolve/{UPSTREAM_REVISION}"
 
@@ -176,6 +178,97 @@ def load_transformer_lora(module, transformer, load_file, path: Path, adapter_na
     del state_dict
 
 
+def ensure_torchvision(torch, reid_root: Path) -> None:
+    """Install a Torch-matched torchvision wheel only inside the ReID subtree."""
+    local_site = reid_root / "python"
+    local_site.mkdir(parents=True, exist_ok=True)
+    local_site_str = str(local_site)
+    if local_site_str not in sys.path:
+        sys.path.insert(0, local_site_str)
+
+    version_match = re.match(r"^(\d+)\.(\d+)\.(\d+)", str(torch.__version__))
+    if version_match is None:
+        raise RuntimeError(f"Cannot determine torchvision version for torch {torch.__version__}")
+
+    torch_major, torch_minor, torch_patch = (int(part) for part in version_match.groups())
+    if torch_major != 2:
+        raise RuntimeError(
+            f"Automatic isolated torchvision setup only knows the PyTorch 2.x version scheme; "
+            f"found torch {torch.__version__}"
+        )
+
+    torchvision_version = f"0.{torch_minor + 15}.{torch_patch}"
+
+    try:
+        import torchvision
+
+        installed = str(getattr(torchvision, "__version__", ""))
+        if installed.split("+", 1)[0] == torchvision_version:
+            print(
+                f"Using isolated torchvision {installed} from {Path(torchvision.__file__).parent}",
+                flush=True,
+            )
+            return
+    except Exception:
+        pass
+
+    # A failed binary import can leave half-imported torchvision modules behind.
+    for name in list(sys.modules):
+        if name == "torchvision" or name.startswith("torchvision."):
+            del sys.modules[name]
+
+    build = str(torch.__version__).split("+", 1)[1] if "+" in str(torch.__version__) else ""
+    if build.startswith("cu"):
+        index_url = f"https://download.pytorch.org/whl/{build}"
+    elif getattr(torch.version, "cuda", None):
+        cuda_digits = str(torch.version.cuda).replace(".", "")
+        index_url = f"https://download.pytorch.org/whl/cu{cuda_digits}"
+    else:
+        index_url = "https://download.pytorch.org/whl/cpu"
+
+    print(
+        f"Installing isolated torchvision {torchvision_version} for torch {torch.__version__}...",
+        flush=True,
+    )
+    cmd = [
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "--disable-pip-version-check",
+        "--no-input",
+        "--no-deps",
+        "--upgrade",
+        "--target",
+        local_site_str,
+        f"torchvision=={torchvision_version}",
+        "--index-url",
+        index_url,
+    ]
+    result = subprocess.run(cmd, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(
+            "Could not install the ReID-only torchvision dependency. "
+            f"Command exited with status {result.returncode}."
+        )
+
+    import importlib
+
+    importlib.invalidate_caches()
+    for name in list(sys.modules):
+        if name == "torchvision" or name.startswith("torchvision."):
+            del sys.modules[name]
+
+    import torchvision
+
+    installed = str(getattr(torchvision, "__version__", ""))
+    if installed.split("+", 1)[0] != torchvision_version:
+        raise RuntimeError(
+            f"Installed torchvision {installed}, expected {torchvision_version} for torch {torch.__version__}"
+        )
+    print(f"Installed isolated torchvision {installed} in {local_site}", flush=True)
+
+
 def rebalance_prompt_embeds(torch, prompt_embeds, profile: str):
     weights = REBALANCE_PROFILES[profile]
     if prompt_embeds.ndim != 4 or prompt_embeds.shape[2] != len(weights):
@@ -226,6 +319,7 @@ def main() -> int:
     os.environ["HUGGINGFACE_HUB_CACHE"] = str(cache / "huggingface" / "hub")
     os.environ["TRANSFORMERS_CACHE"] = str(cache / "huggingface" / "transformers")
     os.environ["TORCH_HOME"] = str(cache / "torch")
+    os.environ["PIP_CACHE_DIR"] = str(cache / "pip")
     os.environ["TORCHINDUCTOR_CACHE_DIR"] = str(cache / "torchinductor")
     os.environ["TRITON_CACHE_DIR"] = str(cache / "triton")
     os.environ["CUDA_CACHE_PATH"] = str(cache / "nvidia")
@@ -246,6 +340,8 @@ def main() -> int:
 
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA is not available")
+
+    ensure_torchvision(torch, reid_root)
 
     module = load_pipeline_module(pipeline_path)
     cuda = torch.device("cuda")
