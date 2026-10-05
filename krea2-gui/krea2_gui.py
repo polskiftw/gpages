@@ -7,6 +7,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import urllib.request
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Optional
@@ -47,6 +48,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QListWidget,
     QListWidgetItem,
+    QLineEdit,
     QMainWindow,
     QMenu,
     QMessageBox,
@@ -68,6 +70,13 @@ DEFAULT_ROOT = Path.home() / "ai" / "krea2"
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 SEED_RE = re.compile(r"Generating\s+(\d+)\s*/\s*(\d+).*?seed\s+(-?\d+)", re.IGNORECASE)
 WORD_RE = re.compile(r"[A-Za-z][A-Za-z'’-]*")
+REID_BACKEND_VERSION = "2026-10-05.1"
+REID_BACKEND_URL = "https://raw.githubusercontent.com/polskiftw/gpages/main/krea2-gui/krea2_reid.py"
+SIZE_PRESETS = {
+    "Square 1024x1024": (1024, 1024),
+    "Portrait 768x1024": (768, 1024),
+    "Landscape 1024x768": (1024, 768),
+}
 
 
 @dataclass
@@ -260,6 +269,8 @@ class Krea2Window(QMainWindow):
             or shutil.which("krea2")
             or "krea2"
         )
+        self.reid_root = self.krea2_root / "reid"
+        self.reid_backend = self.reid_root / "backend" / "krea2_reid.py"
 
         self.process: Optional[QProcess] = None
         self._process_group_pid: Optional[int] = None
@@ -292,7 +303,7 @@ class Krea2Window(QMainWindow):
         self._prepare_output_watcher()
         self._restore_window_state()
         self._restore_control_state()
-        self._update_lora_enabled()
+        self._update_mode()
 
         self.shortcut_return = QShortcut(QKeySequence("Ctrl+Return"), self)
         self.shortcut_return.activated.connect(self.generate_or_cancel)
@@ -309,6 +320,36 @@ class Krea2Window(QMainWindow):
         root_layout.setContentsMargins(12, 12, 12, 12)
         root_layout.setSpacing(10)
         self.setCentralWidget(central)
+
+        mode_controls = QGridLayout()
+        mode_controls.setHorizontalSpacing(10)
+        mode_controls.setVerticalSpacing(8)
+
+        self.mode = QComboBox()
+        self.mode.addItem("Text to image", "generate")
+        self.mode.addItem("ReID reference", "reid")
+        self.mode.currentIndexChanged.connect(self._update_mode)
+
+        self.size_preset = QComboBox()
+        for label in SIZE_PRESETS:
+            self.size_preset.addItem(label)
+
+        self.reference = QLineEdit()
+        self.reference.setPlaceholderText("Reference image for ReID")
+        self.reference_browse = QPushButton("Browse…")
+        self.reference_browse.clicked.connect(self._browse_reference)
+
+        mode_controls.addWidget(QLabel("Mode"), 0, 0)
+        mode_controls.addWidget(self.mode, 0, 1)
+        mode_controls.addWidget(QLabel("Output size"), 0, 2)
+        mode_controls.addWidget(self.size_preset, 0, 3)
+        mode_controls.addWidget(QLabel("Reference"), 1, 0)
+        mode_controls.addWidget(self.reference, 1, 1, 1, 2)
+        mode_controls.addWidget(self.reference_browse, 1, 3)
+        mode_controls.setColumnStretch(1, 2)
+        mode_controls.setColumnStretch(2, 1)
+        mode_controls.setColumnStretch(3, 1)
+        root_layout.addLayout(mode_controls)
 
         self.prompt = SpellcheckPlainTextEdit()
         self.prompt.setPlaceholderText("Describe what you want Krea2 to generate…")
@@ -516,6 +557,17 @@ class Krea2Window(QMainWindow):
         prompt = self.settings.value("controls/prompt", "")
         self.prompt.setPlainText(str(prompt) if prompt is not None else "")
 
+        mode = self.settings.value("controls/mode", "generate")
+        mode_index = self.mode.findData(str(mode))
+        self.mode.setCurrentIndex(mode_index if mode_index >= 0 else 0)
+
+        reference = self.settings.value("controls/reference", "")
+        self.reference.setText(str(reference) if reference is not None else "")
+
+        size_preset = self.settings.value("controls/size_preset", "Square 1024x1024")
+        size_text = str(size_preset) if size_preset is not None else "Square 1024x1024"
+        self.size_preset.setCurrentText(size_text if size_text in SIZE_PRESETS else "Square 1024x1024")
+
         lora = self.settings.value("controls/lora", "None")
         self.lora.setCurrentText(str(lora) if lora is not None else "None")
 
@@ -550,6 +602,9 @@ class Krea2Window(QMainWindow):
     def _save_state(self) -> None:
         self.settings.setValue("geometry", self.saveGeometry())
         self.settings.setValue("controls/prompt", self.prompt.toPlainText())
+        self.settings.setValue("controls/mode", self.mode.currentData())
+        self.settings.setValue("controls/reference", self.reference.text())
+        self.settings.setValue("controls/size_preset", self.size_preset.currentText())
         self.settings.setValue("controls/lora", self.lora.currentText())
         self.settings.setValue("controls/strength", self.strength.value())
         self.settings.setValue("controls/lora2", self.lora2.currentText())
@@ -583,11 +638,68 @@ class Krea2Window(QMainWindow):
         self.details_toggle.setArrowType(Qt.ArrowType.DownArrow if shown else Qt.ArrowType.RightArrow)
         self.details.setVisible(shown)
 
+    def _browse_reference(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Choose ReID reference image",
+            str(Path.home()),
+            "Images (*.png *.jpg *.jpeg *.webp);;All files (*)",
+        )
+        if path:
+            self.reference.setText(path)
+
+    def _update_mode(self) -> None:
+        is_reid = self.mode.currentData() == "reid"
+        self.reference.setEnabled(is_reid)
+        self.reference_browse.setEnabled(is_reid)
+        self.rebalance.setEnabled(not is_reid)
+        if is_reid:
+            self.lora.setEnabled(False)
+            self.strength.setEnabled(False)
+            self.lora2.setEnabled(False)
+            self.strength2.setEnabled(False)
+            self.prompt.setPlaceholderText("Describe the new scene, outfit, pose, expression, props…")
+        else:
+            self.lora.setEnabled(True)
+            self.lora2.setEnabled(True)
+            self._update_lora_enabled()
+            self.prompt.setPlaceholderText("Describe what you want Krea2 to generate…")
+
     def _update_lora_enabled(self) -> None:
+        if hasattr(self, "mode") and self.mode.currentData() == "reid":
+            self.strength.setEnabled(False)
+            self.strength2.setEnabled(False)
+            return
         selected = self.lora.currentText().strip()
         selected2 = self.lora2.currentText().strip()
         self.strength.setEnabled(bool(selected and selected.casefold() != "none"))
         self.strength2.setEnabled(bool(selected2 and selected2.casefold() != "none"))
+
+    def _ensure_reid_backend(self) -> Path:
+        marker = f'BACKEND_VERSION = "{REID_BACKEND_VERSION}"'
+        try:
+            current = self.reid_backend.read_text(encoding="utf-8") if self.reid_backend.is_file() else ""
+        except OSError:
+            current = ""
+        if marker in current:
+            return self.reid_backend
+
+        self.status.setText("Installing/updating ReID backend…")
+        self.reid_backend.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.reid_backend.with_name(self.reid_backend.name + ".part")
+        try:
+            with urllib.request.urlopen(REID_BACKEND_URL, timeout=30) as response:
+                data = response.read()
+            if marker.encode("utf-8") not in data:
+                raise RuntimeError("Downloaded ReID backend has an unexpected version")
+            tmp.write_bytes(data)
+            os.replace(tmp, self.reid_backend)
+        finally:
+            try:
+                tmp.unlink()
+            except FileNotFoundError:
+                pass
+        return self.reid_backend
 
     def _refresh_generate_text(self) -> None:
         if self.process is not None and self.process.state() != QProcess.ProcessState.NotRunning:
@@ -623,52 +735,94 @@ class Krea2Window(QMainWindow):
                 self.seed.setFocus()
                 return
 
-        cli_path = shutil.which(self.cli) if os.path.basename(self.cli) == self.cli else self.cli
-        if not cli_path or not Path(cli_path).exists():
-            QMessageBox.critical(
-                self,
-                APP_NAME,
-                f"Could not find the krea2 CLI: {self.cli}\n\n"
-                "Put it in PATH or launch with KREA2_CLI=/path/to/krea2.",
-            )
-            return
-
         if not self.krea2_root.is_dir():
             QMessageBox.critical(self, APP_NAME, f"Krea2 directory does not exist:\n{self.krea2_root}")
             return
 
-        args: list[str] = [prompt]
-        lora_text = self.lora.currentText().strip()
-        lora_text2 = self.lora2.currentText().strip()
+        mode = str(self.mode.currentData())
+        width, height = SIZE_PRESETS.get(self.size_preset.currentText(), (1024, 1024))
+        queue_total = self.queue.value()
+
         lora_value: Optional[str] = None
         lora_value2: Optional[str] = None
-        strength = self.strength.value()
-        strength2 = self.strength2.value()
+        strength = 1.0
+        strength2 = 1.0
+        rebalance_value = None
 
-        selected_loras: list[tuple[str, float]] = []
-        if lora_text and lora_text.casefold() != "none":
-            lora_value = lora_text
-            selected_loras.append((lora_text, strength))
-        if lora_text2 and lora_text2.casefold() != "none":
-            lora_value2 = lora_text2
-            selected_loras.append((lora_text2, strength2))
+        if mode == "reid":
+            reference = Path(self.reference.text()).expanduser()
+            if not reference.is_file():
+                QMessageBox.warning(self, APP_NAME, "Choose a valid reference image for ReID.")
+                self.reference.setFocus()
+                return
 
-        for selected_lora, selected_strength in selected_loras:
-            args.append(
-                selected_lora
-                if abs(selected_strength - 1.0) < 1e-9
-                else f"{selected_lora}:{selected_strength:g}"
-            )
+            venv_python = self.krea2_root / ".venv" / "bin" / "python"
+            if not venv_python.is_file():
+                QMessageBox.critical(self, APP_NAME, f"Krea2 Python environment not found:\n{venv_python}")
+                return
 
-        if explicit_seed is not None:
-            args.extend(["--seed", str(explicit_seed)])
+            try:
+                backend = self._ensure_reid_backend()
+            except Exception as exc:
+                QMessageBox.critical(self, APP_NAME, f"Could not install/update the ReID backend:\n{exc}")
+                return
 
-        queue_total = self.queue.value()
-        args.extend(["-q", str(queue_total)])
+            program = str(venv_python)
+            args: list[str] = [
+                str(backend),
+                prompt,
+                "--reference",
+                str(reference),
+                "--width",
+                str(width),
+                "--height",
+                str(height),
+                "-q",
+                str(queue_total),
+            ]
+            if explicit_seed is not None:
+                args.extend(["--seed", str(explicit_seed)])
+        else:
+            cli_path = shutil.which(self.cli) if os.path.basename(self.cli) == self.cli else self.cli
+            if not cli_path or not Path(cli_path).exists():
+                QMessageBox.critical(
+                    self,
+                    APP_NAME,
+                    f"Could not find the krea2 CLI: {self.cli}\n\n"
+                    "Put it in PATH or launch with KREA2_CLI=/path/to/krea2.",
+                )
+                return
 
-        rebalance_value = self.rebalance.currentData()
-        if rebalance_value:
-            args.extend(["--rebalance", str(rebalance_value)])
+            program = str(cli_path)
+            args = [prompt]
+            lora_text = self.lora.currentText().strip()
+            lora_text2 = self.lora2.currentText().strip()
+            strength = self.strength.value()
+            strength2 = self.strength2.value()
+
+            selected_loras: list[tuple[str, float]] = []
+            if lora_text and lora_text.casefold() != "none":
+                lora_value = lora_text
+                selected_loras.append((lora_text, strength))
+            if lora_text2 and lora_text2.casefold() != "none":
+                lora_value2 = lora_text2
+                selected_loras.append((lora_text2, strength2))
+
+            for selected_lora, selected_strength in selected_loras:
+                args.append(
+                    selected_lora
+                    if abs(selected_strength - 1.0) < 1e-9
+                    else f"{selected_lora}:{selected_strength:g}"
+                )
+
+            if explicit_seed is not None:
+                args.extend(["--seed", str(explicit_seed)])
+
+            args.extend(["-q", str(queue_total), "--width", str(width), "--height", str(height)])
+
+            rebalance_value = self.rebalance.currentData()
+            if rebalance_value:
+                args.extend(["--rebalance", str(rebalance_value)])
 
         self._save_state()
         self._known_output_paths = set(self._list_output_images())
@@ -685,8 +839,8 @@ class Krea2Window(QMainWindow):
         self._elapsed.restart()
 
         self.details.clear()
-        self._append_detail("$ " + self._display_command(str(cli_path), args))
-        self.status.setText("Starting Krea2…")
+        self._append_detail("$ " + self._display_command(program, args))
+        self.status.setText("Starting Krea2 ReID…" if mode == "reid" else "Starting Krea2…")
         self.progress.setRange(0, queue_total)
         self.progress.setValue(0)
         self.progress.setFormat(f"0 / {queue_total}")
@@ -703,9 +857,9 @@ class Krea2Window(QMainWindow):
         setsid = shutil.which("setsid")
         if setsid:
             process.setProgram(setsid)
-            process.setArguments([str(cli_path), *args])
+            process.setArguments([program, *args])
         else:
-            process.setProgram(str(cli_path))
+            process.setProgram(program)
             process.setArguments(args)
 
         self.process = process
@@ -822,6 +976,10 @@ class Krea2Window(QMainWindow):
     def _set_controls_running(self, running: bool) -> None:
         for widget in (
             self.prompt,
+            self.mode,
+            self.size_preset,
+            self.reference,
+            self.reference_browse,
             self.lora,
             self.strength,
             self.lora2,
@@ -833,7 +991,7 @@ class Krea2Window(QMainWindow):
         ):
             widget.setEnabled(not running)
         if not running:
-            self._update_lora_enabled()
+            self._update_mode()
         self.generate_button.setText("CANCEL QUEUE" if running else "GENERATE")
         if not running:
             self._refresh_generate_text()
