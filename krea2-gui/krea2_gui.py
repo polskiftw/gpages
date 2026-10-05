@@ -70,8 +70,8 @@ DEFAULT_ROOT = Path.home() / "ai" / "krea2"
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 SEED_RE = re.compile(r"Generating\s+(\d+)\s*/\s*(\d+).*?seed\s+(-?\d+)", re.IGNORECASE)
 WORD_RE = re.compile(r"[A-Za-z][A-Za-z'’-]*")
-REID_BACKEND_VERSION = "2026-10-05.11"
-REID_BACKEND_URL = "https://raw.githubusercontent.com/polskiftw/gpages/dfb19e203ea0171aa6c2c720090a74e939e31d76/krea2-gui/krea2_reid.py"
+REID_BACKEND_VERSION = "2026-10-05.12"
+REID_BACKEND_URL = "https://raw.githubusercontent.com/polskiftw/gpages/fa85bd6e7d9cd4c974a81d2ec1c98bdc7bc26047/krea2-gui/krea2_reid.py"
 SIZE_PRESETS = {
     "Square 1024x1024": (1024, 1024),
     "Portrait 768x1024": (768, 1024),
