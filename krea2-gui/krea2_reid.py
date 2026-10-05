@@ -16,7 +16,7 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-BACKEND_VERSION = "2026-10-05.11"
+BACKEND_VERSION = "2026-10-05.12"
 UPSTREAM_REVISION = "121fb0183944f1befeb712d92e9ca07d0e282088"
 UPSTREAM_BASE = f"https://huggingface.co/yijunwang2/krea2-reid/resolve/{UPSTREAM_REVISION}"
 
@@ -228,8 +228,10 @@ def load_transformer_lora(
 
     projector_keys = [
         key
-        for key in ("txtfusion.projector.diff", "text_fusion.projector.diff")
-        if key in state_dict
+        for key in state_dict
+        if key in ("txtfusion.projector.diff", "text_fusion.projector.diff")
+        or key.endswith(".txtfusion.projector.diff")
+        or key.endswith(".text_fusion.projector.diff")
     ]
     if len(projector_keys) > 1:
         raise ValueError(
