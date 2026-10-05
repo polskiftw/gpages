@@ -16,7 +16,7 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-BACKEND_VERSION = "2026-10-05.9"
+BACKEND_VERSION = "2026-10-05.10"
 UPSTREAM_REVISION = "121fb0183944f1befeb712d92e9ca07d0e282088"
 UPSTREAM_BASE = f"https://huggingface.co/yijunwang2/krea2-reid/resolve/{UPSTREAM_REVISION}"
 
@@ -207,13 +207,55 @@ def parse_lora_specs(values: list[str], root: Path) -> list[tuple[Path, float]]:
     return specs
 
 
-def load_transformer_lora(module, transformer, load_file, path: Path, adapter_name: str) -> None:
-    state_dict = load_file(str(path), device="cpu")
+def load_transformer_lora(
+    module,
+    transformer,
+    load_file,
+    path: Path,
+    adapter_name: str,
+    strength: float,
+) -> bool:
+    """Load a normal transformer LoRA or the tiny Krea2 text-fusion projector delta.
+
+    Returns True when an actual PEFT adapter was loaded and should be added to
+    set_adapters(). Projector-only patches modify the base projector directly
+    and therefore return False.
+    """
+    state_dict = dict(load_file(str(path), device="cpu"))
+
+    projector_keys = [
+        key
+        for key in ("txtfusion.projector.diff", "text_fusion.projector.diff")
+        if key in state_dict
+    ]
+    if len(projector_keys) > 1:
+        raise ValueError(
+            f"LoRA file contains multiple projector delta aliases: {projector_keys}"
+        )
+
+    if projector_keys:
+        key = projector_keys[0]
+        delta = state_dict.pop(key)
+        weight = transformer.text_fusion.projector.weight
+        if tuple(delta.shape) != tuple(weight.shape):
+            raise ValueError(
+                f"Projector delta shape {tuple(delta.shape)} does not match "
+                f"Krea2 projector weight {tuple(weight.shape)}"
+            )
+        print(f"Applying Krea2 projector delta: {path} @ {strength:g}", flush=True)
+        with __import__("torch").no_grad():
+            weight.add_(delta.to(device=weight.device, dtype=weight.dtype), alpha=strength)
+        del delta
+
+    if not state_dict:
+        return False
+
     state_dict = module._normalize_lora_state_dict(state_dict)
     if not any(key.startswith("transformer.") for key in state_dict):
         state_dict = module._convert_non_diffusers_krea2_lora_to_diffusers(state_dict)
     transformer.load_lora_adapter(state_dict, prefix="transformer", adapter_name=adapter_name)
     del state_dict
+    return True
 
 
 def ensure_torchvision(torch, reid_root: Path) -> None:
@@ -439,9 +481,17 @@ def main() -> int:
     for index, (lora_path, lora_strength) in enumerate(extra_loras, start=1):
         adapter_name = f"user_lora_{index}"
         print(f"Loading extra LoRA {index}: {lora_path} @ {lora_strength:g}", flush=True)
-        load_transformer_lora(module, transformer, load_file, lora_path, adapter_name)
-        adapter_names.append(adapter_name)
-        adapter_weights.append(lora_strength)
+        loaded_adapter = load_transformer_lora(
+            module,
+            transformer,
+            load_file,
+            lora_path,
+            adapter_name,
+            lora_strength,
+        )
+        if loaded_adapter:
+            adapter_names.append(adapter_name)
+            adapter_weights.append(lora_strength)
 
     transformer.set_adapters(adapter_names, adapter_weights)
 
