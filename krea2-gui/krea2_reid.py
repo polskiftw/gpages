@@ -16,7 +16,7 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-BACKEND_VERSION = "2026-10-05.8"
+BACKEND_VERSION = "2026-10-05.9"
 UPSTREAM_REVISION = "121fb0183944f1befeb712d92e9ca07d0e282088"
 UPSTREAM_BASE = f"https://huggingface.co/yijunwang2/krea2-reid/resolve/{UPSTREAM_REVISION}"
 
@@ -456,6 +456,10 @@ def main() -> int:
         offload_device=cpu,
         offload_type="block_level",
         num_blocks_per_group=1,
+        # precompute_ref_kv passes an empty list that attention mutates in place.
+        # Group offload otherwise send_to_device()s kwargs and creates a copy,
+        # leaving the caller's list empty and causing captured[0] to fail.
+        exclude_kwargs=["kv_capture"],
     )
 
     print("Loading remaining local Krea 2 components...", flush=True)
