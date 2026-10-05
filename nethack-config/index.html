@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2f2f7">
+<title>NetHack Config Generator</title>
+<style>
+:root{color-scheme:light dark;--bg:#f2f2f7;--card:#fff;--field:#f7f7fa;--text:#111;--muted:#6e6e73;--border:rgba(60,60,67,.18);--accent:#007aff;--danger:#c62828;--shadow:0 1px 2px rgba(0,0,0,.04),0 8px 28px rgba(0,0,0,.05)}
+@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--field:#2c2c2e;--text:#f5f5f7;--muted:#98989d;--border:rgba(84,84,88,.65);--accent:#0a84ff;--danger:#ff6961;--shadow:none}}
+*{box-sizing:border-box}
+body{margin:0;padding:max(22px,env(safe-area-inset-top)) 16px max(32px,env(safe-area-inset-bottom));background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+main{width:min(100%,1040px);margin:0 auto}
+.topline{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 2px 16px}.back{color:var(--accent);text-decoration:none;font-weight:700}.version{font-size:12px;font-weight:800;padding:5px 9px;border-radius:999px;background:var(--field);border:1px solid var(--border)}
+h1{font-size:32px;line-height:1.05;letter-spacing:-.7px;margin:0 2px 7px}.subtitle{color:var(--muted);line-height:1.5;margin:0 2px 18px}
+.card,details{background:var(--card);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow)}
+.card{padding:16px;margin-bottom:14px}
+.notice{line-height:1.5}.notice strong{font-weight:800}.notice code,code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.toolbar{display:grid;grid-template-columns:minmax(0,1fr) 190px auto;gap:10px;align-items:center}
+input,select,textarea,button{font:inherit}
+input[type=text],input[type=number],input[type=search],select,textarea{width:100%;border:1px solid var(--border);border-radius:11px;background:var(--field);color:var(--text);padding:10px 11px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}input:disabled,select:disabled,textarea:disabled{opacity:.55}
+button{border:0;border-radius:11px;min-height:42px;padding:0 13px;font-weight:750;cursor:pointer}.primary{background:var(--accent);color:#fff}.secondary{background:var(--field);color:var(--accent);border:1px solid var(--border)}button:active{transform:scale(.985)}button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+details{margin:0 0 12px;overflow:hidden}summary{cursor:pointer;font-size:18px;font-weight:800;padding:16px 18px;list-style:none}summary::-webkit-details-marker{display:none}summary:after{content:"+";float:right;color:var(--muted)}details[open] summary:after{content:"−"}details[open] summary{border-bottom:1px solid var(--border)}
+.sectionbody{padding:4px 16px 12px}.setting{display:grid;grid-template-columns:95px minmax(0,1fr);gap:12px;padding:13px 2px;border-bottom:1px solid var(--border)}.setting:last-child{border-bottom:0}.emit{display:flex;align-items:flex-start;gap:7px;font-size:13px;font-weight:800;padding-top:3px}.emit input{width:18px;height:18px;margin:0}.settingname{font-weight:800;margin-bottom:4px}.path{font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted);margin-bottom:6px}.hint{font-size:13px;line-height:1.42;color:var(--muted);margin:6px 0 0}
+.badges{display:flex;flex-wrap:wrap;gap:5px;margin:5px 0 0}.badge{font-size:10px;font-weight:850;letter-spacing:.2px;padding:3px 6px;border-radius:999px;background:var(--field);border:1px solid var(--border);color:var(--muted)}.badge.gui{color:var(--accent)}
+.dynamic-head{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:12px 2px 4px}.dynamic-head h3{font-size:16px;margin:0}.dynamic-help{font-size:13px;color:var(--muted);line-height:1.45;margin:0 2px 10px}
+.dynamic-list{display:grid;gap:10px}.dynrow{border:1px solid var(--border);border-radius:13px;background:var(--field);padding:11px}.dynrow .rowhead{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:9px}.dynrow .rowtitle{font-size:13px;font-weight:800}.remove{min-height:32px;padding:0 9px;background:transparent;color:var(--danger);border:1px solid var(--border)}
+.fieldgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.fieldgrid .wide{grid-column:1/-1}.fieldgrid label{display:block;font-size:11px;font-weight:800;color:var(--muted);margin:0 0 4px 2px;text-transform:uppercase;letter-spacing:.35px}
+.output textarea{min-height:360px;resize:vertical;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;white-space:pre}.outputbar{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:10px}.status{min-height:20px;margin-top:9px;color:var(--muted);font-size:13px}.status.error{color:var(--danger)}
+.empty{color:var(--muted);font-size:13px;padding:8px 2px}.hiddenByPort{display:none!important}
+footer{color:var(--muted);font-size:12px;line-height:1.5;text-align:center;margin:18px 8px 0}footer a{color:var(--accent)}
+@media(max-width:720px){.setting{grid-template-columns:1fr}.emit{padding-top:0}.fieldgrid,.toolbar,.outputbar{grid-template-columns:1fr}}
+</style>
+</head>
+<body><main>
+<div class="topline"><a class="back" href="../">‹ gpages</a><span class="version">NetHack 5.0.0 · Gentoo 5.0.0-r1</span></div>
+<h1>NetHack Config Generator</h1>
+<p class="subtitle">Build a clean <code>~/.nethackrc</code> for current NetHack. Enable only the settings you want written; everything else stays under NetHack's built-in defaults.</p>
+
+<section class="card notice">
+<strong>Port-aware, not port-confused.</strong> Gentoo always builds tty and curses; <code>qt6</code> adds the <strong>Qt</strong> GUI and <code>X</code> adds X11. Port badges show where a setting is meaningful. Unsupported window-port options are generally ignored by NetHack, but the filter makes it easier not to generate irrelevant clutter.
+</section>
+
+<section class="card toolbar">
+<input id="filter" type="search" placeholder="Find a setting… e.g. tiles, autopickup, status, font" autocomplete="off" spellcheck="false">
+<select id="portFilter" aria-label="Window port filter">
+<option value="">All window ports</option>
+<option value="Qt">Qt GUI</option>
+<option value="curses">curses</option>
+<option value="tty">tty</option>
+<option value="X11">X11 GUI</option>
+</select>
+<button class="secondary" id="expandAll" type="button">Expand all</button>
+</section>
+
+<div id="sections"></div>
+
+<section class="card output">
+<div class="settingname">Generated .nethackrc</div>
+<div class="hint">The preview updates immediately. <code>windowtype</code>, when enabled, is always emitted first because NetHack requires that option to be processed before port-dependent options.</div>
+<textarea id="output" readonly spellcheck="false"></textarea>
+<div class="outputbar">
+<button class="primary" id="downloadBtn" type="button">Download .nethackrc</button>
+<button class="secondary" id="copyBtn" type="button">Copy config</button>
+<button class="secondary" id="resetBtn" type="button">Reset overrides</button>
+</div>
+<div id="status" class="status" aria-live="polite"></div>
+</section>
+
+<footer>Schema targets NetHack 5.0.0 and the Gentoo 5.0.0-r1 build layout. Linux normally reads the result from <code>~/.nethackrc</code>.</footer>
+</main>
+
+<script>
+(function(){
+"use strict";
+
+var S = [
+{title:"Character & startup",open:true,fields:[
+{name:"windowtype",type:"select",def:"tty",values:["tty","curses","Qt","X11"],label:"Window port",hint:"Select the interface NetHack should use. If emitted, this must be the first option in the file."},
+{name:"playmode",type:"select",def:"normal",values:["normal","explore","debug"],label:"Play mode",hint:"Normal scoring play, explore mode, or debug/wizard mode."},
+{name:"name",type:"text",def:"",placeholder:"Claire",label:"Character name",hint:"Your character name. You can also append a role suffix if you use NetHack's traditional name-role syntax."},
+{name:"role",type:"text",def:"",placeholder:"Valkyrie",label:"Role",hint:"Starting role, or random. Prefix with ! or no to exclude a role from random selection."},
+{name:"race",type:"text",def:"",placeholder:"Human",label:"Race",hint:"Starting race, or random."},
+{name:"gender",type:"select",def:"female",values:["male","female","random"],label:"Gender"},
+{name:"alignment",type:"select",def:"lawful",values:["lawful","neutral","chaotic","random"],label:"Alignment",hint:"Canonical option name; 'align' is an alias."},
+{name:"dogname",type:"text",def:"",placeholder:"Fido",label:"Dog name"},
+{name:"catname",type:"text",def:"",placeholder:"Morris",label:"Cat name"},
+{name:"horsename",type:"text",def:"",placeholder:"Silver",label:"Horse name"},
+{name:"fruit",type:"text",def:"slime mold",placeholder:"guava",label:"Fruit",hint:"Name used for the fruit item."},
+{name:"pettype",type:"select",def:"cat",values:["cat","dog","horse","none"],label:"Initial pet",hint:"Only affects roles where the starting pet can vary."},
+{name:"blind",type:"bool",def:false,label:"Blind conduct",hint:"Start permanently blind. New-game option."},
+{name:"deaf",type:"bool",def:false,label:"Deaf conduct",hint:"Start permanently deaf. New-game option."},
+{name:"nudist",type:"bool",def:false,label:"Nudist conduct",hint:"Start without worn armor."},
+{name:"pauper",type:"bool",def:false,label:"Pauper conduct",hint:"Start without items."},
+{name:"reroll",type:"bool",def:false,label:"Allow rerolling",hint:"Allow rerolling starting inventory/items."},
+{name:"legacy",type:"bool",def:true,label:"Legacy intro",hint:"Show the traditional introductory message."},
+{name:"tutorial",type:"bool",def:true,label:"Tutorial prompt",hint:"Ask whether to start the tutorial."},
+{name:"tips",type:"bool",def:true,label:"Gameplay tips"},
+{name:"selectsaved",type:"bool",def:true,label:"Saved-game selector",hint:"Show a saved-game chooser at startup when the window port supports it.",ports:["tty","curses","Qt"]}
+]},
+{title:"Gameplay & safety",fields:[
+{name:"acoustics",type:"bool",def:true,label:"Acoustics",hint:"Enable messages about things your character hears."},
+{name:"autodig",type:"bool",def:false,label:"Auto-dig",hint:"Walk into diggable terrain while wielding a digging tool to dig automatically."},
+{name:"autoopen",type:"bool",def:true,label:"Auto-open doors"},
+{name:"autopickup",type:"bool",def:false,label:"Autopickup"},
+{name:"pickup_types",type:"text",def:"",placeholder:"$\"=/!?+",label:"Pickup types",hint:"Object class symbols to pick up automatically."},
+{name:"pickup_burden",type:"select",def:"u",values:["u","b","s","n","t","l"],labels:["Unencumbered (u)","Burdened (b)","Stressed (s)","Strained (n)","Overtaxed (t)","Overloaded (l)"],label:"Pickup burden",hint:"Prompt before picking up an item that would exceed this encumbrance threshold."},
+{name:"pickup_thrown",type:"bool",def:true,label:"Pick up thrown items"},
+{name:"pickup_stolen",type:"bool",def:true,label:"Pick up stolen items"},
+{name:"dropped_nopick",type:"bool",def:true,label:"Don't re-pick dropped items",hint:"Avoid immediately autopicking items you intentionally dropped."},
+{name:"autoquiver",type:"bool",def:false,label:"Autoquiver"},
+{name:"autounlock",type:"text",def:"",placeholder:"untrap apply-key",label:"Auto-unlock behavior",hint:"Action(s) NetHack should try when encountering a locked door or chest."},
+{name:"cmdassist",type:"bool",def:true,label:"Command assistance"},
+{name:"confirm",type:"bool",def:true,label:"Confirm peaceful attacks"},
+{name:"fireassist",type:"bool",def:true,label:"Fire assistance"},
+{name:"fixinv",type:"bool",def:true,label:"Stable inventory letters"},
+{name:"force_invmenu",type:"bool",def:false,label:"Force inventory menus"},
+{name:"lootabc",type:"bool",def:false,label:"Old loot keys",hint:"Use a/b/c instead of mnemonic loot keys."},
+{name:"paranoid_confirmation",type:"text",def:"pray",placeholder:"confirm quit die bones attack pray remove",label:"Paranoid confirmations"},
+{name:"pile_limit",type:"int",def:5,min:0,label:"Pile popup threshold",hint:"Threshold for the 'many objects here' popup/list behavior."},
+{name:"pushweapon",type:"bool",def:false,label:"Push old weapon",hint:"Move previous weapon to the secondary slot when wielding a new one."},
+{name:"query_menu",type:"bool",def:false,label:"Menu for yes/no queries"},
+{name:"rest_on_space",type:"bool",def:false,label:"Space waits"},
+{name:"safe_pet",type:"bool",def:true,label:"Protect pets"},
+{name:"safe_wait",type:"bool",def:true,label:"Safe wait",hint:"Prevent waiting while adjacent to hostile monsters."},
+{name:"travel",type:"bool",def:true,label:"Travel command"},
+{name:"verbose",type:"bool",def:true,label:"Verbose messages"},
+{name:"price_quotes",type:"bool",def:false,label:"Remember price quotes",hint:"Display prices you have previously seen for unidentified objects."}
+]},
+{title:"Map & visual display",fields:[
+{name:"accessiblemsg",type:"bool",def:false,label:"Accessible messages",hint:"Add location/direction information to messages."},
+{name:"autodescribe",type:"bool",def:true,label:"Auto-describe terrain"},
+{name:"color",type:"bool",def:true,label:"Map color"},
+{name:"customcolors",type:"bool",def:true,label:"Custom map colors"},
+{name:"customsymbols",type:"bool",def:true,label:"Custom UTF-8 symbols"},
+{name:"bgcolors",type:"bool",def:true,label:"Background colors",hint:"Use background colors for some map highlighting."},
+{name:"dark_room",type:"bool",def:true,label:"Dark-room distinction",hint:"Show out-of-sight room floor differently."},
+{name:"hilite_pet",type:"bool",def:false,label:"Highlight pets"},
+{name:"hilite_pile",type:"bool",def:false,label:"Highlight piles"},
+{name:"lit_corridor",type:"bool",def:false,label:"Lit corridors"},
+{name:"showrace",type:"bool",def:false,label:"Use race glyph for hero"},
+{name:"sparkle",type:"bool",def:true,label:"Magic-resistance sparkle"},
+{name:"symset",type:"text",def:"",placeholder:"IBMGraphics_2",label:"Symbol set"},
+{name:"roguesymset",type:"text",def:"",placeholder:"RogueEpyx",label:"Rogue symbol set"},
+{name:"ascii_map",type:"bool",def:true,label:"ASCII map",hint:"Request text instead of tiles on ports that can switch.",ports:["Qt","X11"]},
+{name:"tiled_map",type:"bool",def:false,label:"Tiled map",hint:"Request tiles on a tile-capable window port. Enabling this forces ascii_map off.",ports:["Qt","X11"]},
+{name:"tile_file",type:"text",def:"",placeholder:"/path/to/tiles.bmp",label:"Tile file",hint:"Alternate tile file. X11 uses X resources instead, so this control is Qt-focused.",ports:["Qt"]},
+{name:"tile_width",type:"int",def:32,min:1,label:"Tile width",ports:["Qt"]},
+{name:"tile_height",type:"int",def:32,min:1,label:"Tile height",ports:["Qt"]},
+{name:"font_map",type:"text",def:"",placeholder:"Monospace",label:"Map font",hint:"Qt exposes the map-font option through NetHack's window-port capabilities.",ports:["Qt"]},
+{name:"use_inverse",type:"bool",def:true,label:"Inverse video",ports:["tty","curses","X11"]},
+{name:"use_darkgray",type:"bool",def:true,label:"Dark gray",hint:"Use bold black rather than blue for black glyphs where supported.",ports:["tty","curses"]},
+{name:"use_truecolor",type:"bool",def:false,label:"True color",hint:"Enable true-color handling where the terminal port supports it.",ports:["tty","curses"]},
+{name:"eight_bit_tty",type:"bool",def:false,label:"8-bit tty input",ports:["tty"]},
+{name:"timed_delay",type:"bool",def:true,label:"Timed display delays",ports:["tty"]},
+{name:"cursesgraphics",type:"text",def:"",placeholder:"UTF8graphics",label:"Curses symbol set",hint:"Load a curses display symbol set into symset.",ports:["curses"]},
+{name:"petattr",type:"text",def:"",placeholder:"inverse",label:"Pet attributes",hint:"Text attributes used to highlight pets.",ports:["tty","curses"]}
+]},
+{title:"Menus, messages & input",fields:[
+{name:"extmenu",type:"bool",def:false,label:"Extended-command menu"},
+{name:"help",type:"bool",def:true,label:"Extra what-is help"},
+{name:"herecmd_menu",type:"bool",def:false,label:"Location action menu",hint:"When mouse/cursor interaction is available, show actions for the selected location."},
+{name:"implicit_uncursed",type:"bool",def:true,label:"Implicit uncursed",hint:"When on, omit the word 'uncursed' from inventory descriptions."},
+{name:"menu_headings",type:"select",def:"inverse",values:["none","bold","dim","underline","blink","inverse"],label:"Menu heading style"},
+{name:"menu_objsyms",type:"select",def:"0",values:["0","1","2","3","4"],labels:["0 — no object symbols","1 — separators only","2 — entries only","3 — separators + entries","4 — entries unless separators exist"],label:"Menu object symbols"},
+{name:"menu_overlay",type:"bool",def:true,label:"Menu overlay",hint:"Do not clear the screen before menus; align them to the right where supported.",ports:["tty"]},
+{name:"menustyle",type:"select",def:"full",values:["traditional","combination","full","partial"],label:"Menu style"},
+{name:"menucolors",type:"bool",def:false,label:"Menu colors",hint:"Enable MENUCOLOR rules below.",ports:["tty","curses"]},
+{name:"msghistory",type:"int",def:50,min:0,label:"Message history"},
+{name:"msg_window",type:"select",def:"s",values:["s","c","f","r"],labels:["s — single message","c — combination","f — full, oldest first","r — full, newest first"],label:"Previous-message window",hint:"TTY supports all values; curses supports full/reversed modes.",ports:["tty","curses"]},
+{name:"mouse_support",type:"text",def:"1",placeholder:"1",label:"Mouse support",hint:"Window-port mouse input level. Availability depends on the compiled port.",ports:["curses","X11"]},
+{name:"number_pad",type:"select",def:"0",values:["0","1","2","-1"],labels:["0 — vi movement","1 — numpad","2 — legacy numpad","-1 — vi keys with y/z swapped"],label:"Movement keys"},
+{name:"packorder",type:"text",def:'")[%?+/=!(*0_\u0060',label:"Inventory class order"},
+{name:"runmode",type:"select",def:"run",values:["teleport","run","walk","crawl"],label:"Running redraw"},
+{name:"scores",type:"text",def:"",placeholder:"10 top/2 around/own",label:"Score-list display"},
+{name:"sortloot",type:"select",def:"full",values:["full","loot","none"],label:"Loot sorting"},
+{name:"sortpack",type:"bool",def:true,label:"Group inventory by type"},
+{name:"sortdiscoveries",type:"text",def:"",placeholder:"class",label:"Discovery sorting"},
+{name:"sortvanquished",type:"text",def:"",placeholder:"level",label:"Vanquished sorting"},
+{name:"whatis_coord",type:"select",def:"none",values:["none","compass","map","screen"],label:"Coordinate descriptions"},
+{name:"whatis_filter",type:"select",def:"n",values:["n","v","a"],labels:["n — no filtering","v — in view","a — same area"],label:"Target filtering"},
+{name:"whatis_menu",type:"bool",def:false,label:"Target-selection menu"},
+{name:"whatis_moveskip",type:"bool",def:false,label:"Skip matching glyphs while targeting"},
+{name:"mention_decor",type:"bool",def:false,label:"Mention decor"},
+{name:"mention_map",type:"bool",def:false,label:"Mention map changes"},
+{name:"mention_walls",type:"bool",def:false,label:"Mention walls"},
+{name:"spot_monsters",type:"bool",def:false,label:"Announce spotted monsters"},
+{name:"mon_movement",type:"bool",def:false,label:"Announce visible monster movement"}
+]},
+{title:"Status display",fields:[
+{name:"armorstatus",type:"bool",def:false,label:"Armor status field"},
+{name:"weaponstatus",type:"bool",def:false,label:"Weapon status field"},
+{name:"terrainstatus",type:"bool",def:false,label:"Terrain status field"},
+{name:"hitpointbar",type:"bool",def:false,label:"Hit-point bar",hint:"Supported by tty, curses, and Qt in the Gentoo-capable ports.",ports:["tty","curses","Qt"]},
+{name:"showdamage",type:"bool",def:false,label:"Show damage taken"},
+{name:"showexp",type:"bool",def:false,label:"Experience points"},
+{name:"showscore",type:"bool",def:false,label:"Current score"},
+{name:"showvers",type:"bool",def:false,label:"Version in status"},
+{name:"time",type:"bool",def:false,label:"Turn counter"},
+{name:"statuslines",type:"select",def:"2",values:["2","3"],label:"Status lines",hint:"Qt interprets 2/3 as compact/original status layout; tty and curses use it as line count.",ports:["tty","curses","Qt"]},
+{name:"status_updates",type:"bool",def:true,label:"Status updates"},
+{name:"statushilites",type:"int",def:3,min:0,label:"Status highlight duration",hint:"0 disables status highlighting; positive values keep a changed-field highlight for that many turns.",ports:["tty","curses"]},
+{name:"versinfo",type:"text",def:"",placeholder:"version build-id",label:"Version-info detail"}
+]},
+{title:"Window-port controls",fields:[
+{name:"align_message",type:"select",def:"top",values:["top","bottom","left","right"],label:"Message alignment",ports:["curses"]},
+{name:"align_status",type:"select",def:"bottom",values:["top","bottom","left","right"],label:"Status alignment",ports:["curses"]},
+{name:"perm_invent",type:"bool",def:false,label:"Persistent inventory",ports:["tty","curses","X11"]},
+{name:"perminv_mode",type:"text",def:"",placeholder:"all",label:"Persistent inventory mode",ports:["tty","curses","X11"]},
+{name:"popup_dialog",type:"bool",def:false,label:"Popup dialogs",ports:["curses","Qt"]},
+{name:"player_selection",type:"text",def:"",placeholder:"prompts",label:"Character-selection UI",ports:["Qt","X11"]},
+{name:"splash_screen",type:"bool",def:true,label:"Splash screen",ports:["curses","Qt"]},
+{name:"term_cols",type:"int",def:110,min:1,label:"Terminal columns",ports:["curses"]},
+{name:"term_rows",type:"int",def:32,min:1,label:"Terminal rows",ports:["curses"]},
+{name:"windowborders",type:"select",def:"2",values:["0","1","2","3","4"],labels:["0 — never","1 — always","2 — automatic","3 — on except persistent inventory","4 — automatic except persistent inventory"],label:"Window borders",ports:["curses"]},
+{name:"windowcolors",type:"text",def:"",placeholder:"status white/black message white/black",label:"Window colors",hint:"Foreground/background pairs for menu, message, status, or text windows.",ports:["curses"]},
+{name:"guicolor",type:"bool",def:true,label:"UI color",ports:["curses"]},
+{name:"fullscreen",type:"bool",def:false,label:"Fullscreen request",hint:"Window-port dependent; ignored if the active port does not implement it."}
+]},
+{title:"Advanced & compatibility",fields:[
+{name:"bones",type:"bool",def:true,label:"Bones files"},
+{name:"checkpoint",type:"bool",def:true,label:"Crash-recovery checkpoints"},
+{name:"null",type:"bool",def:true,label:"Terminal padding nulls",ports:["tty"]},
+{name:"silent",type:"bool",def:true,label:"Suppress terminal bell"},
+{name:"standout",type:"bool",def:false,label:"Standout --More--"},
+{name:"tombstone",type:"bool",def:true,label:"Death tombstone"},
+{name:"suppress_alert",type:"text",def:"",placeholder:"5.0.0",label:"Suppress old feature alerts"},
+{name:"goldX",type:"bool",def:false,label:"Gold status classification",hint:"Classify gold as unknown/uncursed for display purposes."},
+{name:"soundlib",type:"text",def:"",placeholder:"Qt",label:"Sound library",hint:"Select a compiled sound interface, if available."},
+{name:"sounds",type:"bool",def:false,label:"Sounds",hint:"Enable sound support if your build/window port provides it."},
+{name:"mail",type:"bool",def:true,label:"In-game mail daemon",hint:"Build-dependent on Unix."},
+{name:"news",type:"bool",def:true,label:"NetHack news",hint:"Show the news file at startup when the build supplies one."},
+{name:"altmeta",type:"bool",def:false,label:"ESC as Meta",hint:"Treat ESC followed by a command key as a meta-key sequence when supported."}
+]}
+];
+
+var D = [
+{title:"Autopickup exceptions",kind:"autopick",help:"Ordered rules. '<' always picks matching items; '>' never picks them."},
+{title:"Message rules",kind:"msg",help:"MSGTYPE rules are ordered; the last matching rule wins."},
+{title:"Menu colors",kind:"menucolor",help:"TTY and curses. The last matching MENUCOLOR rule wins.",ports:["tty","curses"]},
+{title:"Key bindings",kind:"bind",help:"Bind a key, control/meta key, mouse button, or decimal ASCII code to a NetHack command."},
+{title:"Autocomplete commands",kind:"autocomplete",help:"Enable or disable extended-command autocompletion. X11 ignores AUTOCOMPLETE.",ports:["tty","curses","Qt"]},
+{title:"Status highlight rules",kind:"status",help:"Repeatable hilite_status option values such as hitpoints/<=30%/red/normal.",ports:["tty","curses"]},
+{title:"Symbol overrides",kind:"symbols",help:"Override symbols in the normal or Rogue symbol set."},
+{title:"Qt user sounds",kind:"sound",help:"Map message patterns to sound files. Upstream 5.0 documents user sounds for the Qt port.",ports:["Qt"]},
+{title:"Raw directives",kind:"raw",help:"Escape hatch for uncommon directives or options not modeled above. Each non-empty line is appended verbatim."}
+];
+
+var sectionsEl=document.getElementById("sections"), output=document.getElementById("output"), status=document.getElementById("status");
+var fieldEls=[];
+
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+function optText(s){return String(s).replace(/\\/g,"\\\\").replace(/"/g,'\\"');}
+function portBadges(ports){if(!ports||!ports.length)return "";return '<div class="badges">'+ports.map(function(p){return '<span class="badge '+((p==="Qt"||p==="X11")?"gui":"")+'">'+esc(p)+'</span>';}).join("")+'</div>';}
+function selectOptions(f){
+  return f.values.map(function(v,i){var l=(f.labels&&f.labels[i])||v;return '<option value="'+esc(v)+'"'+(String(v)===String(f.def)?' selected':'')+'>'+esc(l)+'</option>';}).join("");
+}
+function control(f){
+  if(f.type==="bool") return '<select class="value"><option value="true"'+(f.def?' selected':'')+'>true</option><option value="false"'+(!f.def?' selected':'')+'>false</option></select>';
+  if(f.type==="select") return '<select class="value">'+selectOptions(f)+'</select>';
+  if(f.type==="int") return '<input class="value" type="number" value="'+esc(f.def)+'"'+(f.min!==undefined?' min="'+f.min+'"':'')+(f.max!==undefined?' max="'+f.max+'"':'')+'>';
+  return '<input class="value" type="text" value="'+esc(f.def||"")+'" placeholder="'+esc(f.placeholder||"")+'" spellcheck="false">';
+}
+function build(){
+  S.forEach(function(sec){
+    var d=document.createElement("details");if(sec.open)d.open=true;d.dataset.search=(sec.title+" "+sec.fields.map(function(f){return f.name+" "+f.label+" "+(f.hint||"")+" "+((f.ports||[]).join(" "));}).join(" ")).toLowerCase();
+    d.innerHTML='<summary>'+esc(sec.title)+'</summary><div class="sectionbody"></div>';
+    var body=d.querySelector(".sectionbody");
+    sec.fields.forEach(function(f){
+      var r=document.createElement("div");r.className="setting";r.dataset.search=(f.name+" "+f.label+" "+(f.hint||"")+" "+((f.ports||[]).join(" "))).toLowerCase();r.dataset.ports=(f.ports||[]).join(",");
+      r.innerHTML='<label class="emit"><input class="override" type="checkbox"><span>Override</span></label><div><div class="settingname">'+esc(f.label)+'</div><div class="path">OPTIONS='+esc(f.name)+(f.type==="bool"?' / !'+esc(f.name):':…')+'</div>'+control(f)+portBadges(f.ports)+(f.hint?'<p class="hint">'+esc(f.hint)+'</p>':'')+'</div>';
+      var cb=r.querySelector(".override"), val=r.querySelector(".value");val.disabled=true;
+      cb.addEventListener("change",function(){val.disabled=!cb.checked;render();});
+      val.addEventListener("input",render);val.addEventListener("change",render);
+      body.appendChild(r);fieldEls.push({spec:f,row:r});
+    });
+    sectionsEl.appendChild(d);
+  });
+  D.forEach(function(spec){
+    var d=document.createElement("details");d.dataset.search=(spec.title+" "+spec.help+" "+((spec.ports||[]).join(" "))).toLowerCase();d.dataset.ports=(spec.ports||[]).join(",");
+    d.innerHTML='<summary>'+esc(spec.title)+'</summary><div class="sectionbody"><div class="dynamic-head"><h3>'+esc(spec.title)+'</h3><button type="button" class="secondary add">Add</button></div><p class="dynamic-help">'+esc(spec.help)+'</p><div class="dynamic-list" data-kind="'+spec.kind+'"><div class="empty">No entries added.</div></div></div>';
+    d.querySelector(".add").addEventListener("click",function(){addRow(d.querySelector(".dynamic-list"),spec.kind);});
+    sectionsEl.appendChild(d);
+  });
+}
+function addRow(list,kind){
+  var empty=list.querySelector(".empty");if(empty)empty.remove();
+  var r=document.createElement("div");r.className="dynrow";
+  var inner='<div class="rowhead"><span class="rowtitle">'+esc(kind)+'</span><button class="remove" type="button">Remove</button></div><div class="fieldgrid">';
+  if(kind==="autopick") inner+='<div><label>Action</label><select class="action"><option value="<">Always pick &lt;</option><option value=">">Never pick &gt;</option></select></div><div><label>Pattern</label><input class="pattern" type="text" placeholder=".*arrow" spellcheck="false"></div>';
+  if(kind==="msg") inner+='<div><label>Type</label><select class="type"><option>show</option><option>hide</option><option>stop</option><option>norep</option></select></div><div><label>Pattern</label><input class="pattern" type="text" placeholder="You feel hungry\\." spellcheck="false"></div>';
+  if(kind==="menucolor") inner+='<div class="wide"><label>Pattern</label><input class="pattern" type="text" placeholder=" cursed " spellcheck="false"></div><div><label>Color</label><select class="color"><option>black</option><option>red</option><option>green</option><option>brown</option><option>blue</option><option>magenta</option><option>cyan</option><option>gray</option><option>orange</option><option>light-green</option><option>yellow</option><option>light-blue</option><option>light-magenta</option><option>light-cyan</option><option>white</option><option>no-color</option></select></div><div><label>Attribute</label><select class="attr"><option value="">None</option><option>bold</option><option>dim</option><option>italic</option><option>underline</option><option>blink</option><option>inverse</option></select></div>';
+  if(kind==="bind") inner+='<div><label>Key</label><input class="key" type="text" placeholder="^X" spellcheck="false"></div><div><label>Command</label><input class="command" type="text" placeholder="getpos.autodescribe" spellcheck="false"></div>';
+  if(kind==="autocomplete") inner+='<div><label>Enabled</label><select class="enabled"><option value="">Yes</option><option value="!">No</option></select></div><div><label>Extended command</label><input class="command" type="text" placeholder="annotate" spellcheck="false"></div>';
+  if(kind==="status") inner+='<div class="wide"><label>hilite_status value</label><input class="value" type="text" placeholder="hitpoints/<=30%/red/normal" spellcheck="false"></div>';
+  if(kind==="symbols") inner+='<div><label>Set</label><select class="set"><option value="SYMBOLS">Normal</option><option value="ROGUESYMBOLS">Rogue</option></select></div><div><label>Override</label><input class="value" type="text" placeholder="S_boulder:0" spellcheck="false"></div>';
+  if(kind==="sound") inner+='<div class="wide"><label>Sound directory (optional on each row; first non-empty wins)</label><input class="dir" type="text" placeholder="/home/claire/.local/share/nethack/sounds" spellcheck="false"></div><div><label>Message pattern</label><input class="pattern" type="text" placeholder="This door is locked" spellcheck="false"></div><div><label>File</label><input class="file" type="text" placeholder="lock.wav" spellcheck="false"></div><div><label>Volume</label><input class="volume" type="number" min="0" max="100" value="100"></div><div><label>Message type (optional)</label><select class="type"><option value="">Normal</option><option>show</option><option>hide</option><option>stop</option><option>norep</option></select></div>';
+  if(kind==="raw") inner+='<div class="wide"><label>Directive lines</label><textarea class="raw" rows="5" placeholder="# Any valid .nethackrc lines&#10;OPTIONS=foo:bar"></textarea></div>';
+  inner+='</div>';r.innerHTML=inner;
+  r.querySelector(".remove").addEventListener("click",function(){r.remove();ensureEmpty(list);render();});
+  r.querySelectorAll("input,select,textarea").forEach(function(el){el.addEventListener("input",render);el.addEventListener("change",render);});
+  list.appendChild(r);render();
+}
+function ensureEmpty(list){if(!list.querySelector(".dynrow")){var e=document.createElement("div");e.className="empty";e.textContent="No entries added.";list.appendChild(e);}}
+function fixedLines(){
+  var first=[],rest=[];
+  fieldEls.forEach(function(item){
+    var f=item.spec,r=item.row;if(!r.querySelector(".override").checked)return;
+    var v=r.querySelector(".value").value;
+    var line;
+    if(f.type==="bool") line="OPTIONS="+(v==="true"?"":"!")+f.name;
+    else {
+      if(String(v).trim()==="") throw new Error(f.label+" needs a value");
+      if(f.type==="int"){
+        var n=Number(v);if(!Number.isInteger(n))throw new Error(f.label+" must be an integer");if(f.min!==undefined&&n<f.min)throw new Error(f.label+" must be at least "+f.min);if(f.max!==undefined&&n>f.max)throw new Error(f.label+" must be at most "+f.max);
+      }
+      line="OPTIONS="+f.name+":"+v;
+    }
+    if(f.name==="windowtype") first.push(line); else rest.push(line);
+  });
+  return first.concat(rest);
+}
+function q(s){return '"'+optText(s)+'"';}
+function dynamicLines(){
+  var out=[],soundDir="";
+  document.querySelectorAll(".dynamic-list").forEach(function(list){
+    var kind=list.dataset.kind;
+    list.querySelectorAll(".dynrow").forEach(function(r){
+      if(kind==="autopick"){var p=r.querySelector(".pattern").value;if(p)out.push("AUTOPICKUP_EXCEPTION="+q(r.querySelector(".action").value+p));}
+      if(kind==="msg"){var p2=r.querySelector(".pattern").value;if(p2)out.push("MSGTYPE="+r.querySelector(".type").value+" "+q(p2));}
+      if(kind==="menucolor"){var p3=r.querySelector(".pattern").value;if(p3){var a=r.querySelector(".attr").value;out.push("MENUCOLOR="+q(p3)+"="+r.querySelector(".color").value+(a?"&"+a:""));}}
+      if(kind==="bind"){var k=r.querySelector(".key").value.trim(),c=r.querySelector(".command").value.trim();if(k||c){if(!k||!c)throw new Error("Each key binding needs both a key and command");out.push("BIND="+k+":"+c);}}
+      if(kind==="autocomplete"){var c2=r.querySelector(".command").value.trim();if(c2)out.push("AUTOCOMPLETE="+r.querySelector(".enabled").value+c2);}
+      if(kind==="status"){var s=r.querySelector(".value").value.trim();if(s)out.push("OPTIONS=hilite_status:"+s);}
+      if(kind==="symbols"){var sv=r.querySelector(".value").value.trim();if(sv)out.push(r.querySelector(".set").value+"="+sv);}
+      if(kind==="sound"){
+        var d=r.querySelector(".dir").value.trim();if(d&&!soundDir)soundDir=d;
+        var pat=r.querySelector(".pattern").value, file=r.querySelector(".file").value.trim();
+        if(pat||file){if(!pat||!file)throw new Error("Each sound rule needs both a message pattern and sound file");var vol=Number(r.querySelector(".volume").value);if(!Number.isInteger(vol)||vol<0||vol>100)throw new Error("Sound volume must be an integer from 0 to 100");var mt=r.querySelector(".type").value;out.push("SOUND=MESG "+(mt?mt+" ":"")+q(pat)+" "+q(file)+" "+vol);}
+      }
+      if(kind==="raw"){r.querySelector(".raw").value.split(/\r?\n/).forEach(function(line){if(line.trim())out.push(line);});}
+    });
+  });
+  if(soundDir)out.unshift("SOUNDDIR="+soundDir);
+  return out;
+}
+function render(){
+  var lines=["# Generated by gpages NetHack Config Generator","# Target: NetHack 5.0.0 / Gentoo 5.0.0-r1",""];
+  try{
+    var f=fixedLines(),d=dynamicLines();
+    if(f.length)lines=lines.concat(f);
+    if(d.length){if(lines[lines.length-1]!=="")lines.push("");lines=lines.concat(d);}
+    while(lines.length&&lines[lines.length-1]==="")lines.pop();
+    output.value=lines.join("\n")+"\n";
+    document.getElementById("downloadBtn").disabled=false;document.getElementById("copyBtn").disabled=false;
+    status.textContent="Ready. "+fieldEls.filter(function(x){return x.row.querySelector(".override").checked;}).length+" fixed override(s), plus any repeatable directives shown above.";status.className="status";
+  }catch(e){
+    output.value=lines.join("\n")+"\n# ERROR: "+e.message+"\n";document.getElementById("downloadBtn").disabled=true;document.getElementById("copyBtn").disabled=true;status.textContent=e.message;status.className="status error";
+  }
+}
+function applyFilters(){
+  var term=document.getElementById("filter").value.trim().toLowerCase(), port=document.getElementById("portFilter").value;
+  document.querySelectorAll("#sections details").forEach(function(d){
+    var any=false;
+    var rows=d.querySelectorAll(".setting");
+    if(rows.length){
+      rows.forEach(function(r){
+        var ps=r.dataset.ports?r.dataset.ports.split(",").filter(Boolean):[];
+        var pm=!port||!ps.length||ps.indexOf(port)!==-1;
+        var tm=!term||r.dataset.search.indexOf(term)!==-1;
+        r.hidden=!(pm&&tm);if(pm&&tm)any=true;
+      });
+    }else{
+      var ps2=d.dataset.ports?d.dataset.ports.split(",").filter(Boolean):[];
+      any=(!port||!ps2.length||ps2.indexOf(port)!==-1)&&(!term||d.dataset.search.indexOf(term)!==-1);
+    }
+    d.hidden=!any;if(term&&any)d.open=true;
+  });
+}
+document.getElementById("filter").addEventListener("input",applyFilters);
+document.getElementById("portFilter").addEventListener("change",applyFilters);
+document.getElementById("expandAll").addEventListener("click",function(){
+  var ds=Array.from(document.querySelectorAll("#sections details:not([hidden])"));var all=ds.length&&ds.every(function(d){return d.open;});ds.forEach(function(d){d.open=!all;});this.textContent=all?"Expand all":"Collapse all";
+});
+document.getElementById("copyBtn").addEventListener("click",async function(){
+  try{await navigator.clipboard.writeText(output.value);status.textContent="Copied .nethackrc to clipboard.";status.className="status";}catch(e){output.focus();output.select();status.textContent="Clipboard API unavailable; the config is selected for manual copy.";status.className="status error";}
+});
+document.getElementById("downloadBtn").addEventListener("click",function(){
+  var blob=new Blob([output.value],{type:"text/plain;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=".nethackrc";document.body.appendChild(a);a.click();var u=a.href;a.remove();setTimeout(function(){URL.revokeObjectURL(u);},500);
+});
+document.getElementById("resetBtn").addEventListener("click",function(){
+  fieldEls.forEach(function(x){var cb=x.row.querySelector(".override");cb.checked=false;x.row.querySelector(".value").disabled=true;});
+  document.querySelectorAll(".dynamic-list").forEach(function(list){list.querySelectorAll(".dynrow").forEach(function(r){r.remove();});ensureEmpty(list);});
+  document.getElementById("filter").value="";document.getElementById("portFilter").value="";applyFilters();render();window.scrollTo({top:0,behavior:"smooth"});
+});
+build();render();
+})();
+</script>
+</body>
+</html>
