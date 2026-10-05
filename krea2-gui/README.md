@@ -8,7 +8,7 @@ A small native Qt 6 front end for Claire's existing local `krea2` CLI. It does *
 - ReID reference-image picker for identity-preserving scene/outfit/pose changes
 - Square, portrait, and landscape output presets for ReID
 - Prompt editor
-- Up to two optional LoRAs, each with its own strength (`file.safetensors:0.8` syntax underneath) in text-to-image mode
+- Up to two optional LoRAs, each with its own strength (`file.safetensors:0.8` syntax underneath) in both text-to-image and ReID modes
 - Seed field with `Random` mode
 - Image count wired to `-q`
 - Rebalance modes: none, subtle, balanced, aggressive
@@ -101,7 +101,7 @@ On the first ReID run, the GUI copies its matching backend script from this repo
 
 The base Krea 2 checkpoint remains the already-installed `~/ai/krea2/models/Krea-2-Turbo`, and generated images continue to go to `~/ai/krea2/out`.
 
-The ReID runtime uses the same low-memory strategy as the existing generator: FP8 transformer storage, BF16 compute, and one-block group offload. The identity adapter is fixed at its tested default strength of 1.0 in the GUI for now. Normal LoRA/rebalance controls are disabled while ReID mode is selected.
+The ReID runtime uses the same low-memory strategy as the existing generator: FP8 transformer storage, BF16 compute, and one-block group offload. The identity adapter is fixed at its tested default strength of 1.0 in the GUI for now. The normal LoRA 1 and LoRA 2 controls remain available in ReID mode and are stacked after the ReID adapter at their selected strengths. Rebalance remains disabled in ReID mode. Strong additional LoRAs can compete with identity retention, so lower strengths are a sensible starting point.
 
 To remove the ReID addition completely without touching ordinary Krea 2:
 
