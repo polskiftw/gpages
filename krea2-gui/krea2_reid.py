@@ -5,15 +5,18 @@ import argparse
 import hashlib
 import importlib.util
 import os
+import platform
 import random
 import re
-import subprocess
+import shutil
 import sys
+import urllib.parse
 import urllib.request
+import zipfile
 from datetime import datetime
 from pathlib import Path
 
-BACKEND_VERSION = "2026-10-05.5"
+BACKEND_VERSION = "2026-10-05.6"
 UPSTREAM_REVISION = "121fb0183944f1befeb712d92e9ca07d0e282088"
 UPSTREAM_BASE = f"https://huggingface.co/yijunwang2/krea2-reid/resolve/{UPSTREAM_REVISION}"
 
@@ -186,7 +189,7 @@ def ensure_torchvision(torch, reid_root: Path) -> None:
     if local_site_str not in sys.path:
         sys.path.insert(0, local_site_str)
 
-    version_match = re.match(r"^(\d+)\.(\d+)\.(\d+)", str(torch.__version__))
+    version_match = re.match(r"^(\\d+)\\.(\\d+)\\.(\\d+)", str(torch.__version__))
     if version_match is None:
         raise RuntimeError(f"Cannot determine torchvision version for torch {torch.__version__}")
 
@@ -218,39 +221,63 @@ def ensure_torchvision(torch, reid_root: Path) -> None:
             del sys.modules[name]
 
     build = str(torch.__version__).split("+", 1)[1] if "+" in str(torch.__version__) else ""
-    if build.startswith("cu"):
-        index_url = f"https://download.pytorch.org/whl/{build}"
-    elif getattr(torch.version, "cuda", None):
-        cuda_digits = str(torch.version.cuda).replace(".", "")
-        index_url = f"https://download.pytorch.org/whl/cu{cuda_digits}"
-    else:
-        index_url = "https://download.pytorch.org/whl/cpu"
+    if not build:
+        if getattr(torch.version, "cuda", None):
+            build = "cu" + str(torch.version.cuda).replace(".", "")
+        else:
+            build = "cpu"
 
-    print(
-        f"Installing isolated torchvision {torchvision_version} for torch {torch.__version__}...",
-        flush=True,
+    machine = platform.machine().lower()
+    if machine in {"x86_64", "amd64"}:
+        wheel_arch = "x86_64"
+    elif machine in {"aarch64", "arm64"}:
+        wheel_arch = "aarch64"
+    else:
+        raise RuntimeError(f"Unsupported architecture for automatic torchvision setup: {machine}")
+
+    py_tag = f"cp{sys.version_info.major}{sys.version_info.minor}"
+    filename = (
+        f"torchvision-{torchvision_version}+{build}-"
+        f"{py_tag}-{py_tag}-manylinux_2_28_{wheel_arch}.whl"
     )
-    cmd = [
-        sys.executable,
-        "-m",
-        "pip",
-        "install",
-        "--disable-pip-version-check",
-        "--no-input",
-        "--no-deps",
-        "--upgrade",
-        "--target",
-        local_site_str,
-        f"torchvision=={torchvision_version}",
-        "--index-url",
-        index_url,
-    ]
-    result = subprocess.run(cmd, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(
-            "Could not install the ReID-only torchvision dependency. "
-            f"Command exited with status {result.returncode}."
+    index_build = build if build.startswith("cu") else "cpu"
+    encoded_name = urllib.parse.quote(filename, safe="-_.")
+    wheel_url = f"https://download.pytorch.org/whl/{index_build}/{encoded_name}"
+
+    wheel_dir = reid_root / "cache" / "wheels"
+    wheel_path = wheel_dir / filename
+    if not wheel_path.is_file():
+        wheel_dir.mkdir(parents=True, exist_ok=True)
+        print(
+            f"Downloading isolated torchvision {torchvision_version}+{build} "
+            f"for torch {torch.__version__}...",
+            flush=True,
         )
+        download(wheel_url, wheel_path)
+
+    print(f"Installing isolated torchvision from {wheel_path.name}...", flush=True)
+
+    # Remove any stale/partial prior extraction, but only inside the ReID subtree.
+    for path in (
+        local_site / "torchvision",
+        local_site / "torchvision.libs",
+    ):
+        if path.is_dir():
+            shutil.rmtree(path)
+        elif path.exists():
+            path.unlink()
+    for path in local_site.glob("torchvision-*.dist-info"):
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+
+    try:
+        with zipfile.ZipFile(wheel_path) as wheel:
+            wheel.extractall(local_site)
+    except (OSError, zipfile.BadZipFile) as exc:
+        wheel_path.unlink(missing_ok=True)
+        raise RuntimeError(f"Could not unpack torchvision wheel: {exc}") from exc
 
     import importlib
 
@@ -264,7 +291,8 @@ def ensure_torchvision(torch, reid_root: Path) -> None:
     installed = str(getattr(torchvision, "__version__", ""))
     if installed.split("+", 1)[0] != torchvision_version:
         raise RuntimeError(
-            f"Installed torchvision {installed}, expected {torchvision_version} for torch {torch.__version__}"
+            f"Installed torchvision {installed}, expected {torchvision_version} "
+            f"for torch {torch.__version__}"
         )
     print(f"Installed isolated torchvision {installed} in {local_site}", flush=True)
 
