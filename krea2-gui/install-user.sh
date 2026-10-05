@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-base_url="https://raw.githubusercontent.com/polskiftw/gpages/b1feb496089a3b8573ee593c0ac44d72e5bd35e0/krea2-gui"
+base_url="https://raw.githubusercontent.com/polskiftw/gpages/5f5497a268e4c73c7aa4b2d147bb6e93972d996b/krea2-gui"
 root="${KREA2_ROOT:-$HOME/ai/krea2}"
 bin_dir="$root/bin"
 reid_backend_dir="$root/reid/backend"
