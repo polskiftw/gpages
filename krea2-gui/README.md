@@ -37,16 +37,17 @@ emerge -av dev-python/pyside
 
 ## Install/update without local Git
 
-The installer downloads the current GUI directly from the remote repository and writes only inside the existing Krea2 tree:
+The installer downloads the pinned GUI and matching ReID backend directly from the remote repository and writes only inside the existing Krea2 tree:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/polskiftw/gpages/main/krea2-gui/install-user.sh | sh
 ```
 
-This installs the launcher at:
+This installs/updates:
 
 ```text
 ~/ai/krea2/bin/krea2-gui
+~/ai/krea2/reid/backend/krea2_reid.py
 ```
 
 No desktop/menu entry and no local Git checkout are created.
