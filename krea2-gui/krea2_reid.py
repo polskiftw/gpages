@@ -16,7 +16,7 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-BACKEND_VERSION = "2026-10-05.6"
+BACKEND_VERSION = "2026-10-05.7"
 UPSTREAM_REVISION = "121fb0183944f1befeb712d92e9ca07d0e282088"
 UPSTREAM_BASE = f"https://huggingface.co/yijunwang2/krea2-reid/resolve/{UPSTREAM_REVISION}"
 
@@ -189,7 +189,7 @@ def ensure_torchvision(torch, reid_root: Path) -> None:
     if local_site_str not in sys.path:
         sys.path.insert(0, local_site_str)
 
-    version_match = re.match(r"^(\\d+)\\.(\\d+)\\.(\\d+)", str(torch.__version__))
+    version_match = re.match(r"^(\d+)\.(\d+)\.(\d+)", str(torch.__version__))
     if version_match is None:
         raise RuntimeError(f"Cannot determine torchvision version for torch {torch.__version__}")
 
