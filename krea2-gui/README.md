@@ -4,8 +4,11 @@ A small native Qt 6 front end for Claire's existing local `krea2` CLI. It does *
 
 ## What it exposes
 
+- Text-to-image and ReID-reference modes
+- ReID reference-image picker for identity-preserving scene/outfit/pose changes
+- Square, portrait, and landscape output presets
 - Prompt editor
-- Up to two optional LoRAs, each with its own strength (`file.safetensors:0.8` syntax underneath)
+- Up to two optional LoRAs, each with its own strength (`file.safetensors:0.8` syntax underneath) in text-to-image mode
 - Seed field with `Random` mode
 - Image count wired to `-q`
 - Rebalance modes: none, subtle, balanced, aggressive
@@ -74,10 +77,37 @@ krea2 "prompt" first.safetensors:0.8
 krea2 "prompt" first.safetensors:0.8 second.safetensors:0.45
 ```
 
+## ReID mode
+
+ReID uses the existing local Krea 2 model and Python environment; it does not create a second Krea installation. The GUI keeps the entire ReID add-on under:
+
+```text
+~/ai/krea2/reid/
+├── backend/
+├── vendor/
+├── runtime/
+├── cache/
+└── tmp/
+```
+
+On the first ReID run, the GUI copies its matching backend script from this repository into `backend/`. The backend then downloads the pinned Krea 2 ReID functional adapter and its pinned reference pipeline into `vendor/`. Hugging Face, Transformers, Torch, XDG, and temporary-file caches used by ReID are redirected into the ReID tree.
+
+The base Krea 2 checkpoint remains the already-installed `~/ai/krea2/models/Krea-2-Turbo`, and generated images continue to go to `~/ai/krea2/out`.
+
+The ReID runtime uses the same low-memory strategy as the existing generator: FP8 transformer storage, BF16 compute, and one-block group offload. The identity adapter is fixed at its tested default strength of 1.0 in the GUI for now. Normal LoRA/rebalance controls are disabled while ReID mode is selected.
+
+To remove the ReID addition completely without touching ordinary Krea 2:
+
+```sh
+rm -rf ~/ai/krea2/reid
+```
+
+The next ReID run will recreate it.
+
 ## Cancellation
 
-On Linux the GUI launches Krea2 through `setsid` when available. Cancel Queue sends `SIGTERM` to the whole Krea2 process group, then escalates to `SIGKILL` after two seconds if it is still alive. That prevents a shell launcher from exiting while leaving the CUDA/Python child running.
+On Linux the GUI launches Krea2 through `setsid` when available. Cancel Queue sends `SIGTERM` to the whole Krea2 process group, then escalates to `SIGKILL` after two seconds if it is still alive. That applies to both ordinary generation and ReID setup/generation, so closing/cancelling does not leave a model server or generation worker running.
 
 ## Privacy / networking
 
-The GUI has no networking code. It is a local Qt application and only talks to the existing local CLI and output directory.
+There is no local web server, daemon, service, or autostart process. Ordinary text-to-image generation remains local-only. ReID uses outbound HTTPS only when its small backend file or pinned upstream ReID files are missing; after those files and the Qwen processor metadata are cached, generation uses the local Krea 2 model and local ReID tree.
