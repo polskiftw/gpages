@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-base_url="https://raw.githubusercontent.com/polskiftw/gpages/e1cbb5d254202c253f1c09e6abbe5b480fd06a35/krea2-gui"
+base_url="https://raw.githubusercontent.com/polskiftw/gpages/f3d67c27612b894aa08657917a042cb5457cd85d/krea2-gui"
 root="${KREA2_ROOT:-$HOME/ai/krea2}"
 bin_dir="$root/bin"
 tmp_dir="$root/tmp/krea2-gui-install-$$"
