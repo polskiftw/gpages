@@ -652,6 +652,7 @@ class Krea2Window(QMainWindow):
         is_reid = self.mode.currentData() == "reid"
         self.reference.setEnabled(is_reid)
         self.reference_browse.setEnabled(is_reid)
+        self.size_preset.setEnabled(is_reid)
         self.rebalance.setEnabled(not is_reid)
         if is_reid:
             self.lora.setEnabled(False)
@@ -818,7 +819,7 @@ class Krea2Window(QMainWindow):
             if explicit_seed is not None:
                 args.extend(["--seed", str(explicit_seed)])
 
-            args.extend(["-q", str(queue_total), "--width", str(width), "--height", str(height)])
+            args.extend(["-q", str(queue_total)])
 
             rebalance_value = self.rebalance.currentData()
             if rebalance_value:
