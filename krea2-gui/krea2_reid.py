@@ -16,7 +16,7 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-BACKEND_VERSION = "2026-10-05.7"
+BACKEND_VERSION = "2026-10-05.8"
 UPSTREAM_REVISION = "121fb0183944f1befeb712d92e9ca07d0e282088"
 UPSTREAM_BASE = f"https://huggingface.co/yijunwang2/krea2-reid/resolve/{UPSTREAM_REVISION}"
 
@@ -114,6 +114,41 @@ def prepare_local_pipeline(vendor: Path, runtime: Path) -> Path:
     if needle not in source:
         raise RuntimeError("Pinned ReID pipeline no longer matches the expected compatibility patch")
     patched = source.replace(needle, replacement, 1)
+
+    kv_needle = (
+        "            if kv_cache:\n"
+        "                # Precompute pass: the refs alone run through the blocks once at t=0\n"
+        "                # and every denoising step reuses their per-block K/V, so the ref\n"
+        "                # tokens are dropped from the per-step sequence entirely.\n"
+        "                ref_kv = self.transformer.precompute_ref_kv(ref_tokens, ref_position_ids, attention_kwargs)\n"
+        "                ref_tokens, ref_seq_len = None, 0"
+    )
+    kv_replacement = (
+        "            if kv_cache:\n"
+        "                # Block-level group offload hooks run on transformer.forward(), but\n"
+        "                # precompute_ref_kv() is called directly. Stage only the small\n"
+        "                # top-level modules used by that direct method, then return them\n"
+        "                # to CPU; each large transformer block still onloads one at a time.\n"
+        "                _ref_prelude = (\n"
+        "                    self.transformer.time_embed,\n"
+        "                    self.transformer.time_mod_proj,\n"
+        "                    self.transformer.img_in,\n"
+        "                )\n"
+        "                for _module in _ref_prelude:\n"
+        "                    _module.to(device)\n"
+        "                try:\n"
+        "                    ref_kv = self.transformer.precompute_ref_kv(\n"
+        "                        ref_tokens, ref_position_ids, attention_kwargs\n"
+        "                    )\n"
+        "                finally:\n"
+        "                    for _module in _ref_prelude:\n"
+        "                        _module.to(\"cpu\")\n"
+        "                ref_tokens, ref_seq_len = None, 0"
+    )
+    if kv_needle not in patched:
+        raise RuntimeError("Pinned ReID pipeline no longer matches the K/V offload compatibility patch")
+    patched = patched.replace(kv_needle, kv_replacement, 1)
+
     runtime.mkdir(parents=True, exist_ok=True)
     target = runtime / "pipeline_local.py"
     content = (
@@ -337,7 +372,15 @@ def main() -> int:
     out_dir = (args.out or (root / "out")).expanduser()
     extra_loras = parse_lora_specs(args.lora, root)
 
-    for directory in (cache, tmp, out_dir):
+    for directory in (
+        cache,
+        tmp,
+        out_dir,
+        cache / "xdg" / "torch" / "kernels",
+        cache / "torchinductor",
+        cache / "triton",
+        cache / "nvidia",
+    ):
         directory.mkdir(parents=True, exist_ok=True)
 
     # Keep everything ReID-specific under ~/ai/krea2/reid.
