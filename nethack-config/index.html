@@ -36,10 +36,10 @@ footer{color:var(--muted);font-size:12px;line-height:1.5;text-align:center;margi
 <body><main>
 <div class="topline"><a class="back" href="../">‹ gpages</a><span class="version">NetHack 5.0.0 · Gentoo 5.0.0-r1</span></div>
 <h1>NetHack Config Generator</h1>
-<p class="subtitle">Build a clean <code>~/.nethackrc</code> for current NetHack. Enable only the settings you want written; everything else stays under NetHack's built-in defaults.</p>
+<p class="subtitle">Build a clean <code>~/.nethackrc</code> for NetHack 5.0.0 on Gentoo. Enable only the settings you want written; everything else stays under NetHack's built-in defaults.</p>
 
 <section class="card notice">
-<strong>Port-aware, not port-confused.</strong> Gentoo always builds tty and curses; <code>qt6</code> adds the <strong>Qt</strong> GUI and <code>X</code> adds X11. Port badges show where a setting is meaningful. Unsupported window-port options are generally ignored by NetHack, but the filter makes it easier not to generate irrelevant clutter.
+<strong>Port-aware, not port-confused.</strong> Gentoo always builds tty and curses; <code>qt6</code> adds the <strong>Qt</strong> GUI and <code>X</code> adds X11. Port badges show where a setting is meaningful. This generator targets the Gentoo build, so Win32/MS-DOS-only knobs are intentionally omitted. Unsupported window-port options are generally ignored by NetHack.
 </section>
 
 <section class="card toolbar">
@@ -153,7 +153,7 @@ var S = [
 {name:"use_darkgray",type:"bool",def:true,label:"Dark gray",hint:"Use bold black rather than blue for black glyphs where supported.",ports:["tty","curses"]},
 {name:"use_truecolor",type:"bool",def:false,label:"True color",hint:"Enable true-color handling where the terminal port supports it.",ports:["tty","curses"]},
 {name:"eight_bit_tty",type:"bool",def:false,label:"8-bit tty input",ports:["tty"]},
-{name:"timed_delay",type:"bool",def:true,label:"Timed display delays",ports:["tty"]},
+{name:"timed_delay",type:"bool",def:true,label:"Timed display delays",ports:["tty","curses"]},
 {name:"cursesgraphics",type:"text",def:"",placeholder:"UTF8graphics",label:"Curses symbol set",hint:"Load a curses display symbol set into symset.",ports:["curses"]},
 {name:"petattr",type:"text",def:"",placeholder:"inverse",label:"Pet attributes",hint:"Text attributes used to highlight pets.",ports:["tty","curses"]}
 ]},
@@ -162,23 +162,23 @@ var S = [
 {name:"help",type:"bool",def:true,label:"Extra what-is help"},
 {name:"herecmd_menu",type:"bool",def:false,label:"Location action menu",hint:"When mouse/cursor interaction is available, show actions for the selected location."},
 {name:"implicit_uncursed",type:"bool",def:true,label:"Implicit uncursed",hint:"When on, omit the word 'uncursed' from inventory descriptions."},
-{name:"menu_headings",type:"select",def:"inverse",values:["none","bold","dim","underline","blink","inverse"],label:"Menu heading style"},
-{name:"menu_objsyms",type:"select",def:"0",values:["0","1","2","3","4"],labels:["0 — no object symbols","1 — separators only","2 — entries only","3 — separators + entries","4 — entries unless separators exist"],label:"Menu object symbols"},
+{name:"menu_headings",type:"text",def:"inverse",placeholder:"red&bold",label:"Menu heading style",hint:"A text attribute, or color&attribute (for example red&bold)."},
+{name:"menu_objsyms",type:"select",def:"4",values:["0","1","2","3","4","5"],labels:["0 — none","1 — headers only","2 — entries only","3 — headers + entries","4 — entries unless headers exist","5 — headers, or entries if no headers"],label:"Menu object symbols",ports:["tty","curses"]},
 {name:"menu_overlay",type:"bool",def:true,label:"Menu overlay",hint:"Do not clear the screen before menus; align them to the right where supported.",ports:["tty"]},
 {name:"menustyle",type:"select",def:"full",values:["traditional","combination","full","partial"],label:"Menu style"},
 {name:"menucolors",type:"bool",def:false,label:"Menu colors",hint:"Enable MENUCOLOR rules below.",ports:["tty","curses"]},
-{name:"msghistory",type:"int",def:50,min:0,label:"Message history"},
+{name:"msghistory",type:"int",def:20,min:0,label:"Message history"},
 {name:"msg_window",type:"select",def:"s",values:["s","c","f","r"],labels:["s — single message","c — combination","f — full, oldest first","r — full, newest first"],label:"Previous-message window",hint:"TTY supports all values; curses supports full/reversed modes.",ports:["tty","curses"]},
 {name:"mouse_support",type:"text",def:"1",placeholder:"1",label:"Mouse support",hint:"Window-port mouse input level. Availability depends on the compiled port.",ports:["curses","X11"]},
 {name:"number_pad",type:"select",def:"0",values:["0","1","2","-1"],labels:["0 — vi movement","1 — numpad","2 — legacy numpad","-1 — vi keys with y/z swapped"],label:"Movement keys"},
 {name:"packorder",type:"text",def:'")[%?+/=!(*0_\u0060',label:"Inventory class order"},
 {name:"runmode",type:"select",def:"run",values:["teleport","run","walk","crawl"],label:"Running redraw"},
 {name:"scores",type:"text",def:"",placeholder:"10 top/2 around/own",label:"Score-list display"},
-{name:"sortloot",type:"select",def:"full",values:["full","loot","none"],label:"Loot sorting"},
+{name:"sortloot",type:"select",def:"none",values:["full","loot","none"],label:"Loot sorting"},
 {name:"sortpack",type:"bool",def:true,label:"Group inventory by type"},
-{name:"sortdiscoveries",type:"text",def:"",placeholder:"class",label:"Discovery sorting"},
-{name:"sortvanquished",type:"text",def:"",placeholder:"level",label:"Vanquished sorting"},
-{name:"whatis_coord",type:"select",def:"none",values:["none","compass","map","screen"],label:"Coordinate descriptions"},
+{name:"sortdiscoveries",type:"select",def:"o",values:["o","s","c","a"],labels:["o — class, discovery order","s — sortloot classification","c — class, alphabetic","a — alphabetic across classes"],label:"Discovery sorting"},
+{name:"sortvanquished",type:"select",def:"t",values:["t","d","a","c","n","z"],labels:["t — traditional / monster level","d — difficulty","a — alphabetic","c — monster class","n — count high to low","z — count low to high"],label:"Vanquished sorting"},
+{name:"whatis_coord",type:"select",def:"none",values:["none","compass","fullcompass","map","screen"],labels:["none","compass","full compass","map coordinates","screen coordinates"],label:"Coordinate descriptions"},
 {name:"whatis_filter",type:"select",def:"n",values:["n","v","a"],labels:["n — no filtering","v — in view","a — same area"],label:"Target filtering"},
 {name:"whatis_menu",type:"bool",def:false,label:"Target-selection menu"},
 {name:"whatis_moveskip",type:"bool",def:false,label:"Skip matching glyphs while targeting"},
@@ -231,7 +231,56 @@ var S = [
 {name:"sounds",type:"bool",def:false,label:"Sounds",hint:"Enable sound support if your build/window port provides it."},
 {name:"mail",type:"bool",def:true,label:"In-game mail daemon",hint:"Build-dependent on Unix."},
 {name:"news",type:"bool",def:true,label:"NetHack news",hint:"Show the news file at startup when the build supplies one."},
-{name:"altmeta",type:"bool",def:false,label:"ESC as Meta",hint:"Treat ESC followed by a command key as a meta-key sequence when supported."}
+{name:"altmeta",type:"bool",def:false,label:"ESC as Meta",hint:"Treat ESC followed by a command key as a meta-key sequence when supported."},
+{name:"ignintr",type:"bool",def:false,label:"Ignore interrupt signals",hint:"Ignore interrupt/break signals. Persistent."},
+{name:"disclose",type:"text",def:"",placeholder:"+i +a +v +g +c +o",label:"End-game disclosure",hint:"Choose which information NetHack reveals at the end of a game."},
+{name:"quick_farsight",type:"bool",def:false,label:"Quick farsight",hint:"Skip map browsing when the game forces you to look at the map."},
+{name:"toptenwin",type:"bool",def:false,label:"Score list in a NetHack window",hint:"Display the ending score list in a NetHack window rather than stdout."}
+]},
+{title:"Menu accelerator keys",fields:[
+{name:"menu_deselect_all",type:"text",def:"-",label:"Deselect all key"},
+{name:"menu_deselect_page",type:"text",def:"\\",label:"Deselect page key"},
+{name:"menu_first_page",type:"text",def:"^",label:"First page key"},
+{name:"menu_invert_all",type:"text",def:"@",label:"Invert all key"},
+{name:"menu_invert_page",type:"text",def:"~",label:"Invert page key"},
+{name:"menu_last_page",type:"text",def:"|",label:"Last page key"},
+{name:"menu_next_page",type:"text",def:">",label:"Next page key"},
+{name:"menu_previous_page",type:"text",def:"<",label:"Previous page key"},
+{name:"menu_search",type:"text",def:":",label:"Search key"},
+{name:"menu_select_all",type:"text",def:".",label:"Select all key"},
+{name:"menu_select_page",type:"text",def:",",label:"Select page key"},
+{name:"menu_shift_left",type:"text",def:"{",label:"Shift menu left key",hint:"Used for horizontally scrollable persistent inventory.",ports:["curses","X11"]},
+{name:"menu_shift_right",type:"text",def:"}",label:"Shift menu right key",hint:"Used for horizontally scrollable persistent inventory.",ports:["curses","X11"]},
+{name:"menuinvertmode",type:"text",def:"",placeholder:"0",label:"Menu invert mode",hint:"Experimental menu-selection inversion behavior; normally leave unset."}
+]},
+{title:"Symbols & legacy display controls",fields:[
+{name:"glyph",type:"text",def:"",placeholder:"glyph-name/U+codepoint/color",label:"Glyph override",hint:"Low-level glyph representation override. Can occur multiple times; use Raw directives if you need several."},
+{name:"dungeon",type:"text",def:"",placeholder:"symbol string",label:"Dungeon symbols",hint:"Legacy full symbol-list override."},
+{name:"effects",type:"text",def:"",placeholder:"symbol string",label:"Effect symbols",hint:"Legacy full effect-symbol override."},
+{name:"monsters",type:"text",def:"",placeholder:"symbol string",label:"Monster symbols",hint:"Legacy full monster-symbol override."},
+{name:"objects",type:"text",def:"",placeholder:"symbol string",label:"Object symbols",hint:"Legacy full object-symbol override."},
+{name:"traps",type:"text",def:"",placeholder:"symbol string",label:"Trap symbols",hint:"Legacy full trap-symbol override."},
+{name:"warnings",type:"text",def:"",placeholder:"012345",label:"Warning symbols"},
+{name:"boulder",type:"text",def:"",placeholder:"0",label:"Boulder symbol (deprecated)",hint:"Deprecated compatibility option; SYMBOLS=S_boulder:… is preferred."},
+{name:"DECgraphics",type:"text",def:"",placeholder:"1",label:"DEC graphics (deprecated)",hint:"Deprecated; prefer symset."},
+{name:"IBMgraphics",type:"text",def:"",placeholder:"1",label:"IBM graphics (deprecated)",hint:"Deprecated; prefer symset."}
+]},
+{title:"Crash reporting",fields:[
+{name:"crash_name",type:"text",def:"",placeholder:"Your Name",label:"Crash-report name",hint:"Prefills your name in a crash/bug-report form. NetHack does not submit the report by itself."},
+{name:"crash_email",type:"text",def:"",placeholder:"you@example.com",label:"Crash-report email",hint:"Prefills your email in a crash/bug-report form."},
+{name:"crash_urlmax",type:"int",def:4000,min:1,label:"Maximum crash-report URL length",hint:"Only useful if your browser cannot handle very long generated report URLs."}
+]},
+{title:"Debug / wizard mode",fields:[
+{name:"debug_hunger",type:"bool",def:false,label:"Disable hunger",hint:"Debug mode only."},
+{name:"debug_mongen",type:"bool",def:false,label:"Disable random monster generation",hint:"Debug mode only."},
+{name:"debug_overwrite_stairs",type:"bool",def:false,label:"Allow level generation over stairs",hint:"Debug mode only."},
+{name:"monpolycontrol",type:"bool",def:false,label:"Control monster polymorphs",hint:"Debug mode only."},
+{name:"montelecontrol",type:"bool",def:false,label:"Control monster teleports",hint:"Debug mode only."},
+{name:"sanity_check",type:"bool",def:false,label:"Per-turn sanity checks",hint:"Debug mode only."},
+{name:"travel_debug",type:"bool",def:false,label:"Travel debugging",hint:"Debug mode only."},
+{name:"wizmgender",type:"bool",def:false,label:"Wizard monster gender detail",hint:"Debug mode only."},
+{name:"wizweight",type:"bool",def:false,label:"Show object weights",hint:"Debug mode only."},
+{name:"menu_tab_sep",type:"bool",def:false,label:"Menu tab separators",hint:"Wizard/debug formatting option."}
 ]}
 ];
 
