@@ -70,7 +70,7 @@ DEFAULT_ROOT = Path.home() / "ai" / "krea2"
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 SEED_RE = re.compile(r"Generating\s+(\d+)\s*/\s*(\d+).*?seed\s+(-?\d+)", re.IGNORECASE)
 WORD_RE = re.compile(r"[A-Za-z][A-Za-z'’-]*")
-REID_BACKEND_VERSION = "2026-10-05.2"
+REID_BACKEND_VERSION = "2026-10-05.3"
 REID_BACKEND_URL = "https://raw.githubusercontent.com/polskiftw/gpages/main/krea2-gui/krea2_reid.py"
 SIZE_PRESETS = {
     "Square 1024x1024": (1024, 1024),
@@ -659,23 +659,15 @@ class Krea2Window(QMainWindow):
         self.reference_browse.setEnabled(is_reid)
         self.size_preset.setEnabled(is_reid)
         self.rebalance.setEnabled(not is_reid)
+        self.lora.setEnabled(True)
+        self.lora2.setEnabled(True)
+        self._update_lora_enabled()
         if is_reid:
-            self.lora.setEnabled(False)
-            self.strength.setEnabled(False)
-            self.lora2.setEnabled(False)
-            self.strength2.setEnabled(False)
             self.prompt.setPlaceholderText("Describe the new scene, outfit, pose, expression, props…")
         else:
-            self.lora.setEnabled(True)
-            self.lora2.setEnabled(True)
-            self._update_lora_enabled()
             self.prompt.setPlaceholderText("Describe what you want Krea2 to generate…")
 
     def _update_lora_enabled(self) -> None:
-        if hasattr(self, "mode") and self.mode.currentData() == "reid":
-            self.strength.setEnabled(False)
-            self.strength2.setEnabled(False)
-            return
         selected = self.lora.currentText().strip()
         selected2 = self.lora2.currentText().strip()
         self.strength.setEnabled(bool(selected and selected.casefold() != "none"))
@@ -786,6 +778,28 @@ class Krea2Window(QMainWindow):
                 "-q",
                 str(queue_total),
             ]
+
+            lora_text = self.lora.currentText().strip()
+            lora_text2 = self.lora2.currentText().strip()
+            strength = self.strength.value()
+            strength2 = self.strength2.value()
+
+            selected_loras: list[tuple[str, float]] = []
+            if lora_text and lora_text.casefold() != "none":
+                lora_value = lora_text
+                selected_loras.append((lora_text, strength))
+            if lora_text2 and lora_text2.casefold() != "none":
+                lora_value2 = lora_text2
+                selected_loras.append((lora_text2, strength2))
+
+            for selected_lora, selected_strength in selected_loras:
+                lora_arg = (
+                    selected_lora
+                    if abs(selected_strength - 1.0) < 1e-9
+                    else f"{selected_lora}:{selected_strength:g}"
+                )
+                args.extend(["--lora", lora_arg])
+
             if explicit_seed is not None:
                 args.extend(["--seed", str(explicit_seed)])
         else:
