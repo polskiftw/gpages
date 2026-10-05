@@ -11,7 +11,7 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-BACKEND_VERSION = "2026-10-05.2"
+BACKEND_VERSION = "2026-10-05.3"
 UPSTREAM_REVISION = "121fb0183944f1befeb712d92e9ca07d0e282088"
 UPSTREAM_BASE = f"https://huggingface.co/yijunwang2/krea2-reid/resolve/{UPSTREAM_REVISION}"
 
@@ -34,6 +34,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--height", type=int, default=1024)
     parser.add_argument("--steps", type=int, default=8)
     parser.add_argument("--identity-strength", type=float, default=1.0)
+    parser.add_argument(
+        "--lora",
+        action="append",
+        default=[],
+        help="Additional Krea 2 LoRA path, optionally suffixed with :strength. May be passed twice.",
+    )
     parser.add_argument("--out", type=Path)
     return parser.parse_args()
 
@@ -119,6 +125,46 @@ def output_path(out_dir: Path, seed: int, index: int) -> Path:
     return out_dir / f"reid_{stamp}_{index:02d}_seed{seed}.png"
 
 
+def parse_lora_specs(values: list[str], root: Path) -> list[tuple[Path, float]]:
+    specs: list[tuple[Path, float]] = []
+    for raw in values:
+        text = raw.strip()
+        if not text:
+            continue
+
+        strength = 1.0
+        path_text = text
+        if ":" in text:
+            maybe_path, maybe_strength = text.rsplit(":", 1)
+            try:
+                strength = float(maybe_strength)
+                path_text = maybe_path
+            except ValueError:
+                pass
+
+        path = Path(path_text).expanduser()
+        if not path.is_absolute():
+            path = root / path
+        path = path.resolve()
+        if not path.is_file():
+            raise SystemExit(f"LoRA not found: {path}")
+
+        specs.append((path, strength))
+
+    if len(specs) > 2:
+        raise SystemExit("ReID mode supports at most two additional LoRAs")
+    return specs
+
+
+def load_transformer_lora(module, transformer, load_file, path: Path, adapter_name: str) -> None:
+    state_dict = load_file(str(path), device="cpu")
+    state_dict = module._normalize_lora_state_dict(state_dict)
+    if not any(key.startswith("transformer.") for key in state_dict):
+        state_dict = module._convert_non_diffusers_krea2_lora_to_diffusers(state_dict)
+    transformer.load_lora_adapter(state_dict, prefix="transformer", adapter_name=adapter_name)
+    del state_dict
+
+
 def main() -> int:
     args = parse_args()
     if args.queue < 1:
@@ -136,6 +182,7 @@ def main() -> int:
     tmp = reid_root / "tmp"
     model_dir = root / "models" / "Krea-2-Turbo"
     out_dir = (args.out or (root / "out")).expanduser()
+    extra_loras = parse_lora_specs(args.lora, root)
 
     for directory in (cache, tmp, out_dir):
         directory.mkdir(parents=True, exist_ok=True)
@@ -186,8 +233,18 @@ def main() -> int:
     if not any(key.startswith("transformer.") for key in state_dict):
         state_dict = module._convert_non_diffusers_krea2_lora_to_diffusers(state_dict)
     transformer.load_lora_adapter(state_dict, prefix="transformer", adapter_name="reid")
-    transformer.set_adapters(["reid"], [args.identity_strength])
     del state_dict
+
+    adapter_names = ["reid"]
+    adapter_weights = [args.identity_strength]
+    for index, (lora_path, lora_strength) in enumerate(extra_loras, start=1):
+        adapter_name = f"user_lora_{index}"
+        print(f"Loading extra LoRA {index}: {lora_path} @ {lora_strength:g}", flush=True)
+        load_transformer_lora(module, transformer, load_file, lora_path, adapter_name)
+        adapter_names.append(adapter_name)
+        adapter_weights.append(lora_strength)
+
+    transformer.set_adapters(adapter_names, adapter_weights)
 
     # Same strategy as the already-working local Krea2 generator: FP8 storage,
     # BF16 compute, one transformer block resident on the GPU at a time.
@@ -209,7 +266,7 @@ def main() -> int:
         torch_dtype=torch.bfloat16,
         local_files_only=True,
     )
-    pipe.set_adapters(["reid"], [args.identity_strength])
+    pipe.set_adapters(adapter_names, adapter_weights)
 
     reference = ImageOps.exif_transpose(Image.open(args.reference)).convert("RGB")
     ref_tensor = pipe._to_chw_tensor(reference)
