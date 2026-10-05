@@ -35,19 +35,26 @@ On Gentoo, PySide6 is provided by `dev-python/pyside`:
 emerge -av dev-python/pyside
 ```
 
-## Run it
+## Install/update without local Git
 
-From this directory:
+The installer downloads the current GUI directly from the remote repository and writes only inside the existing Krea2 tree:
 
 ```sh
-python3 krea2_gui.py
+curl -fsSL https://raw.githubusercontent.com/polskiftw/gpages/main/krea2-gui/install-user.sh | sh
 ```
 
-Or make the script executable and run it directly:
+This installs the launcher at:
+
+```text
+~/ai/krea2/bin/krea2-gui
+```
+
+No desktop/menu entry and no local Git checkout are created.
+
+## Run it
 
 ```sh
-chmod +x krea2_gui.py
-./krea2_gui.py
+~/ai/krea2/bin/krea2-gui
 ```
 
 ## Optional environment overrides
@@ -110,4 +117,4 @@ On Linux the GUI launches Krea2 through `setsid` when available. Cancel Queue se
 
 ## Privacy / networking
 
-There is no local web server, daemon, service, or autostart process. Ordinary text-to-image generation remains local-only. ReID uses outbound HTTPS only when its small backend file or pinned upstream ReID files are missing; after those files and the Qwen processor metadata are cached, generation uses the local Krea 2 model and local ReID tree.
+There is no local web server, daemon, service, desktop/menu entry, or autostart process. GUI settings live in `~/ai/krea2/config/krea2-gui.ini`. Installer scratch files live temporarily under `~/ai/krea2/tmp/`. Ordinary text-to-image generation remains local-only. ReID uses outbound HTTPS only when its small backend file or pinned upstream ReID files are missing; after those files and the Qwen processor metadata are cached, generation uses the local Krea 2 model and local ReID tree.
