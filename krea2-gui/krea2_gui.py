@@ -259,8 +259,13 @@ class SpellcheckPlainTextEdit(QPlainTextEdit):
 class Krea2Window(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.settings = QSettings(APP_ORG, APP_NAME)
         self.krea2_root = Path(os.environ.get("KREA2_ROOT", str(DEFAULT_ROOT))).expanduser()
+        self.config_dir = self.krea2_root / "config"
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+        self.settings = QSettings(
+            str(self.config_dir / "krea2-gui.ini"),
+            QSettings.Format.IniFormat,
+        )
         self.out_dir = self.krea2_root / "out"
         local_cli = self.krea2_root / "bin" / "krea2"
         self.cli = (
