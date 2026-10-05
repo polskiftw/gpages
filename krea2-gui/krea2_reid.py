@@ -11,7 +11,7 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-BACKEND_VERSION = "2026-10-05.3"
+BACKEND_VERSION = "2026-10-05.4"
 UPSTREAM_REVISION = "121fb0183944f1befeb712d92e9ca07d0e282088"
 UPSTREAM_BASE = f"https://huggingface.co/yijunwang2/krea2-reid/resolve/{UPSTREAM_REVISION}"
 
@@ -21,6 +21,12 @@ ASSETS = {
     "PIPELINE_LICENSE": None,
     "NOTICE": None,
     "LICENSE.pdf": None,
+}
+
+REBALANCE_PROFILES = {
+    "subtle": [1, 1, 1, 1, 1, 1, 1, 1.4, 2, 1.05, 1.8, 1],
+    "balanced": [1, 1, 1, 1, 1, 1, 1, 2.5, 5, 1.1, 4, 1],
+    "aggressive": [1, 1, 1, 1, 1, 1, 1, 3, 6, 1.2, 5, 1],
 }
 
 
@@ -34,6 +40,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--height", type=int, default=1024)
     parser.add_argument("--steps", type=int, default=8)
     parser.add_argument("--identity-strength", type=float, default=1.0)
+    parser.add_argument(
+        "--rebalance",
+        choices=tuple(REBALANCE_PROFILES),
+        help="Reweight Krea 2's 12 prompt-conditioning layers using the existing GUI profiles.",
+    )
     parser.add_argument(
         "--lora",
         action="append",
@@ -165,6 +176,27 @@ def load_transformer_lora(module, transformer, load_file, path: Path, adapter_na
     del state_dict
 
 
+def rebalance_prompt_embeds(torch, prompt_embeds, profile: str):
+    weights = REBALANCE_PROFILES[profile]
+    if prompt_embeds.ndim != 4 or prompt_embeds.shape[2] != len(weights):
+        raise RuntimeError(
+            "Unexpected Krea 2 prompt embedding shape for rebalance: "
+            f"{tuple(prompt_embeds.shape)}"
+        )
+
+    orig_rms = prompt_embeds.float().pow(2).mean().sqrt()
+    layer_weights = torch.tensor(
+        weights,
+        device=prompt_embeds.device,
+        dtype=prompt_embeds.dtype,
+    ).view(1, 1, len(weights), 1)
+
+    balanced = prompt_embeds * layer_weights
+    new_rms = balanced.float().pow(2).mean().sqrt().clamp_min(1e-8)
+    balanced = balanced * (orig_rms / new_rms).to(dtype=balanced.dtype)
+    return balanced
+
+
 def main() -> int:
     args = parse_args()
     if args.queue < 1:
@@ -285,6 +317,9 @@ def main() -> int:
             device=cuda,
         )
     prompt_embeds = prompt_embeds.to(dtype=torch.bfloat16)
+    if args.rebalance:
+        print(f"Applying {args.rebalance} prompt rebalance...", flush=True)
+        prompt_embeds = rebalance_prompt_embeds(torch, prompt_embeds, args.rebalance)
     pipe.text_encoder.to(cpu)
     del vl_images
     torch.cuda.empty_cache()
