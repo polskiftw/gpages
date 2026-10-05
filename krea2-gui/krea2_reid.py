@@ -141,13 +141,13 @@ def main() -> int:
         directory.mkdir(parents=True, exist_ok=True)
 
     # Keep everything ReID-specific under ~/ai/krea2/reid.
-    os.environ.setdefault("HF_HOME", str(cache / "huggingface"))
-    os.environ.setdefault("HUGGINGFACE_HUB_CACHE", str(cache / "huggingface" / "hub"))
-    os.environ.setdefault("TRANSFORMERS_CACHE", str(cache / "huggingface" / "transformers"))
-    os.environ.setdefault("TORCH_HOME", str(cache / "torch"))
-    os.environ.setdefault("XDG_CACHE_HOME", str(cache / "xdg"))
-    os.environ.setdefault("TMPDIR", str(tmp))
-    os.environ.setdefault("PYTORCH_ALLOC_CONF", "expandable_segments:True")
+    os.environ["HF_HOME"] = str(cache / "huggingface")
+    os.environ["HUGGINGFACE_HUB_CACHE"] = str(cache / "huggingface" / "hub")
+    os.environ["TRANSFORMERS_CACHE"] = str(cache / "huggingface" / "transformers")
+    os.environ["TORCH_HOME"] = str(cache / "torch")
+    os.environ["XDG_CACHE_HOME"] = str(cache / "xdg")
+    os.environ["TMPDIR"] = str(tmp)
+    os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
 
     if not model_dir.is_dir():
         raise SystemExit(f"Local Krea 2 model not found: {model_dir}")
