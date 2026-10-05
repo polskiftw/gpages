@@ -4,14 +4,15 @@ set -eu
 base_url="https://raw.githubusercontent.com/polskiftw/gpages/b1feb496089a3b8573ee593c0ac44d72e5bd35e0/krea2-gui"
 root="${KREA2_ROOT:-$HOME/ai/krea2}"
 bin_dir="$root/bin"
-tmp_dir="$root/tmp/krea2-gui-install-$$"
+reid_backend_dir="$root/reid/backend"
+tmp_dir="$root/tmp/krea2-gui-install-$"
 
 cleanup() {
     rm -rf "$tmp_dir"
 }
 trap cleanup EXIT HUP INT TERM
 
-mkdir -p "$bin_dir" "$tmp_dir"
+mkdir -p "$bin_dir" "$reid_backend_dir" "$tmp_dir"
 
 fetch() {
     url=$1
@@ -27,8 +28,11 @@ fetch() {
 }
 
 fetch "$base_url/krea2_gui.py" "$tmp_dir/krea2_gui.py"
+fetch "$base_url/krea2_reid.py" "$tmp_dir/krea2_reid.py"
 install -m 0755 "$tmp_dir/krea2_gui.py" "$bin_dir/krea2-gui"
+install -m 0755 "$tmp_dir/krea2_reid.py" "$reid_backend_dir/krea2_reid.py"
 
 printf 'Installed/updated %s\n' "$bin_dir/krea2-gui"
+printf 'Installed/updated %s\n' "$reid_backend_dir/krea2_reid.py"
 printf '%s\n' "Everything stays under $root."
 printf '%s\n' "No desktop entry or local Git checkout was created."
