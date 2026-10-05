@@ -6,7 +6,7 @@ A small native Qt 6 front end for Claire's existing local `krea2` CLI. It does *
 
 - Text-to-image and ReID-reference modes
 - ReID reference-image picker for identity-preserving scene/outfit/pose changes
-- Square, portrait, and landscape output presets
+- Square, portrait, and landscape output presets for ReID
 - Prompt editor
 - Up to two optional LoRAs, each with its own strength (`file.safetensors:0.8` syntax underneath) in text-to-image mode
 - Seed field with `Random` mode
