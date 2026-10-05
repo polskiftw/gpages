@@ -70,7 +70,7 @@ DEFAULT_ROOT = Path.home() / "ai" / "krea2"
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 SEED_RE = re.compile(r"Generating\s+(\d+)\s*/\s*(\d+).*?seed\s+(-?\d+)", re.IGNORECASE)
 WORD_RE = re.compile(r"[A-Za-z][A-Za-z'’-]*")
-REID_BACKEND_VERSION = "2026-10-05.3"
+REID_BACKEND_VERSION = "2026-10-05.4"
 REID_BACKEND_URL = "https://raw.githubusercontent.com/polskiftw/gpages/main/krea2-gui/krea2_reid.py"
 SIZE_PRESETS = {
     "Square 1024x1024": (1024, 1024),
@@ -658,7 +658,7 @@ class Krea2Window(QMainWindow):
         self.reference.setEnabled(is_reid)
         self.reference_browse.setEnabled(is_reid)
         self.size_preset.setEnabled(is_reid)
-        self.rebalance.setEnabled(not is_reid)
+        self.rebalance.setEnabled(True)
         self.lora.setEnabled(True)
         self.lora2.setEnabled(True)
         self._update_lora_enabled()
@@ -799,6 +799,10 @@ class Krea2Window(QMainWindow):
                     else f"{selected_lora}:{selected_strength:g}"
                 )
                 args.extend(["--lora", lora_arg])
+
+            rebalance_value = self.rebalance.currentData()
+            if rebalance_value:
+                args.extend(["--rebalance", str(rebalance_value)])
 
             if explicit_seed is not None:
                 args.extend(["--seed", str(explicit_seed)])
