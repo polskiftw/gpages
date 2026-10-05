@@ -16,7 +16,7 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-BACKEND_VERSION = "2026-10-05.10"
+BACKEND_VERSION = "2026-10-05.11"
 UPSTREAM_REVISION = "121fb0183944f1befeb712d92e9ca07d0e282088"
 UPSTREAM_BASE = f"https://huggingface.co/yijunwang2/krea2-reid/resolve/{UPSTREAM_REVISION}"
 
@@ -222,6 +222,9 @@ def load_transformer_lora(
     and therefore return False.
     """
     state_dict = dict(load_file(str(path), device="cpu"))
+    # Normalize first: fedor_bypass is stored with an upstream-style prefix
+    # that normalizes down to txtfusion.projector.diff.
+    state_dict = module._normalize_lora_state_dict(state_dict)
 
     projector_keys = [
         key
@@ -250,7 +253,6 @@ def load_transformer_lora(
     if not state_dict:
         return False
 
-    state_dict = module._normalize_lora_state_dict(state_dict)
     if not any(key.startswith("transformer.") for key in state_dict):
         state_dict = module._convert_non_diffusers_krea2_lora_to_diffusers(state_dict)
     transformer.load_lora_adapter(state_dict, prefix="transformer", adapter_name=adapter_name)
