@@ -11,7 +11,7 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-BACKEND_VERSION = "2026-10-05.1"
+BACKEND_VERSION = "2026-10-05.2"
 UPSTREAM_REVISION = "121fb0183944f1befeb712d92e9ca07d0e282088"
 UPSTREAM_BASE = f"https://huggingface.co/yijunwang2/krea2-reid/resolve/{UPSTREAM_REVISION}"
 
@@ -142,9 +142,14 @@ def main() -> int:
 
     # Keep everything ReID-specific under ~/ai/krea2/reid.
     os.environ["HF_HOME"] = str(cache / "huggingface")
+    os.environ["HF_HUB_CACHE"] = str(cache / "huggingface" / "hub")
+    os.environ["HF_ASSETS_CACHE"] = str(cache / "huggingface" / "assets")
     os.environ["HUGGINGFACE_HUB_CACHE"] = str(cache / "huggingface" / "hub")
     os.environ["TRANSFORMERS_CACHE"] = str(cache / "huggingface" / "transformers")
     os.environ["TORCH_HOME"] = str(cache / "torch")
+    os.environ["TORCHINDUCTOR_CACHE_DIR"] = str(cache / "torchinductor")
+    os.environ["TRITON_CACHE_DIR"] = str(cache / "triton")
+    os.environ["CUDA_CACHE_PATH"] = str(cache / "nvidia")
     os.environ["XDG_CACHE_HOME"] = str(cache / "xdg")
     os.environ["TMPDIR"] = str(tmp)
     os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
