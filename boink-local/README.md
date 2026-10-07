@@ -10,6 +10,7 @@ It watches the configured subreddits while it is running, saves only media files
 - `config.sh` - the only file you normally edit.
 - `state.sqlite3` - created automatically. It contains gallery-dl's download archive plus Boink Local's SHA-256 content index.
 - `.staging/` - temporary/resumable downloads, created automatically.
+- `.errors/` - transient per-subreddit gallery-dl diagnostics, created automatically.
 - `archive/` - default media destination, created automatically unless `SAVE_DIR` points somewhere else.
 
 No post titles, authors, captions, URLs, or metadata sidecars are saved. The SQLite database contains only the downloader's internal archive identifiers and Boink Local's content hashes/random filenames.
@@ -71,7 +72,7 @@ Boink Local runs gallery-dl quietly and ignores any system/user gallery-dl confi
 
 Completed downloads are handed straight back to Boink Local through gallery-dl's synchronous exec postprocessor. That means each file is hashed, deduplicated, moved to the archive, and printed as soon as that individual download finishes rather than being held until the entire subreddit pass is over. The final staging sweep remains as a recovery path for completed files left behind by an interruption or callback failure.
 
-gallery-dl still runs in quiet mode, but its error-level stderr is captured per subreddit. If a subreddit pass exits nonzero, Boink Local prints the gallery-dl exit code followed by up to the last eight diagnostic lines prefixed with `ERROR:`. Local hashing/indexing/move failures are reported separately so a downloader problem is not confused with a Boink processing problem.
+gallery-dl still runs in quiet mode, but its error-level stderr is captured per subreddit in `.errors/`, outside the media staging tree. If a subreddit pass exits nonzero, Boink Local prints the gallery-dl exit code followed by up to the last eight diagnostic lines prefixed with `ERROR:`. Local hashing/indexing/move failures are reported separately so a downloader problem is not confused with a Boink processing problem. Exit-code fallback text is used when gallery-dl truly emits no diagnostics.
 
 ## Dedupe behavior
 
