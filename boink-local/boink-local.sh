@@ -50,6 +50,9 @@ load_config() {
 
     declare -p FILE_TYPES >/dev/null 2>&1 || die "config must define FILE_TYPES as a Bash array"
     declare -p SUBREDDITS >/dev/null 2>&1 || die "config must define SUBREDDITS as a Bash array"
+
+    # Backward-compatible default for configs created before scan depth was exposed.
+    POSTS_PER_SUBREDDIT="${POSTS_PER_SUBREDDIT:-100}"
     [[ ${#FILE_TYPES[@]} -gt 0 ]] || die "FILE_TYPES is empty"
     [[ ${#SUBREDDITS[@]} -gt 0 ]] || die "SUBREDDITS is empty; edit config.sh first"
     [[ -n "${SAVE_DIR:-}" ]] || die "SAVE_DIR is empty"
