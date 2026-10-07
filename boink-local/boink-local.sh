@@ -287,7 +287,6 @@ main() {
     need_command find
     need_command od
     need_command tr
-    need_command tail
 
     load_config
     init_state
