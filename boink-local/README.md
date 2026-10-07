@@ -54,7 +54,7 @@ Start it:
 
 Stop it with `Ctrl+C`.
 
-Boink Local ignores any system/user gallery-dl config so its behavior stays self-contained. It reads Reddit cookies directly from the most recently used Firefox profile at runtime; it does not copy a cookie file into this folder.
+Boink Local runs gallery-dl quietly and ignores any system/user gallery-dl config so the terminal mostly shows its own scan/save lines and its behavior stays self-contained. It reads Reddit cookies directly from the most recently used Firefox profile at runtime; it does not copy a cookie file into this folder.
 
 ## Dedupe behavior
 
