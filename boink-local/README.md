@@ -26,6 +26,8 @@ FILE_TYPES=(
     mp4 m4v webm mov mkv
 )
 
+SCAN_PAUSE_SECONDS=60
+
 SAVE_DIR="./archive"
 
 SUBREDDITS=(
@@ -35,6 +37,8 @@ SUBREDDITS=(
 ```
 
 Subreddits are names only; use `pics`, not a full Reddit URL.
+
+`SCAN_PAUSE_SECONDS` is the delay after one complete pass through all configured subreddits before the next pass begins. The default is 60 seconds.
 
 The configured extension list is a **keep list**, not a limitation on what gallery-dl may inspect or temporarily download. Boink Local lets Reddit's own media handling and gallery-dl child extractors resolve the post first, then keeps only files whose final extension appears in `FILE_TYPES`. This is intentional so Reddit galleries and external hosts are not rejected just because the parent Reddit post does not expose the final media extension yet.
 

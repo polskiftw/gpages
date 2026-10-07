@@ -6,7 +6,6 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 CONFIG_FILE="$SCRIPT_DIR/config.sh"
 STATE_DB="$SCRIPT_DIR/state.sqlite3"
 STAGING_DIR="$SCRIPT_DIR/.staging"
-SCAN_PAUSE_SECONDS=60
 POSTS_PER_SUBREDDIT=100
 
 say() {
@@ -55,6 +54,7 @@ load_config() {
     [[ ${#FILE_TYPES[@]} -gt 0 ]] || die "FILE_TYPES is empty"
     [[ ${#SUBREDDITS[@]} -gt 0 ]] || die "SUBREDDITS is empty; edit config.sh first"
     [[ -n "${SAVE_DIR:-}" ]] || die "SAVE_DIR is empty"
+    [[ "${SCAN_PAUSE_SECONDS:-}" =~ ^[1-9][0-9]*$ ]] || die "SCAN_PAUSE_SECONDS must be a positive whole number"
 
     local configured_ext
     for configured_ext in "${FILE_TYPES[@]}"; do
