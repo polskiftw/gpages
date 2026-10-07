@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 CONFIG_FILE="$SCRIPT_DIR/config.sh"
 STATE_DB="$SCRIPT_DIR/state.sqlite3"
 STAGING_DIR="$SCRIPT_DIR/.staging"
+ERROR_DIR="$SCRIPT_DIR/.errors"
 
 say() {
     printf '[%(%H:%M:%S)T] %s\n' -1 "$*"
@@ -68,7 +69,7 @@ load_config() {
     if [[ "$SAVE_DIR" != /* ]]; then
         SAVE_DIR="$SCRIPT_DIR/$SAVE_DIR"
     fi
-    mkdir -p -- "$SAVE_DIR" "$STAGING_DIR"
+    mkdir -p -- "$SAVE_DIR" "$STAGING_DIR" "$ERROR_DIR"
     SAVE_DIR="$(cd -- "$SAVE_DIR" && pwd -P)"
 }
 
@@ -170,7 +171,7 @@ scan_subreddit() {
     }
 
     run_dir="$STAGING_DIR/$sub"
-    error_log="$STAGING_DIR/.gallery-dl-${sub}.err"
+    error_log="$ERROR_DIR/${sub}.log"
     mkdir -p -- "$run_dir"
     : > "$error_log"
 
@@ -207,7 +208,11 @@ scan_subreddit() {
                 [[ -n "$line" ]] && printf 'ERROR: %s\n' "$line"
             done < <(tail -n 8 -- "$error_log")
         else
-            printf 'ERROR: gallery-dl returned no diagnostic text\n'
+            if (( gallery_rc & 4 )); then
+                printf 'ERROR: gallery-dl exit 4 indicates an extraction error (for example an HTTP failure or missing resource); no diagnostic text was logged\n'
+            else
+                printf 'ERROR: gallery-dl returned no diagnostic text\n'
+            fi
         fi
     fi
 
