@@ -75,7 +75,9 @@ Boink Local runs gallery-dl quietly and ignores any system/user gallery-dl confi
 
 Completed downloads are handed straight back to Boink Local through gallery-dl's synchronous exec postprocessor. That means each file is hashed, deduplicated, moved to the archive, and printed as soon as that individual download finishes rather than being held until the entire subreddit pass is over. The final staging sweep remains as a recovery path for completed files left behind by an interruption or callback failure.
 
-gallery-dl still runs in quiet mode, but its error-level stderr is captured per subreddit in `.errors/`, outside the media staging tree. If a subreddit pass exits nonzero, Boink Local prints the gallery-dl exit code followed by up to the last eight diagnostic lines prefixed with `ERROR:`. Local hashing/indexing/move failures are reported separately so a downloader problem is not confused with a Boink processing problem. Exit-code fallback text is used when gallery-dl truly emits no diagnostics.
+gallery-dl still runs in quiet mode, but its error-level stderr is captured per subreddit in `.errors/`, outside the media staging tree. Explicitly permanent missing-media conditions such as deleted/removed content, 404/NotFound results, and resources that no longer exist are treated as background misses and are not printed. Other failures still print the gallery-dl exit code followed by up to the last eight actionable diagnostic lines prefixed with `ERROR:`. Local hashing/indexing/move failures are reported separately so a downloader problem is not confused with a Boink processing problem.
+
+gallery-dl only adds successful downloads to its normal download archive. That means a permanently unavailable child item may still be encountered and retried silently on a later pass; Boink Local suppresses that expected noise rather than pretending it was successfully archived.
 
 ## Dedupe behavior
 
