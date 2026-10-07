@@ -26,6 +26,7 @@ FILE_TYPES=(
     mp4 m4v webm mov mkv
 )
 
+POSTS_PER_SUBREDDIT=100
 SCAN_PAUSE_SECONDS=60
 
 SAVE_DIR="./archive"
@@ -37,6 +38,8 @@ SUBREDDITS=(
 ```
 
 Subreddits are names only; use `pics`, not a full Reddit URL.
+
+`POSTS_PER_SUBREDDIT` controls how far each pass asks gallery-dl to walk through the subreddit's `/new` listing. The default `100` means posts 1 through 100, newest first. It is a post count rather than a time window, so how many hours/days it covers depends on how active that subreddit is. Raising it to `500`, for example, asks for posts 1 through 500 if Reddit exposes that much listing history.
 
 `SCAN_PAUSE_SECONDS` is the delay after one complete pass through all configured subreddits before the next pass begins. The default is 60 seconds.
 
@@ -65,6 +68,8 @@ Start it:
 Stop it with `Ctrl+C`.
 
 Boink Local runs gallery-dl quietly and ignores any system/user gallery-dl config so the terminal mostly shows its own scan/save lines and its behavior stays self-contained. It reads Reddit cookies directly from the most recently used Firefox profile at runtime; it does not copy a cookie file into this folder.
+
+Completed downloads are handed straight back to Boink Local through gallery-dl's synchronous exec postprocessor. That means each file is hashed, deduplicated, moved to the archive, and printed as soon as that individual download finishes rather than being held until the entire subreddit pass is over. The final staging sweep remains as a recovery path for completed files left behind by an interruption or callback failure.
 
 ## Dedupe behavior
 
