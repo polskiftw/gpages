@@ -21,6 +21,18 @@ dupe() {
     printf 'DUPE: %s\n' "$*"
 }
 
+is_background_media_error() {
+    local line="${1,,}"
+
+    case "$line" in
+        *deleted*|        *notfounderror*|        *"404 not found"*|        *"http error 404"*|        *"404 client error"*|        *"does not exist"*|        *"no longer exists"*|        *" has been removed"*|        *" was removed"*|        *"content removed"*|        *"media removed"*|        *"post removed"*)
+            return 0
+            ;;
+    esac
+
+    return 1
+}
+
 need_command() {
     command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
 }
@@ -167,6 +179,8 @@ process_staging() {
 
 scan_subreddit() {
     local raw="$1" sub run_dir error_log gallery_rc=0 staging_rc=0 line
+    local ignored_errors=0 start=0 index
+    local -a visible_errors=()
     sub="$(validate_subreddit "$raw")" || {
         say "skipping invalid subreddit: $raw"
         return 0
@@ -204,15 +218,32 @@ scan_subreddit() {
 
     process_staging || staging_rc=$?
 
+    if [[ -s "$error_log" ]]; then
+        while IFS= read -r line; do
+            [[ -n "$line" ]] || continue
+            if is_background_media_error "$line"; then
+                ((ignored_errors += 1))
+            else
+                visible_errors+=("$line")
+            fi
+        done < "$error_log"
+    fi
+
     if (( gallery_rc != 0 )); then
-        say "r/$sub gallery-dl error (exit ${gallery_rc}); continuing"
-        if [[ -s "$error_log" ]]; then
-            while IFS= read -r line; do
-                [[ -n "$line" ]] && printf 'ERROR: %s\n' "$line"
-            done < <(tail -n 8 -- "$error_log")
+        if (( ${#visible_errors[@]} > 0 )); then
+            say "r/$sub completed with media errors (exit ${gallery_rc}); continuing"
+            if (( ${#visible_errors[@]} > 8 )); then
+                start=$(( ${#visible_errors[@]} - 8 ))
+            fi
+            for (( index=start; index<${#visible_errors[@]}; index++ )); do
+                printf 'ERROR: %s\n' "${visible_errors[index]}"
+            done
+        elif (( ignored_errors > 0 && gallery_rc == 4 )); then
+            :
         else
+            say "r/$sub gallery-dl error (exit ${gallery_rc}); continuing"
             if (( gallery_rc & 4 )); then
-                printf 'ERROR: gallery-dl exit 4 indicates an extraction error (for example an HTTP failure or missing resource); no diagnostic text was logged\n'
+                printf 'ERROR: gallery-dl exit 4 indicates an extraction error; no diagnostic text was logged\n'
             else
                 printf 'ERROR: gallery-dl returned no diagnostic text\n'
             fi
