@@ -52,12 +52,14 @@ load_config() {
     declare -p FILE_TYPES >/dev/null 2>&1 || die "config must define FILE_TYPES as a Bash array"
     declare -p SUBREDDITS >/dev/null 2>&1 || die "config must define SUBREDDITS as a Bash array"
 
-    # Backward-compatible default for configs created before scan depth was exposed.
+    # Backward-compatible defaults for configs created before these knobs were exposed.
     POSTS_PER_SUBREDDIT="${POSTS_PER_SUBREDDIT:-100}"
+    STOP_AFTER_KNOWN_ITEMS="${STOP_AFTER_KNOWN_ITEMS:-15}"
     [[ ${#FILE_TYPES[@]} -gt 0 ]] || die "FILE_TYPES is empty"
     [[ ${#SUBREDDITS[@]} -gt 0 ]] || die "SUBREDDITS is empty; edit config.sh first"
     [[ -n "${SAVE_DIR:-}" ]] || die "SAVE_DIR is empty"
     [[ "${POSTS_PER_SUBREDDIT:-}" =~ ^[1-9][0-9]*$ ]] || die "POSTS_PER_SUBREDDIT must be a positive whole number"
+    [[ "${STOP_AFTER_KNOWN_ITEMS:-}" =~ ^[1-9][0-9]*$ ]] || die "STOP_AFTER_KNOWN_ITEMS must be a positive whole number"
     [[ "${SCAN_PAUSE_SECONDS:-}" =~ ^[1-9][0-9]*$ ]] || die "SCAN_PAUSE_SECONDS must be a positive whole number"
 
     local configured_ext
@@ -175,7 +177,7 @@ scan_subreddit() {
     mkdir -p -- "$run_dir"
     : > "$error_log"
 
-    say "checking r/$sub (newest ${POSTS_PER_SUBREDDIT} posts from /new)"
+    say "checking r/$sub (newest ${POSTS_PER_SUBREDDIT} posts from /new; move on after ${STOP_AFTER_KNOWN_ITEMS} known in a row)"
 
     BOINK_LOCAL_SCRIPT="$SCRIPT_DIR/boink-local.sh" gallery-dl \
         --quiet \
@@ -185,6 +187,7 @@ scan_subreddit() {
         --download-archive "$STATE_DB" \
         --destination "$run_dir" \
         --post-range "1-${POSTS_PER_SUBREDDIT}" \
+        --abort "${STOP_AFTER_KNOWN_ITEMS}" \
         -P exec \
         -O 'command=["{_env[BOINK_LOCAL_SCRIPT]}","--ingest","{_path}"]' \
         -O 'event=after' \

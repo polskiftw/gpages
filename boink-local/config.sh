@@ -14,6 +14,10 @@ FILE_TYPES=(
 # This is a post count, not a time window. Increase it to reach farther back.
 POSTS_PER_SUBREDDIT=100
 
+# Move on from a subreddit after this many already-known/skipped media items in a row.
+# A newly downloaded item resets the consecutive-skip count.
+STOP_AFTER_KNOWN_ITEMS=15
+
 # Seconds to wait after a complete scan of all configured subreddits.
 SCAN_PAUSE_SECONDS=60
 
