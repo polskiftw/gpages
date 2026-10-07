@@ -11,4 +11,4 @@ Small static browser tools hosted with GitHub Pages.
 - `/tag-harvester/` — legacy browser/bookmarklet Tag Gremlin
 - `/tag-gremlin/` — desktop Tag Gremlin CLI, SQLite harvester, and synonym-map exporter
 
-Each tool should live in its own folder with its own `index.html` so the repository stays tidy as more tools are added.
+Each browser tool should live in its own folder with its own `index.html`; non-browser utilities should likewise stay self-contained in their own folders.
