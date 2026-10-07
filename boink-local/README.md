@@ -28,6 +28,7 @@ FILE_TYPES=(
 )
 
 POSTS_PER_SUBREDDIT=100
+STOP_AFTER_KNOWN_ITEMS=15
 SCAN_PAUSE_SECONDS=60
 
 SAVE_DIR="./archive"
@@ -41,6 +42,8 @@ SUBREDDITS=(
 Subreddits are names only; use `pics`, not a full Reddit URL.
 
 `POSTS_PER_SUBREDDIT` controls how far each pass asks gallery-dl to walk through the subreddit's `/new` listing. The default `100` means posts 1 through 100, newest first. It is a post count rather than a time window, so how many hours/days it covers depends on how active that subreddit is. Raising it to `500`, for example, asks for posts 1 through 500 if Reddit exposes that much listing history.
+
+`STOP_AFTER_KNOWN_ITEMS` tells gallery-dl to stop the current subreddit after that many consecutive file downloads were skipped because they were already known (for example, already present in its download archive). The default is `15`. A newly downloaded file breaks the streak and the counter starts over. This can end a subreddit pass before `POSTS_PER_SUBREDDIT` is reached once Boink gets back into territory it has already seen. Older local configs that do not define this setting automatically use `15`.
 
 `SCAN_PAUSE_SECONDS` is the delay after one complete pass through all configured subreddits before the next pass begins. The default is 60 seconds.
 
