@@ -10,6 +10,9 @@ FILE_TYPES=(
     mp4 m4v webm mov mkv
 )
 
+# Seconds to wait after a complete scan of all configured subreddits.
+SCAN_PAUSE_SECONDS=60
+
 # Relative paths are resolved from this folder.
 SAVE_DIR="./archive"
 
