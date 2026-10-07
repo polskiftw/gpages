@@ -6,7 +6,6 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 CONFIG_FILE="$SCRIPT_DIR/config.sh"
 STATE_DB="$SCRIPT_DIR/state.sqlite3"
 STAGING_DIR="$SCRIPT_DIR/.staging"
-POSTS_PER_SUBREDDIT=100
 
 say() {
     printf '[%(%H:%M:%S)T] %s\n' -1 "$*"
@@ -54,6 +53,7 @@ load_config() {
     [[ ${#FILE_TYPES[@]} -gt 0 ]] || die "FILE_TYPES is empty"
     [[ ${#SUBREDDITS[@]} -gt 0 ]] || die "SUBREDDITS is empty; edit config.sh first"
     [[ -n "${SAVE_DIR:-}" ]] || die "SAVE_DIR is empty"
+    [[ "${POSTS_PER_SUBREDDIT:-}" =~ ^[1-9][0-9]*$ ]] || die "POSTS_PER_SUBREDDIT must be a positive whole number"
     [[ "${SCAN_PAUSE_SECONDS:-}" =~ ^[1-9][0-9]*$ ]] || die "SCAN_PAUSE_SECONDS must be a positive whole number"
 
     local configured_ext
@@ -169,15 +169,20 @@ scan_subreddit() {
     run_dir="$STAGING_DIR/$sub"
     mkdir -p -- "$run_dir"
 
-    say "checking r/$sub"
+    say "checking r/$sub (newest ${POSTS_PER_SUBREDDIT} posts from /new)"
 
-    gallery-dl \
+    BOINK_LOCAL_SCRIPT="$SCRIPT_DIR/boink-local.sh" gallery-dl \
         --quiet \
         --config-ignore \
         --cookies-from-browser 'firefox/reddit.com' \
         --download-archive "$STATE_DB" \
         --destination "$run_dir" \
         --post-range "1-${POSTS_PER_SUBREDDIT}" \
+        -P exec \
+        -O 'command=["{_env[BOINK_LOCAL_SCRIPT]}","--ingest","{_path}"]' \
+        -O 'event=after' \
+        -O 'output=true' \
+        -O 'verbose=false' \
         --sleep-request '2-4' \
         --sleep-429 '60' \
         --retries 4 \
@@ -199,6 +204,20 @@ stop_now() {
     say "stopping"
     process_staging || true
     exit 0
+}
+
+ingest_main() {
+    [[ $# -eq 1 ]] || die "internal --ingest expects exactly one completed file"
+
+    need_command sqlite3
+    need_command sha256sum
+    need_command stat
+    need_command od
+    need_command tr
+
+    load_config
+    init_state
+    save_candidate "$1"
 }
 
 main() {
@@ -235,5 +254,10 @@ main() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-    main "$@"
+    if [[ "${1:-}" == "--ingest" ]]; then
+        shift
+        ingest_main "$@"
+    else
+        main "$@"
+    fi
 fi
