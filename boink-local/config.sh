@@ -10,6 +10,10 @@ FILE_TYPES=(
     mp4 m4v webm mov mkv
 )
 
+# How many of the newest posts in each subreddit's /new listing to inspect per scan.
+# This is a post count, not a time window. Increase it to reach farther back.
+POSTS_PER_SUBREDDIT=100
+
 # Seconds to wait after a complete scan of all configured subreddits.
 SCAN_PAUSE_SECONDS=60
 
