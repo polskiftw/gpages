@@ -18,6 +18,10 @@ die() {
     exit 1
 }
 
+dupe() {
+    printf 'DUPE: %s\n' "$*"
+}
+
 need_command() {
     command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
 }
@@ -29,18 +33,6 @@ random_stem() {
 normalize_extension() {
     local ext="${1#.}"
     printf '%s' "${ext,,}"
-}
-
-build_filter() {
-    local ext out="" sep=""
-    for ext in "${FILE_TYPES[@]}"; do
-        ext="$(normalize_extension "$ext")"
-        [[ "$ext" =~ ^[a-z0-9]+$ ]] || die "invalid FILE_TYPES entry: $ext"
-        out+="${sep}'${ext}'"
-        sep=","
-    done
-    [[ -n "$out" ]] || die "FILE_TYPES is empty"
-    printf 'extension in (%s,)' "$out"
 }
 
 validate_subreddit() {
@@ -64,6 +56,12 @@ load_config() {
     [[ ${#SUBREDDITS[@]} -gt 0 ]] || die "SUBREDDITS is empty; edit config.sh first"
     [[ -n "${SAVE_DIR:-}" ]] || die "SAVE_DIR is empty"
 
+    local configured_ext
+    for configured_ext in "${FILE_TYPES[@]}"; do
+        configured_ext="$(normalize_extension "$configured_ext")"
+        [[ "$configured_ext" =~ ^[a-z0-9]+$ ]] || die "invalid FILE_TYPES entry: $configured_ext"
+    done
+
     if [[ "$SAVE_DIR" != /* ]]; then
         SAVE_DIR="$SCRIPT_DIR/$SAVE_DIR"
     fi
@@ -85,6 +83,11 @@ already_saved() {
     [[ "$(sqlite3 "$STATE_DB" "SELECT 1 FROM local_saved WHERE sha256='${hash}' LIMIT 1;")" == "1" ]]
 }
 
+saved_filename_for_hash() {
+    local hash="$1"
+    sqlite3 "$STATE_DB" "SELECT filename FROM local_saved WHERE sha256='${hash}' LIMIT 1;"
+}
+
 record_saved() {
     local hash="$1" filename="$2"
     sqlite3 "$STATE_DB" \
@@ -101,7 +104,7 @@ allowed_extension() {
 }
 
 save_candidate() {
-    local path="$1" name ext hash bytes stem final
+    local path="$1" name ext hash bytes stem final existing
     name="${path##*/}"
 
     [[ "$name" == *.part ]] && return 0
@@ -123,6 +126,8 @@ save_candidate() {
     bytes="$(stat -c '%s' -- "$path")" || return 1
 
     if already_saved "$hash"; then
+        existing="$(saved_filename_for_hash "$hash")"
+        dupe "${name} matches ${existing:-previously-saved media} (${bytes} bytes) - not saved"
         rm -f -- "$path"
         return 0
     fi
@@ -155,7 +160,7 @@ process_staging() {
 }
 
 scan_subreddit() {
-    local raw="$1" sub run_dir filter rc=0
+    local raw="$1" sub run_dir rc=0
     sub="$(validate_subreddit "$raw")" || {
         say "skipping invalid subreddit: $raw"
         return 0
@@ -163,7 +168,6 @@ scan_subreddit() {
 
     run_dir="$STAGING_DIR/$sub"
     mkdir -p -- "$run_dir"
-    filter="$(build_filter)"
 
     say "checking r/$sub"
 
@@ -174,12 +178,12 @@ scan_subreddit() {
         --download-archive "$STATE_DB" \
         --destination "$run_dir" \
         --post-range "1-${POSTS_PER_SUBREDDIT}" \
-        --filter "$filter" \
         --sleep-request '2-4' \
         --sleep-429 '60' \
         --retries 4 \
         --timeout 45 \
         -o 'reddit.videos=true' \
+        -o 'reddit.previews=true' \
         -o 'ytdl.enabled=true' \
         "https://www.reddit.com/r/${sub}/new/" || rc=$?
 
