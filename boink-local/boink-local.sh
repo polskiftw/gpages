@@ -163,19 +163,22 @@ process_staging() {
 }
 
 scan_subreddit() {
-    local raw="$1" sub run_dir rc=0
+    local raw="$1" sub run_dir error_log gallery_rc=0 staging_rc=0 line
     sub="$(validate_subreddit "$raw")" || {
         say "skipping invalid subreddit: $raw"
         return 0
     }
 
     run_dir="$STAGING_DIR/$sub"
+    error_log="$STAGING_DIR/.gallery-dl-${sub}.err"
     mkdir -p -- "$run_dir"
+    : > "$error_log"
 
     say "checking r/$sub (newest ${POSTS_PER_SUBREDDIT} posts from /new)"
 
     BOINK_LOCAL_SCRIPT="$SCRIPT_DIR/boink-local.sh" gallery-dl \
         --quiet \
+        --no-colors \
         --config-ignore \
         --cookies-from-browser 'firefox/reddit.com' \
         --download-archive "$STATE_DB" \
@@ -193,13 +196,27 @@ scan_subreddit() {
         -o 'reddit.videos=true' \
         -o 'reddit.previews=true' \
         -o 'ytdl.enabled=true' \
-        "https://www.reddit.com/r/${sub}/new/" || rc=$?
+        "https://www.reddit.com/r/${sub}/new/" 2>"$error_log" || gallery_rc=$?
 
-    process_staging || rc=1
+    process_staging || staging_rc=$?
 
-    if (( rc != 0 )); then
-        say "r/$sub returned an error; continuing"
+    if (( gallery_rc != 0 )); then
+        say "r/$sub gallery-dl error (exit ${gallery_rc}); continuing"
+        if [[ -s "$error_log" ]]; then
+            while IFS= read -r line; do
+                [[ -n "$line" ]] && printf 'ERROR: %s\n' "$line"
+            done < <(tail -n 8 -- "$error_log")
+        else
+            printf 'ERROR: gallery-dl returned no diagnostic text\n'
+        fi
     fi
+
+    if (( staging_rc != 0 )); then
+        say "r/$sub local processing error; continuing"
+        printf 'ERROR: one or more completed files could not be hashed, indexed, or moved into the archive\n'
+    fi
+
+    rm -f -- "$error_log"
 }
 
 stop_now() {
@@ -231,6 +248,7 @@ main() {
     need_command find
     need_command od
     need_command tr
+    need_command tail
 
     load_config
     init_state
