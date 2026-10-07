@@ -7,6 +7,7 @@ Small static browser tools hosted with GitHub Pages.
 - `/index.html` — landing page
 - `/terraria-shopping/` — Terraria Shopping acquisition planner
 - `/boolean-search/` — Boolean Search Builder
+- `/boink-local/` — manually-run local Reddit media archiver with SQLite/content dedupe
 - `/tag-harvester/` — legacy browser/bookmarklet Tag Gremlin
 - `/tag-gremlin/` — desktop Tag Gremlin CLI, SQLite harvester, and synonym-map exporter
 
