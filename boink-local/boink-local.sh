@@ -181,7 +181,7 @@ scan_subreddit() {
         --sleep-request '2-4' \
         --sleep-429 '60' \
         --retries 4 \
-        --timeout 45 \
+        --http-timeout 45 \
         -o 'reddit.videos=true' \
         -o 'reddit.previews=true' \
         -o 'ytdl.enabled=true' \
