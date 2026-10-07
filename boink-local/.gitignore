@@ -1,0 +1,4 @@
+/archive/
+/.staging/
+/state.sqlite3
+/state.sqlite3-*
