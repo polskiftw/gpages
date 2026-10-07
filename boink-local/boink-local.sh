@@ -40,7 +40,7 @@ build_filter() {
         sep=","
     done
     [[ -n "$out" ]] || die "FILE_TYPES is empty"
-    printf 'extension in (%s)' "$out"
+    printf 'extension in (%s,)' "$out"
 }
 
 validate_subreddit() {
@@ -134,7 +134,10 @@ save_candidate() {
     done
 
     mv -- "$path" "$final" || return 1
-    record_saved "$hash" "${stem}.${ext}" || return 1
+    if ! record_saved "$hash" "${stem}.${ext}"; then
+        mv -- "$final" "$path" || true
+        return 1
+    fi
     say "saved ${stem}.${ext} (${bytes} bytes)"
 }
 
@@ -165,6 +168,7 @@ scan_subreddit() {
     say "checking r/$sub"
 
     gallery-dl \
+        --quiet \
         --config-ignore \
         --cookies-from-browser 'firefox/reddit.com' \
         --download-archive "$STATE_DB" \
