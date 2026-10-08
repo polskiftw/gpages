@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 194" width="940" height="194" role="img" aria-labelledby="title desc">
+<title id="title">gpages — THE INTERNET HAS MADE A TERRIBLE MISTAKE</title>
+<desc id="desc">Ridiculous nineties-style neon flaming word art with pixel stars and a purple grid.</desc>
+<defs><linearGradient id="sky" x2="1" y2="1"><stop stop-color="#080032"/><stop offset=".52" stop-color="#500273"/><stop offset="1" stop-color="#060333"/></linearGradient>
+<linearGradient id="chrome" x2="0" y2="1"><stop stop-color="#ffffff"/><stop offset=".18" stop-color="#00f9ff"/><stop offset=".36" stop-color="#ffff54"/><stop offset=".49" stop-color="#ffffff"/><stop offset=".5" stop-color="#fe43b4"/><stop offset=".75" stop-color="#ff6900"/><stop offset="1" stop-color="#ffff20"/></linearGradient>
+<pattern id="checks" width="22" height="22" patternUnits="userSpaceOnUse"><path d="M0 11H22M11 0V22" stroke="#a15fff" opacity=".3" stroke-width="1"/></pattern></defs>
+<rect width="940" height="194" fill="url(#sky)"/><rect width="940" height="194" fill="url(#checks)"/>
+<path d="M0 171L50 138 91 169 126 105 157 159 201 86 242 162 269 130 324 176 374 91 420 162 468 100 499 178 539 118 571 169 625 106 652 167 690 117 737 174 783 112 822 173 873 126 913 176 940 144V194H0" fill="#ff5106" opacity=".95"/>
+<path d="M0 177L39 163 78 184 121 142 168 188 204 126 243 179 292 158 347 194 391 141 443 183 489 151 533 190 574 151 634 192 681 156 741 182 790 150 851 192 903 154 940 180V194H0" fill="#ffe600"/>
+<g stroke="#faff00" stroke-width="2" fill="none"><path d="M32 21v19m-10-10h20M859 27v25m-12-12h24M909 90v15m-8-8h16"/></g>
+<g fill="#76fffd"><circle cx="71" cy="108" r="3"/><circle cx="865" cy="117" r="3"/><circle cx="116" cy="30" r="2"/><circle cx="760" cy="24" r="2"/></g>
+<text x="471" y="129" text-anchor="middle" font-family="Impact,'Arial Black',sans-serif" font-weight="900" font-size="151" letter-spacing="-5" paint-order="stroke" stroke="#0a002b" stroke-width="19" fill="#140031">gpages</text>
+<text x="468" y="119" text-anchor="middle" font-family="Impact,'Arial Black',sans-serif" font-weight="900" font-size="151" letter-spacing="-5" paint-order="stroke" stroke="#ff00f0" stroke-width="8" fill="url(#chrome)">gpages</text>
+<rect x="195" y="153" width="550" height="30" fill="#080019" stroke="#00f3ff" stroke-width="3"/>
+<text x="470" y="175" text-anchor="middle" font-family="'Courier New',monospace" font-weight="bold" font-size="20" fill="#fffa2b">THE INTERNET HAS MADE A TERRIBLE MISTAKE</text>
+</svg>

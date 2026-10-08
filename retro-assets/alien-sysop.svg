@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="252" height="205" viewBox="0 0 252 205" role="img" aria-labelledby="t">
+<title id="t">A ridiculous pixel alien holding a floppy disk</title><rect width="252" height="205" fill="#0c0037"/><rect x="3" y="3" width="246" height="199" fill="none" stroke="#f0f" stroke-width="5" stroke-dasharray="15 6"/>
+<g fill="#ffec20"><path d="M16 24h13v4H16zM22 18h3v16h-3zM205 31h14v3h-14zM211 25h3v15h-3z"/></g>
+<g shape-rendering="crispEdges"><path d="M78 71h16V55h64v16h16v16h16v50h-16v16h-16v14H94v-14H78v-16H62V87h16z" fill="#65ff21" stroke="#161a11" stroke-width="5"/>
+<rect x="87" y="95" width="28" height="31" fill="#11043c"/><rect x="139" y="95" width="28" height="31" fill="#11043c"/><rect x="97" y="102" width="8" height="14" fill="#fc21ce"/><rect x="150" y="102" width="8" height="14" fill="#fc21ce"/>
+<rect x="119" y="132" width="17" height="7" fill="#095907"/>
+<rect x="99" y="167" width="19" height="27" fill="#65ff21"/><rect x="141" y="167" width="19" height="27" fill="#65ff21"/>
+<rect x="171" y="148" width="55" height="46" fill="#8989d6" stroke="#fff" stroke-width="4"/>
+<rect x="180" y="153" width="26" height="17" fill="#0d0a41"/><rect x="184" y="176" width="30" height="10" fill="#e7f5ff"/>
+</g><text x="126" y="28" text-anchor="middle" font-family="'Courier New',monospace" font-size="17" font-weight="bold" fill="#00f7ff">YOUR WEBMASTER</text>
+</svg>
