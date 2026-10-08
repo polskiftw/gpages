@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="87" viewBox="0 0 520 87" role="img" aria-labelledby="t">
+<title id="t">WARNING! UNDER PERPETUAL CONSTRUCTION</title><defs><pattern id="hazard" width="36" height="24" patternUnits="userSpaceOnUse" patternTransform="skewX(-25)"><rect width="36" height="24" fill="#ffe600"/><rect width="18" height="24" fill="#151016"/></pattern></defs>
+<rect width="520" height="87" fill="#fbed32"/><rect width="520" height="14" fill="url(#hazard)"/><rect y="73" width="520" height="14" fill="url(#hazard)"/>
+<rect x="4" y="15" width="512" height="58" fill="#ffe42b" stroke="#0b0821" stroke-width="3"/>
+<path d="M36 23L10 65h52z" fill="#ff6a00" stroke="#000" stroke-width="3"/><text x="36" y="58" font-size="25" font-weight="900" text-anchor="middle" fill="#100017">!</text>
+<text x="297" y="40" font-family="Impact,'Arial Black',sans-serif" font-size="29" text-anchor="middle" fill="#101018">UNDER PERPETUAL</text>
+<text x="296" y="64" font-family="Impact,'Arial Black',sans-serif" font-size="27" text-anchor="middle" fill="#d10b45">CONSTRUCTION !!!</text>
+</svg>

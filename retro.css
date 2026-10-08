@@ -1,0 +1,155 @@
+/* Shared 1998 visual catastrophe. Keep all application logic in its own files. */
+html.retro-tool {
+  color-scheme: dark;
+  --bg: #0a032a !important;
+  --card: #211351 !important;
+  --panel: #201049 !important;
+  --panel-2: #2b175d !important;
+  --panel-3: #371974 !important;
+  --field: #100a39 !important;
+  --text: #fffbc5 !important;
+  --muted: #d4d8ff !important;
+  --border: #04e9ff !important;
+  --border-strong: #fbeb00 !important;
+  --accent: #ffeb00 !important;
+  --accent-strong: #80ffff !important;
+  --chip: #60108b !important;
+  --good: #7eff91 !important;
+  --warn: #ffe357 !important;
+  --danger: #ff8088 !important;
+  --bad: #ff8088 !important;
+  --button: #ffea00 !important;
+  --buttonText: #120326 !important;
+  --shadow: 6px 6px 0 #fd00b0 !important;
+}
+html.retro-tool body {
+  background: #0b032b url("./retro-assets/space-tile.svg") repeat fixed !important;
+  color: #fffbc5;
+  font-family: "Comic Sans MS", "Trebuchet MS", cursive, sans-serif !important;
+  -webkit-font-smoothing: auto;
+}
+html.retro-tool body:not(.retro-chat) > main {
+  background: rgba(15, 5, 57, .95);
+  border: 6px ridge #ffef00;
+  box-shadow: 9px 9px 0 #ff00b0, -5px -5px 0 #00ffff;
+  padding: clamp(12px, 3vw, 24px);
+  margin-top: 23px;
+  margin-bottom: 28px;
+}
+html.retro-tool body:not(.retro-chat) > main::before {
+  content: "★ YOU ARE NOW ENTERING THE COMPUTER ZONE ★";
+  display: block;
+  margin: -6px -6px 22px;
+  padding: 9px 6px;
+  text-align: center;
+  border: 3px outset #fff79a;
+  background: #e900a4;
+  color: #fff;
+  font: 900 clamp(12px, 2.3vw, 20px)/1.25 "Courier New", monospace;
+  text-shadow: 2px 2px #070027;
+  letter-spacing: .03em;
+}
+html.retro-tool body:not(.retro-chat) > main::after {
+  content: "";
+  display: block;
+  margin: 26px auto 0;
+  max-width: 520px;
+  height: 85px;
+  background: url("./retro-assets/under-construction.svg") center / contain no-repeat;
+}
+html.retro-tool h1, html.retro-tool h2, html.retro-tool h3 {
+  font-family: Impact, "Arial Black", "Trebuchet MS", sans-serif !important;
+  letter-spacing: .025em !important;
+}
+html.retro-tool h1 {
+  color: #ffeb00 !important;
+  text-shadow: 3px 3px #ed00d5, -2px -2px #007bff;
+  overflow-wrap: anywhere;
+}
+html.retro-tool h1::before { content: "★ "; color: #00ffff; }
+html.retro-tool a:not(.download):not(.button):not(.btn) {
+  color: #65ffff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+html.retro-tool a:focus-visible, html.retro-tool button:focus-visible,
+html.retro-tool input:focus-visible, html.retro-tool select:focus-visible,
+html.retro-tool textarea:focus-visible { outline: 3px dashed #ffff00 !important; outline-offset: 3px; }
+html.retro-tool .card, html.retro-tool details, html.retro-tool .controls,
+html.retro-tool .panel {
+  border: 3px ridge #05f0ff !important;
+  border-radius: 0 !important;
+  box-shadow: 4px 4px 0 #f000ac !important;
+}
+html.retro-tool .card, html.retro-tool details { background-color: #211351; }
+html.retro-tool .back, html.retro-tool .version {
+  display: inline-block;
+  border: 2px dashed #ffeb00 !important;
+  border-radius: 0 !important;
+  padding: 5px 7px;
+  background: #250454;
+}
+html.retro-tool button, html.retro-tool input:not([type="checkbox"]):not([type="radio"]),
+html.retro-tool textarea, html.retro-tool select, html.retro-tool .button,
+html.retro-tool .btn, html.retro-tool .download {
+  border-radius: 0 !important;
+  border-width: 2px !important;
+  border-style: outset !important;
+  border-color: #f8f0a4 #940064 #940064 #f8f0a4 !important;
+  font-family: "Courier New", monospace !important;
+}
+html.retro-tool button, html.retro-tool .button, html.retro-tool .btn,
+html.retro-tool .download { box-shadow: 3px 3px 0 #ff00ae !important; font-weight: bold !important; }
+html.retro-tool .primary, html.retro-tool .primary-button, html.retro-tool .btn,
+html.retro-tool .download, html.retro-tool button.active {
+  background: #ffeb00 !important;
+  color: #160335 !important;
+  text-shadow: none !important;
+}
+html.retro-tool .secondary, html.retro-tool .secondary-button {
+  background: #3d146f !important;
+  color: #fff6a5 !important;
+}
+html.retro-tool .danger, html.retro-tool .danger-button { background: #a50043 !important; color: #fff !important; }
+html.retro-tool input:not([type="checkbox"]):not([type="radio"]), html.retro-tool select, html.retro-tool textarea {
+  background-color: #0e0737;
+  color: #fffbd5;
+}
+html.retro-tool input::placeholder, html.retro-tool textarea::placeholder { color: #b8a5d8; opacity: 1; }
+html.retro-tool p, html.retro-tool .subtitle, html.retro-tool .sub, html.retro-tool .hint,
+html.retro-tool .note, html.retro-tool .desc, html.retro-tool .meta,
+html.retro-tool .version, html.retro-tool .small { text-wrap: pretty; }
+html.retro-tool .subtitle, html.retro-tool .sub, html.retro-tool .desc { color: #e5dcff; }
+html.retro-tool .code, html.retro-tool pre, html.retro-tool code {
+  color: #c1fdfc;
+  overflow-wrap: anywhere;
+}
+html.retro-tool .controls { background: #2b0b59 !important; }
+/* Chat has a viewport-height layout: do not add header or change its sizing. */
+html.retro-tool .sidebar { background: #23064b !important; border-right: 5px ridge #fdef1b !important; }
+html.retro-tool .sidebar-head h1 { font-size: clamp(17px, 2.2vw, 25px); }
+html.retro-tool .topbar, html.retro-tool .control-panel, html.retro-tool .composer-wrap {
+  background: #17093a !important; border-color: #f000b1 !important;
+}
+html.retro-tool .messages { background: rgba(10, 2, 40, .90) !important; }
+html.retro-tool .message, html.retro-tool .model-menu, html.retro-tool dialog {
+  border-color: #01eeff !important;
+  box-shadow: 3px 3px 0 #f000ad;
+}
+html.retro-tool .chat-row { border-radius: 0 !important; }
+html.retro-tool .chat-row.active, html.retro-tool .model-option.active {
+  background: #68259b !important;
+}
+html.retro-tool .eyebrow { color: #85ffff !important; }
+@media (max-width: 620px) {
+  html.retro-tool body:not(.retro-chat) > main {
+    border-width: 3px; box-shadow: 3px 3px 0 #ff00b3, -3px -3px 0 #00ffff;
+    margin-top: 10px;
+  }
+  html.retro-tool body:not(.retro-chat) > main::after {height: 65px;}
+}
+@media (prefers-reduced-motion: reduce) {
+  html.retro-tool *, html.retro-tool *::before, html.retro-tool *::after {
+    scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important;
+  }
+}
