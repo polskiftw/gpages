@@ -153,3 +153,6 @@ html.retro-tool .eyebrow { color: #85ffff !important; }
     scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important;
   }
 }
+
+/* The Valheim DLL builder uses a bare #build button: give yellow a dark label. */
+html.retro-tool #build { background: #ffeb00 !important; color: #160335 !important; }
