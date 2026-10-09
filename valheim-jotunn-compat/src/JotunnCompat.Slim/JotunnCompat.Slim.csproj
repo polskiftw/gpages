@@ -32,7 +32,8 @@
       <Private>false</Private>
     </Reference>
 
-    <_ValheimManagedReference Include="$(ValheimManaged)\Assembly-CSharp.dll" />
+    <_ValheimManagedReference Include="$(ValheimManaged)\Assembly-CSharp.dll"
+                              Condition="!Exists('$(ValheimManaged)\assembly_valheim.dll')" />
     <_ValheimManagedReference Include="$(ValheimManaged)\assembly_valheim.dll"
                               Condition="Exists('$(ValheimManaged)\assembly_valheim.dll')" />
     <_ValheimManagedReference Include="$(ValheimManaged)\assembly_utils.dll"

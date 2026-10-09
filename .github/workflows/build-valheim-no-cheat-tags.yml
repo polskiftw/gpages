@@ -8,13 +8,18 @@ on:
       - 'valheim-no-cheat-tags/**'
       - 'valheim/no-cheat-tags/index.html'
       - '.github/workflows/build-valheim-no-cheat-tags.yml'
+  pull_request:
+    paths:
+      - 'valheim-no-cheat-tags/**'
+      - 'valheim/no-cheat-tags/index.html'
+      - '.github/workflows/build-valheim-no-cheat-tags.yml'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: valheim-no-cheat-tags-main
+  group: valheim-no-cheat-tags-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -87,6 +92,7 @@ jobs:
           Get-FileHash $dll -Algorithm SHA256
 
       - name: Publish No Cheat Tags
+        if: github.event_name != 'pull_request'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
