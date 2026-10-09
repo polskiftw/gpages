@@ -10,6 +10,13 @@ on:
       - 'valheim-hammer-everything/**'
       - 'valheim-jotunn-compat/**'
       - '.github/workflows/build-valheim.yml'
+  pull_request:
+    paths:
+      - 'valheim-ward-hit-sound/**'
+      - 'valheim-gear-inspector/**'
+      - 'valheim-hammer-everything/**'
+      - 'valheim-jotunn-compat/**'
+      - '.github/workflows/build-valheim.yml'
   workflow_dispatch:
 
 permissions:
@@ -121,9 +128,10 @@ jobs:
 
           $releases = Invoke-RestMethod -Uri 'https://api.github.com/repos/polskiftw/gpages/releases?per_page=100' -Headers $apiHeaders
           $managedRelease = $releases |
-            Where-Object { $_.draft -and $_.name -eq 'valheim managed binaries' } |
+            Where-Object { $_.draft -and $_.name -eq 'Valheim Debug' } |
+            Sort-Object -Property updated_at -Descending |
             Select-Object -First 1
-          if (-not $managedRelease) { throw 'Could not find draft release "valheim managed binaries".' }
+          if (-not $managedRelease) { throw 'Could not find draft release "Valheim Debug".' }
 
           $managedAsset = $managedRelease.assets |
             Where-Object { $_.name -eq 'ValheimDebug.tar.gz' } |
@@ -134,7 +142,7 @@ jobs:
               Select-Object -First 1
           }
           if (-not $managedAsset) {
-            throw 'Draft release "valheim managed binaries" contains neither ValheimDebug.tar.gz nor legacy Managed.zip.'
+            throw 'Draft release "Valheim Debug" contains neither ValheimDebug.tar.gz nor legacy Managed.zip.'
           }
           if (-not $managedAsset.digest -or -not $managedAsset.digest.StartsWith('sha256:')) {
             throw 'ValheimDebug.tar.gz does not expose a SHA-256 digest through the GitHub release API.'
@@ -156,15 +164,15 @@ jobs:
           } else {
             tar -xzf $managedZip -C $managedExtract
           }
-          $assemblyCSharp = Get-ChildItem -Path $managedExtract -Recurse -File -Filter 'Assembly-CSharp.dll' |
+          $assemblyValheim = Get-ChildItem -Path $managedExtract -Recurse -File -Filter 'assembly_valheim.dll' |
             Select-Object -First 1
-          if (-not $assemblyCSharp) {
-            throw 'ValheimDebug.tar.gz does not contain Assembly-CSharp.dll'
+          if (-not $assemblyValheim) {
+            throw 'ValheimDebug.tar.gz does not contain assembly_valheim.dll'
           }
 
-          $managedDir = $assemblyCSharp.Directory.FullName
+          $managedDir = $assemblyValheim.Directory.FullName
           foreach ($required in @(
-            'Assembly-CSharp.dll',
+            'assembly_valheim.dll',
             'SoftReferenceableAssets.dll',
             'UnityEngine.CoreModule.dll'
           )) {
@@ -429,6 +437,7 @@ jobs:
           }
 
       - name: Publish Valheim artifacts to gpages
+        if: github.event_name != 'pull_request'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'

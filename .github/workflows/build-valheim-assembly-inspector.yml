@@ -7,6 +7,10 @@ on:
     paths:
       - 'valheim-assembly-inspector/**'
       - '.github/workflows/build-valheim-assembly-inspector.yml'
+  pull_request:
+    paths:
+      - 'valheim-assembly-inspector/**'
+      - '.github/workflows/build-valheim-assembly-inspector.yml'
   workflow_dispatch:
 
 permissions:
@@ -17,7 +21,7 @@ env:
   ASSEMBLY_INSPECTOR_BUILD_RECIPE: 'net472-dotnet-build-v1'
 
 concurrency:
-  group: valheim-assembly-inspector-main
+  group: valheim-assembly-inspector-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -60,9 +64,10 @@ jobs:
 
           $releases = Invoke-RestMethod -Uri 'https://api.github.com/repos/polskiftw/gpages/releases?per_page=100' -Headers $apiHeaders
           $managedRelease = $releases |
-            Where-Object { $_.draft -and $_.name -eq 'valheim managed binaries' } |
+            Where-Object { $_.draft -and $_.name -eq 'Valheim Debug' } |
+            Sort-Object -Property updated_at -Descending |
             Select-Object -First 1
-          if (-not $managedRelease) { throw 'Could not find draft release "valheim managed binaries".' }
+          if (-not $managedRelease) { throw 'Could not find draft release "Valheim Debug".' }
 
           $managedAsset = $managedRelease.assets |
             Where-Object { $_.name -eq 'ValheimDebug.tar.gz' } |
@@ -73,7 +78,7 @@ jobs:
               Select-Object -First 1
           }
           if (-not $managedAsset) {
-            throw 'Draft release "valheim managed binaries" contains neither ValheimDebug.tar.gz nor legacy Managed.zip.'
+            throw 'Draft release "Valheim Debug" contains neither ValheimDebug.tar.gz nor legacy Managed.zip.'
           }
           if (-not $managedAsset.digest -or -not $managedAsset.digest.StartsWith('sha256:')) {
             throw 'ValheimDebug.tar.gz does not expose a SHA-256 digest through the GitHub release API.'
@@ -442,6 +447,7 @@ jobs:
           Write-Host 'Generated live bundle compiled successfully.'
 
       - name: Publish Assembly Inspector
+        if: github.event_name != 'pull_request'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'

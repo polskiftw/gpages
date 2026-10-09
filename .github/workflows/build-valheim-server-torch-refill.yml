@@ -8,6 +8,11 @@ on:
       - 'valheim-server-torch-refill/**'
       - 'valheim/server-torch-refill/index.html'
       - '.github/workflows/build-valheim-server-torch-refill.yml'
+  pull_request:
+    paths:
+      - 'valheim-server-torch-refill/**'
+      - 'valheim/server-torch-refill/index.html'
+      - '.github/workflows/build-valheim-server-torch-refill.yml'
   workflow_dispatch:
 
 permissions:
@@ -19,7 +24,7 @@ env:
   YAMLDOTNET_VERSION: '16.3.1'
 
 concurrency:
-  group: valheim-server-torch-refill-main
+  group: valheim-server-torch-refill-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -81,9 +86,10 @@ jobs:
 
           $releases = Invoke-RestMethod -Uri 'https://api.github.com/repos/polskiftw/gpages/releases?per_page=100' -Headers $apiHeaders
           $managedRelease = $releases |
-            Where-Object { $_.draft -and $_.name -eq 'valheim managed binaries' } |
+            Where-Object { $_.draft -and $_.name -eq 'Valheim Debug' } |
+            Sort-Object -Property updated_at -Descending |
             Select-Object -First 1
-          if (-not $managedRelease) { throw 'Could not find draft release "valheim managed binaries".' }
+          if (-not $managedRelease) { throw 'Could not find draft release "Valheim Debug".' }
 
           $managedAsset = $managedRelease.assets |
             Where-Object { $_.name -eq 'ValheimDebug.tar.gz' } |
@@ -94,7 +100,7 @@ jobs:
               Select-Object -First 1
           }
           if (-not $managedAsset) {
-            throw 'Draft release "valheim managed binaries" contains neither ValheimDebug.tar.gz nor legacy Managed.zip.'
+            throw 'Draft release "Valheim Debug" contains neither ValheimDebug.tar.gz nor legacy Managed.zip.'
           }
           if (-not $managedAsset.digest -or -not $managedAsset.digest.StartsWith('sha256:')) {
             throw 'ValheimDebug.tar.gz does not expose a SHA-256 digest through the GitHub release API.'
@@ -149,6 +155,7 @@ jobs:
           Get-FileHash $dll -Algorithm SHA256
 
       - name: Publish Server Torch Refill
+        if: github.event_name != 'pull_request'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
