@@ -93,6 +93,36 @@ try
         "UnityEngine.Texture2D",
         "System.Byte[]");
 
+    // Test-only cross-mod canaries for reflection-heavy gpages plugins.
+    // These contracts are used by game-facing mod code, NOT by Jotunn runtime.
+    // Without this check the plugins can compile against BepInEx stubs while
+    // silently losing their purpose when Valheim renames a private member.
+    Console.WriteLine("Checking gpages reflection-only mod contracts:");
+
+    // Ward Hit Sound Toggle: live ward discovery and effect muting.
+    RequireField(modules, "PrivateArea", "m_allAreas", isStatic: true);
+    RequireField(modules, "PrivateArea", "m_flashEffect", isStatic: false);
+    RequireMethod(modules, "ZNetScene", "GetPrefab", "System.String");
+    RequireField(modules, "EffectList", "m_effectPrefabs", isStatic: false);
+    RequireField(modules, "EffectList/EffectData", "m_prefab", isStatic: false);
+
+    // No Cheat Tags: cheating state cannot be scrubbed if this field moves.
+    var cheated = RequireField(modules, "ItemDrop/ItemData", "m_cheated", isStatic: false);
+    if (cheated.FieldType.FullName != "System.Boolean")
+    {
+        throw new InvalidDataException(
+            $"ItemDrop.ItemData.m_cheated must be Boolean; found {cheated.FieldType.FullName}.");
+    }
+    RequireField(modules, "PlayerProfile", "m_usedCheats", isStatic: false);
+    RequireMethod(modules, "PlayerProfile", "get_s_bypassCheatChecks");
+
+    // Hammer Everything: all four category hooks are required for its UI.
+    RequireAnyMethod(modules, "PieceTable", "UpdateAvailable");
+    RequireAnyMethod(modules, "ByUsagePieceList", "UpdateAvailableTags");
+    RequireAnyMethod(modules, "ByUsagePieceList", "GetTagDisplayName");
+    RequireAnyMethod(modules, "ByUsagePieceList", "GetAvailablePiecesWithTag");
+    Console.WriteLine("gpages reflection-only mod contract canaries passed.");
+
     // SoftReferenceableAssets internals used by the slim runtime asset bridge.
     RequireField(
         modules,
