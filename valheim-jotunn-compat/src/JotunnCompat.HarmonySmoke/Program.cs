@@ -27,6 +27,8 @@ namespace JotunnCompat.HarmonySmoke
     internal struct HiddenAssetLoader
     {
         internal int m_assetID;
+        internal object m_asset;
+        internal bool CallbackRan;
         private uint remaining;
 
         public uint ReferenceCount => remaining;
@@ -34,6 +36,8 @@ namespace JotunnCompat.HarmonySmoke
         public HiddenAssetLoader(int id, uint references)
         {
             m_assetID = id;
+            m_asset = new object();
+            CallbackRan = false;
             remaining = references;
         }
 
@@ -41,6 +45,12 @@ namespace JotunnCompat.HarmonySmoke
         public void Release()
         {
             if (remaining > 0) remaining--;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public void InvokeCallbacks(int result)
+        {
+            CallbackRan = result == 1 && m_asset != null;
         }
     }
 
@@ -60,6 +70,34 @@ namespace JotunnCompat.HarmonySmoke
         internal static uint LastReferenceCount = uint.MaxValue;
         internal static readonly List<uint> RegistryCounts = new List<uint>();
         internal static LoaderRegistry Registry;
+        internal static readonly object ReplacementAsset = new object();
+
+        private static void CallbackControl(int result)
+        {
+            if (result != 1) throw new InvalidOperationException("Wrong original callback arg");
+            Calls++;
+        }
+
+        // Identical to the slim runtime's existing InvokeCallbacks prefix:
+        // AssetID is a value-type field injection, while m_asset is a
+        // by-reference object field injection on an internal struct.
+        private static void CallbackFieldRef(int ___m_assetID, ref object ___m_asset, int result)
+        {
+            if (result != 1 || ___m_asset == null)
+                throw new InvalidOperationException("Invalid callback arguments");
+            LastID = ___m_assetID;
+            ___m_asset = ReplacementAsset;
+            Calls++;
+        }
+
+        private static void CallbackStructByRef(ref HiddenAssetLoader __instance, int result)
+        {
+            if (result != 1 || __instance.m_asset == null)
+                throw new InvalidOperationException("Invalid callback args");
+            LastID = __instance.m_assetID;
+            __instance.m_asset = ReplacementAsset;
+            Calls++;
+        }
 
         // These postfix signatures are intentionally minimal and independent.
         // Each is installed into a NEW process to isolate a native crash.
@@ -137,6 +175,7 @@ namespace JotunnCompat.HarmonySmoke
                 var harmony = new Harmony("test.jotunn.assetloader." + testName);
                 MethodInfo target;
                 MethodInfo postfix;
+                bool prefixPatch = false;
                 switch (testName)
                 {
                     case "class-control":
@@ -167,17 +206,45 @@ namespace JotunnCompat.HarmonySmoke
                         target = AccessTools.Method(typeof(HiddenAssetLoader), "Release");
                         postfix = Probes.Hook("RegistryLookup");
                         break;
+                    case "callback-control":
+                        target = AccessTools.Method(typeof(HiddenAssetLoader), "InvokeCallbacks");
+                        postfix = Probes.Hook("CallbackControl");
+                        prefixPatch = true;
+                        break;
+                    case "callback-field-ref":
+                        target = AccessTools.Method(typeof(HiddenAssetLoader), "InvokeCallbacks");
+                        postfix = Probes.Hook("CallbackFieldRef");
+                        prefixPatch = true;
+                        break;
+                    case "callback-struct-byref":
+                        target = AccessTools.Method(typeof(HiddenAssetLoader), "InvokeCallbacks");
+                        postfix = Probes.Hook("CallbackStructByRef");
+                        prefixPatch = true;
+                        break;
                     default:
                         throw new ArgumentException("Unknown smoke case " + testName);
                 }
 
                 File.AppendAllText(trace, "Patching " + target + " with " + postfix + Environment.NewLine);
-                harmony.Patch(target, postfix: new HarmonyMethod(postfix));
+                if (prefixPatch)
+                    harmony.Patch(target, prefix: new HarmonyMethod(postfix));
+                else
+                    harmony.Patch(target, postfix: new HarmonyMethod(postfix));
                 File.AppendAllText(trace, "Patch installed; invoking method" + Environment.NewLine);
 
                 if (testName == "class-control")
                 {
                     new TestClassLoader().Release();
+                }
+                else if (testName.StartsWith("callback-", StringComparison.Ordinal))
+                {
+                    var loader = new HiddenAssetLoader(117, 2);
+                    loader.InvokeCallbacks(1);
+                    if (!loader.CallbackRan)
+                        throw new InvalidOperationException("Original callback was not executed");
+                    if (testName != "callback-control" &&
+                        !ReferenceEquals(loader.m_asset, Probes.ReplacementAsset))
+                        throw new InvalidOperationException("Callback did not update struct asset field");
                 }
                 else if (testName == "struct-registry")
                 {
@@ -199,15 +266,14 @@ namespace JotunnCompat.HarmonySmoke
                 }
 
                 File.AppendAllText(trace, "Method returned; hooks=" + Probes.Calls + Environment.NewLine);
-                Console.WriteLine("CASE PASS " + testName + ": hook calls=" + Probes.Calls +
-                    ", assetID=" + Probes.LastID +
-                    ", referenceCount=" + Probes.LastReferenceCount);
                 if (Probes.Calls != (testName == "struct-registry" ? 2 : 1))
                 {
                     throw new InvalidOperationException("Unexpected postfix invocation count");
                 }
                 if (testName == "struct-field" || testName == "struct-mixed" ||
-                    testName == "struct-byref" || testName == "struct-registry")
+                    testName == "struct-byref" || testName == "struct-registry" ||
+                    testName == "callback-field-ref" ||
+                    testName == "callback-struct-byref")
                 {
                     if (Probes.LastID != 117)
                         throw new InvalidOperationException("Wrong injected asset id");
@@ -226,6 +292,9 @@ namespace JotunnCompat.HarmonySmoke
                         throw new InvalidOperationException(
                             "Registry lookup must reflect both 1->0 release transitions");
                 }
+                Console.WriteLine("CASE PASS " + testName + ": hook calls=" + Probes.Calls +
+                    ", assetID=" + Probes.LastID +
+                    ", referenceCount=" + Probes.LastReferenceCount);
                 return 0;
             }
             catch (Exception e)
