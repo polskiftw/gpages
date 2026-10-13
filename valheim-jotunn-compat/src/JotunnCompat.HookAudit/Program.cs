@@ -180,6 +180,18 @@ try
         {
             Console.WriteLine("ASSET CALLBACK " + signature.FullName);
         }
+        var releases = loader.Methods.Where(m => m.Name == "Release").ToArray();
+        var refCount = loader.Properties.FirstOrDefault(p => p.Name == "ReferenceCount");
+        Console.WriteLine("ASSET RELEASE candidates=" + releases.Length +
+            " refcount=" + (refCount?.PropertyType.FullName ?? "(missing)"));
+        if (releases.Length != 1 || releases[0].Parameters.Count != 0)
+        {
+            failures.Add("Expected unique AssetLoader.Release() for generic mock cleanup");
+        }
+        if (refCount?.PropertyType.FullName != "System.Int32")
+        {
+            failures.Add("AssetLoader.ReferenceCount must be Int32 for cleanup contract");
+        }
 
         // This hook is selected dynamically by AssetManager.Patches.TargetMethod.
         // Check the original private struct's injected fields explicitly; a
@@ -194,6 +206,18 @@ try
         else
         {
             tested++;
+            bool wholeStructByRef = hook.Parameters.Any(p =>
+                p.Name == "__instance" &&
+                p.ParameterType is ByReferenceType br &&
+                br.ElementType.FullName == loader.FullName);
+            Console.WriteLine("ASSET PATCH WHOLE-STRUCT BYREF: " + wholeStructByRef);
+            if (loader.IsValueType && !wholeStructByRef)
+            {
+                warnings++;
+                Console.WriteLine(
+                    "RISK: This value-type callback uses Harmony field injections " +
+                    "instead of the upstream ref AssetLoader __instance contract.");
+            }
             foreach (var param in hook.Parameters.Where(p =>
                          p.Name.StartsWith("___", StringComparison.Ordinal)))
             {
