@@ -384,17 +384,63 @@ namespace Jotunn.Managers
                 return AccessTools.Method(assetLoader, "InvokeCallbacks");
             }
 
+            // The raw game assembly declares AssetLoader as internal. Our
+            // runtime deliberately compiles against those exact assemblies
+            // (rather than publicized/rewritten copies), so keep the known
+            // working Harmony field injections for this callback.
             [HarmonyPrefix]
-            private static void Loaded(ref AssetLoader __instance, LoadResult result)
-                => Instance.OnLoaded(__instance.m_assetID, ref __instance.m_asset, result);
+            private static void Loaded(AssetID ___m_assetID, ref Object ___m_asset, LoadResult result)
+                => Instance.OnLoaded(___m_assetID, ref ___m_asset, result);
         }
 
-        [HarmonyPatch(typeof(AssetLoader), nameof(AssetLoader.Release))]
+        [HarmonyPatch]
         internal static class ReleasePatches
         {
+            private static readonly MethodInfo ReferenceCountGetter =
+                AccessTools.PropertyGetter(
+                    AccessTools.TypeByName("SoftReferenceableAssets.AssetLoader"),
+                    "ReferenceCount");
+
+            private static bool warned;
+
+            private static MethodBase TargetMethod()
+            {
+                var assetLoader = AccessTools.TypeByName("SoftReferenceableAssets.AssetLoader");
+                return AccessTools.Method(assetLoader, "Release");
+            }
+
             [HarmonyPostfix]
-            private static void Released(ref AssetLoader __instance)
-                => Instance.OnReleased(__instance.m_assetID, __instance.ReferenceCount);
+            private static void Released(AssetID ___m_assetID, object __instance)
+            {
+                // Harmony boxes the internal value type for a read-only
+                // __instance parameter. The actual reference counter is
+                // queried on that boxed snapshot AFTER Release completes.
+                // This avoids modifying the game's internal ABI or relying
+                // on a field name the game has not publicly exposed.
+                if (ReferenceCountGetter == null || __instance == null)
+                {
+                    return;
+                }
+
+                try
+                {
+                    object remaining = ReferenceCountGetter.Invoke(__instance, null);
+                    if (remaining is uint count)
+                    {
+                        Instance.OnReleased(___m_assetID, count);
+                    }
+                }
+                catch (Exception e)
+                {
+                    if (!warned)
+                    {
+                        warned = true;
+                        Logger.LogWarning(
+                            "Could not inspect AssetLoader.Release reference count: " +
+                            e.Message);
+                    }
+                }
+            }
         }
     }
 }
