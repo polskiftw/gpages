@@ -327,7 +327,10 @@ jobs:
             Copy-Item -Destination $testDir -Force
           $testExe = (Resolve-Path (Join-Path $testDir 'JotunnCompat.HarmonySmoke.exe')).Path
           $failures = @()
-          $smokeCases = @('class-control', 'struct-control', 'struct-instance', 'struct-field', 'struct-mixed', 'struct-byref')
+          # 'struct-instance' / 'struct-mixed' are isolated negative repros:
+          # object __instance into an internal value type faults with 0xc0000005.
+          # Keep them manually invocable but NEVER use that ABI in production.
+          $smokeCases = @('class-control', 'struct-control', 'struct-field', 'struct-byref', 'struct-registry')
           foreach ($scenario in $smokeCases) {
             Write-Host "==== Harmony scenario: $scenario ===="
             $outPath = Join-Path $env:RUNNER_TEMP "harmony-$scenario.stdout.txt"
