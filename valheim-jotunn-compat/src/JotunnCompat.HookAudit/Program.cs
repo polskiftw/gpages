@@ -214,10 +214,9 @@ try
             Console.WriteLine("ASSET PATCH WHOLE-STRUCT BYREF: " + wholeStructByRef);
             if (loader.IsValueType && !wholeStructByRef)
             {
-                warnings++;
-                Console.WriteLine(
-                    "RISK: This value-type callback uses Harmony field injections " +
-                    "instead of the upstream ref AssetLoader __instance contract.");
+                failures.Add(
+                    "Value-type AssetLoader callback must use ref AssetLoader __instance, " +
+                    "not separate Harmony field injections.");
             }
             foreach (var param in hook.Parameters.Where(p =>
                          p.Name.StartsWith("___", StringComparison.Ordinal)))
@@ -250,6 +249,21 @@ try
             Console.WriteLine("ASSET HOOK dynamically targets a " +
                 (loader.IsValueType ? "value-type" : "reference-type") +
                 " method; managed metadata alone cannot validate native Mono/Harmony JIT behavior.");
+        }
+
+        var releasePatchType = AllTypes(jotunn.Types).FirstOrDefault(t =>
+            t.FullName == "Jotunn.Managers.AssetManager/ReleasePatches");
+        var releasePatch = releasePatchType?.Methods.FirstOrDefault(m =>
+            m.Name == "Released" && IsAttributePresent(m, "HarmonyPostfix"));
+        bool validRelease = releasePatch != null &&
+            releasePatch.Parameters.Any(p =>
+                p.Name == "__instance" &&
+                p.ParameterType is ByReferenceType br &&
+                br.ElementType.FullName == loader.FullName);
+        Console.WriteLine("ASSET RELEASE PATCH WHOLE-STRUCT BYREF: " + validRelease);
+        if (!validRelease)
+        {
+            failures.Add("Missing upstream-equivalent AssetLoader.Release postfix with ref struct instance");
         }
     }
     else
