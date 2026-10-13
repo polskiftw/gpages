@@ -330,7 +330,10 @@ jobs:
           # 'struct-instance' / 'struct-mixed' are isolated negative repros:
           # object __instance into an internal value type faults with 0xc0000005.
           # Keep them manually invocable but NEVER use that ABI in production.
-          $smokeCases = @('class-control', 'struct-control', 'struct-field', 'struct-byref', 'struct-registry')
+          # Test the older InvokeCallbacks prefix as well. Its ref Object
+          # field injection predates this PR and is a plausible independent
+          # native-Harmony ABI risk during world generation.
+          $smokeCases = @('class-control', 'struct-control', 'struct-field', 'struct-byref', 'struct-registry', 'callback-control', 'callback-field-ref', 'callback-struct-byref')
           foreach ($scenario in $smokeCases) {
             Write-Host "==== Harmony scenario: $scenario ===="
             $outPath = Join-Path $env:RUNNER_TEMP "harmony-$scenario.stdout.txt"
