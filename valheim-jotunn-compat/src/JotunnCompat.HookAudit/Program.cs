@@ -100,9 +100,18 @@ try
             Console.WriteLine("PATCH " + patchType.FullName + "::" + patchMethod.Name +
                 " => " + original.FullName);
 
+            bool isTranspiler = IsAttributePresent(patchMethod, "HarmonyTranspiler");
             foreach (var param in patchMethod.Parameters)
             {
                 string name = param.Name;
+                if (isTranspiler &&
+                    (name == "instructions" || name == "generator" ||
+                     name == "original"))
+                {
+                    // Harmony transpiler parameters are not original method
+                    // parameters and should never be name-matched against them.
+                    continue;
+                }
                 if (name.StartsWith("___", StringComparison.Ordinal))
                 {
                     var field = target.Fields.FirstOrDefault(f => f.Name == name.Substring(3));
@@ -166,12 +175,56 @@ try
         Console.WriteLine("ASSET LOADER " +
             (loader.IsValueType ? "VALUETYPE" : "REFERENCE-TYPE") +
             " : " + loader.Module.Name);
-        var callbacks = loader.Methods
-            .Where(m => m.Name == "InvokeCallbacks")
-            .Select(m => m.FullName).ToArray();
+        var callbacks = loader.Methods.Where(m => m.Name == "InvokeCallbacks").ToArray();
         foreach (var signature in callbacks)
         {
-            Console.WriteLine("ASSET CALLBACK " + signature);
+            Console.WriteLine("ASSET CALLBACK " + signature.FullName);
+        }
+
+        // This hook is selected dynamically by AssetManager.Patches.TargetMethod.
+        // Check the original private struct's injected fields explicitly; a
+        // normal public-API probe misses field types and by-reference injection.
+        var patchedAssetType = AllTypes(jotunn.Types).FirstOrDefault(t =>
+            t.FullName == "Jotunn.Managers.AssetManager/Patches");
+        var hook = patchedAssetType?.Methods.FirstOrDefault(m => m.Name == "Loaded");
+        if (hook == null || callbacks.Length != 1)
+        {
+            failures.Add("Missing or ambiguous AssetLoader.InvokeCallbacks hook contract");
+        }
+        else
+        {
+            tested++;
+            foreach (var param in hook.Parameters.Where(p =>
+                         p.Name.StartsWith("___", StringComparison.Ordinal)))
+            {
+                string name = param.Name.Substring(3);
+                var field = loader.Fields.FirstOrDefault(f => f.Name == name);
+                if (field == null)
+                {
+                    failures.Add("Missing AssetLoader field injected by Harmony: " + name);
+                    continue;
+                }
+
+                TypeReference injectedType = param.ParameterType is ByReferenceType reference
+                    ? reference.ElementType
+                    : param.ParameterType;
+                if (injectedType.FullName != field.FieldType.FullName)
+                {
+                    failures.Add("AssetLoader field injection type mismatch for " + name +
+                        ": hook expects " + injectedType.FullName +
+                        ", runtime field is " + field.FieldType.FullName);
+                }
+                else
+                {
+                    Console.WriteLine("ASSET FIELD " + name + " : " +
+                        field.FieldType.FullName +
+                        (param.ParameterType is ByReferenceType ? " (by ref)" : ""));
+                }
+            }
+
+            Console.WriteLine("ASSET HOOK dynamically targets a " +
+                (loader.IsValueType ? "value-type" : "reference-type") +
+                " method; managed metadata alone cannot validate native Mono/Harmony JIT behavior.");
         }
     }
     else
