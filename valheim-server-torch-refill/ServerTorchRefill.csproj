@@ -10,6 +10,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Fuel-policy regression console program is a separate executable, not plugin code. -->
+    <Compile Remove="tests/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="BepInEx">
       <HintPath>lib\BepInEx.dll</HintPath>
       <Private>false</Private>

@@ -20,7 +20,7 @@ permissions:
 
 env:
   BEPINEX_PACK_VERSION: '5.4.2351'
-  SERVERSIDE_QOL_VERSION: '2.1.1'
+  SERVERSIDE_QOL_VERSION: '2.3.1'
   YAMLDOTNET_VERSION: '16.3.1'
 
 concurrency:
@@ -32,6 +32,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Test fuel arithmetic
+        shell: pwsh
+        run: dotnet run --project .\valheim-server-torch-refill\tests\FuelPolicy.Tests.csproj -c Release
 
       - name: Prepare compile references
         shell: pwsh
