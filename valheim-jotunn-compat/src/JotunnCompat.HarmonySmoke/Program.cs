@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -42,11 +44,22 @@ namespace JotunnCompat.HarmonySmoke
         }
     }
 
+    // Mirrors AssetBundleLoader's actual array-and-index registry. The
+    // registry, not Harmony's __instance argument, owns the value type.
+    internal sealed class LoaderRegistry
+    {
+        internal readonly Dictionary<int, int> m_assetIDToLoaderIndex =
+            new Dictionary<int, int>();
+        internal HiddenAssetLoader[] m_assetLoaders;
+    }
+
     internal static class Probes
     {
         internal static int Calls;
         internal static int LastID;
         internal static uint LastReferenceCount = uint.MaxValue;
+        internal static readonly List<uint> RegistryCounts = new List<uint>();
+        internal static LoaderRegistry Registry;
 
         // These postfix signatures are intentionally minimal and independent.
         // Each is installed into a NEW process to isolate a native crash.
@@ -76,6 +89,26 @@ namespace JotunnCompat.HarmonySmoke
         {
             LastID = ___m_assetID;
             BoxedInstance(__instance);
+        }
+
+        private static void RegistryLookup(int ___m_assetID)
+        {
+            // Exercise the exact reflection strategy used by the real release
+            // hook. Importantly, the postfix never receives object __instance.
+            var registry = (object)Registry;
+            var type = registry.GetType();
+            var indexMap = AccessTools.Field(type, "m_assetIDToLoaderIndex")
+                .GetValue(registry) as IDictionary;
+            var loaders = AccessTools.Field(type, "m_assetLoaders")
+                .GetValue(registry) as Array;
+            var index = (int)indexMap[___m_assetID];
+            var snapshot = loaders.GetValue(index);
+            var getter = AccessTools.PropertyGetter(
+                snapshot.GetType(), "ReferenceCount");
+            LastReferenceCount = (uint)getter.Invoke(snapshot, null);
+            LastID = ___m_assetID;
+            RegistryCounts.Add(LastReferenceCount);
+            Calls++;
         }
 
         private static void StructByReference(ref HiddenAssetLoader __instance)
@@ -130,6 +163,10 @@ namespace JotunnCompat.HarmonySmoke
                         target = AccessTools.Method(typeof(HiddenAssetLoader), "Release");
                         postfix = Probes.Hook("StructByReference");
                         break;
+                    case "struct-registry":
+                        target = AccessTools.Method(typeof(HiddenAssetLoader), "Release");
+                        postfix = Probes.Hook("RegistryLookup");
+                        break;
                     default:
                         throw new ArgumentException("Unknown smoke case " + testName);
                 }
@@ -142,6 +179,19 @@ namespace JotunnCompat.HarmonySmoke
                 {
                     new TestClassLoader().Release();
                 }
+                else if (testName == "struct-registry")
+                {
+                    var registry = new LoaderRegistry
+                    {
+                        m_assetLoaders = new[] { new HiddenAssetLoader(117, 2) }
+                    };
+                    registry.m_assetIDToLoaderIndex.Add(117, 0);
+                    Probes.Registry = registry;
+                    // Operate on the array element by reference, just as the
+                    // game's owning asset-bundle registry does.
+                    registry.m_assetLoaders[0].Release();
+                    registry.m_assetLoaders[0].Release();
+                }
                 else
                 {
                     var loader = new HiddenAssetLoader(117, 2);
@@ -152,12 +202,12 @@ namespace JotunnCompat.HarmonySmoke
                 Console.WriteLine("CASE PASS " + testName + ": hook calls=" + Probes.Calls +
                     ", assetID=" + Probes.LastID +
                     ", referenceCount=" + Probes.LastReferenceCount);
-                if (Probes.Calls != 1)
+                if (Probes.Calls != (testName == "struct-registry" ? 2 : 1))
                 {
-                    throw new InvalidOperationException("Expected exactly one postfix invocation");
+                    throw new InvalidOperationException("Unexpected postfix invocation count");
                 }
                 if (testName == "struct-field" || testName == "struct-mixed" ||
-                    testName == "struct-byref")
+                    testName == "struct-byref" || testName == "struct-registry")
                 {
                     if (Probes.LastID != 117)
                         throw new InvalidOperationException("Wrong injected asset id");
@@ -167,6 +217,14 @@ namespace JotunnCompat.HarmonySmoke
                 {
                     if (Probes.LastReferenceCount != 1)
                         throw new InvalidOperationException("Post-release reference count should equal 1");
+                }
+                if (testName == "struct-registry")
+                {
+                    if (Probes.RegistryCounts.Count != 2 ||
+                        Probes.RegistryCounts[0] != 1 ||
+                        Probes.RegistryCounts[1] != 0)
+                        throw new InvalidOperationException(
+                            "Registry lookup must reflect both 1->0 release transitions");
                 }
                 return 0;
             }
