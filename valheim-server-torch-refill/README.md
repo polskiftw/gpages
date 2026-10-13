@@ -20,7 +20,7 @@ It consumes the real fuel item accepted by each refillable `Fireplace` and moves
 ## Runtime dependency
 
 - BepInEx 5
-- ServersideQoL 2.3.0 or newer (compiled against 2.3.0)
+- ServersideQoL 2.3.1 or newer (compiled against 2.3.1)
 - The dependencies required by ServersideQoL itself (currently including ValheimModding YamlDotNet)
 
 Install only on the dedicated server. Vanilla/console clients do not need this DLL.
@@ -47,7 +47,7 @@ so the mod intentionally ignores it even though its name contains "candle".
 
 ## Fixes in v1.1.0
 
-- Rebuilt against ServersideQoL 2.3.0 and the current privately supplied
+- Rebuilt against ServersideQoL 2.3.1 and the current privately supplied
   Valheim managed-assembly snapshot, instead of the old 2.1.1 dependency.
 - Account for fractional remaining fuel with a whole-item refill: a torch with
   capacity 1 and fuel 0.2 now receives its one fuel item instead of being
