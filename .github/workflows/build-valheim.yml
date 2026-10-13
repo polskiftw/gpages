@@ -313,6 +313,14 @@ jobs:
           dotnet $checker "$env:VALHEIM_MANAGED"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Smoke-test Harmony release hook on an internal value type
+        shell: pwsh
+        run: |
+          dotnet build .\valheim-jotunn-compat\src\JotunnCompat.HarmonySmoke\JotunnCompat.HarmonySmoke.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & '.\valheim-jotunn-compat\src\JotunnCompat.HarmonySmoke\bin\Release\net472\JotunnCompat.HarmonySmoke.exe'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Build slim Jotunn runtime
         shell: pwsh
         run: |
