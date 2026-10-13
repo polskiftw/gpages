@@ -47,7 +47,7 @@ A Cecil contract checker verifies the private Valheim and SoftReferenceableAsset
 
 ## More World Locations canary
 
-More World Locations AIO 5.2.0 is the first broad compatibility canary.
+More World Locations AIO 5.2.1 is the first broad compatibility canary.
 
 CI checks every DLL in the downloaded MWL package against the source-built slim `Jotunn.dll`. The main MWL assembly currently references:
 
@@ -56,7 +56,7 @@ CI checks every DLL in the downloaded MWL package against the source-built slim 
 
 All of those references resolve against the slim build.
 
-The 5.2.0 canary additionally covers the public custom-skill types and the reflection-only `SkillManager.CustomSkills` registry used by its skill books. This proves binary/API compatibility for the exercised surface. It does not replace an actual in-game regression test; world generation, asset lifetime, networking, and other Unity runtime behavior still need live-game testing.
+The 5.2.1 canary retains coverage of the public custom-skill types and the reflection-only `SkillManager.CustomSkills` registry introduced with MWL 5.2.0. This proves binary/API compatibility for the exercised surface. It does not replace an actual in-game regression test; world generation, asset lifetime, networking, and other Unity runtime behavior still need live-game testing.
 
 ## ValheimRAFT canary
 
