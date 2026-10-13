@@ -20,6 +20,12 @@ namespace Jotunn.Managers
         public static PrefabManager Instance => instance ??= new PrefabManager();
         public static event Action OnVanillaPrefabsAvailable;
         private readonly Dictionary<string, CustomPrefab> prefabs = new Dictionary<string, CustomPrefab>();
+        // The ObjectDB passed to CopyOtherDB is the fully loaded vanilla
+        // menu database. The newly created ObjectDB is not populated yet.
+        // Retain the menu's canonical item roots for name collisions.
+        private readonly Dictionary<string, GameObject> menuItemPrefabs =
+            new Dictionary<string, GameObject>(StringComparer.Ordinal);
+        internal ObjectDB MenuObjectDB { get; private set; }
         internal GameObject PrefabContainer { get; }
 
         private PrefabManager()
@@ -32,7 +38,12 @@ namespace Jotunn.Managers
             // scene become stale after a scene transition; keeping them cached
             // can make later vanilla-prefab lookups return destroyed/null
             // objects even though the new scene has the real prefab loaded.
-            SceneManager.sceneUnloaded += _ => Cache.Clear();
+            SceneManager.sceneUnloaded += _ =>
+            {
+                Cache.Clear();
+                MenuObjectDB = null;
+                menuItemPrefabs.Clear();
+            };
         }
 
         internal bool Contains(string name) => prefabs.ContainsKey(name);
@@ -100,10 +111,56 @@ namespace Jotunn.Managers
 
         public void RemovePrefab(string name) => prefabs.Remove(name);
 
-        internal void InvokeVanilla() =>
+        internal void InvokeVanilla(ObjectDB source)
+        {
+            // Rebuild before notifying dependents, matching the upstream
+            // lifecycle: this is the already-populated vanilla ObjectDB,
+            // not the new ObjectDB which is about to copy from it.
+            MenuObjectDB = source;
+            menuItemPrefabs.Clear();
+
+            if (source && source.m_items != null)
+            {
+                foreach (var prefab in source.m_items)
+                {
+                    if (prefab && prefab.GetComponent<ItemDrop>())
+                    {
+                        menuItemPrefabs[prefab.name] = prefab;
+                    }
+                }
+            }
+
             RuntimeEventHelpers.InvokeSafely(
                 OnVanillaPrefabsAvailable,
                 nameof(OnVanillaPrefabsAvailable));
+        }
+
+        internal GameObject FindCanonicalItemPrefab(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                return null;
+            }
+
+            // During gameplay, prefer the live ObjectDB's item roots. During
+            // menu initialization its item map may still be empty, so fall
+            // back to the populated database passed to CopyOtherDB.
+            var live = ObjectDB.instance;
+            if (live)
+            {
+                var items = GameInternals.ItemByHash(live);
+                if (items != null &&
+                    items.TryGetValue(name.GetStableHashCode(), out var item) &&
+                    item && item.name == name && item.GetComponent<ItemDrop>())
+                {
+                    return item;
+                }
+            }
+
+            return menuItemPrefabs.TryGetValue(name, out var vanilla) && vanilla
+                ? vanilla
+                : null;
+        }
 
         internal void RegisterAll(ZNetScene scene)
         {
@@ -175,7 +232,7 @@ namespace Jotunn.Managers
                             var asset = soft.Asset;
                             if (asset && type.IsAssignableFrom(asset.GetType()))
                             {
-                                return asset;
+                                return PreferCanonicalItem(type, name, asset);
                             }
 
                             if (asset is GameObject go &&
@@ -200,9 +257,29 @@ namespace Jotunn.Managers
                     cache[type] = map;
                 }
 
-                return map.TryGetValue(name, out var found) && found
+                var candidate = map.TryGetValue(name, out var found) && found
                     ? found
                     : null;
+                return PreferCanonicalItem(type, name, candidate);
+            }
+
+            private static Object PreferCanonicalItem(
+                Type type,
+                string name,
+                Object candidate)
+            {
+                // A same-named scene/soft-reference GameObject can shadow a
+                // real item prefab. Only replace a non-item result when an
+                // exact-name ItemDrop prefab exists in the game's own item DB.
+                // This keeps unrelated GameObject lookups unchanged.
+                if (type != typeof(GameObject) ||
+                    candidate is GameObject go && go.GetComponent<ItemDrop>())
+                {
+                    return candidate;
+                }
+
+                var item = PrefabManager.Instance.FindCanonicalItemPrefab(name);
+                return item ? item : candidate;
             }
 
             private static Dictionary<string, Object> BuildMap(Type type)
@@ -802,7 +879,8 @@ namespace Jotunn.Managers
     {
         [HarmonyPatch(typeof(ObjectDB), nameof(ObjectDB.CopyOtherDB))]
         [HarmonyPrefix]
-        private static void ObjectDBCopyPrefix() => PrefabManager.Instance.InvokeVanilla();
+        private static void ObjectDBCopyPrefix(ObjectDB other) =>
+            PrefabManager.Instance.InvokeVanilla(other);
 
         [HarmonyPatch(typeof(ZNetScene), "Awake")]
         [HarmonyPostfix]
