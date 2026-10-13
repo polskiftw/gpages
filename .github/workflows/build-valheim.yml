@@ -313,6 +313,47 @@ jobs:
           dotnet $checker "$env:VALHEIM_MANAGED"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Smoke-test Harmony release hook on an internal value type
+        shell: pwsh
+        run: |
+          dotnet build .\valheim-jotunn-compat\src\JotunnCompat.HarmonySmoke\JotunnCompat.HarmonySmoke.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # The stand-alone test must load the *whole* 0Harmony dependency
+          # set from the same BepInEx pack used for the real Valheim build.
+          $harmony = Get-ChildItem -Path "$env:RUNNER_TEMP\bepinex" -Recurse -File -Filter '0Harmony.dll' | Select-Object -First 1
+          if (-not $harmony) { throw 'Missing downloaded Harmony runtime for smoke test' }
+          $testDir = '.\valheim-jotunn-compat\src\JotunnCompat.HarmonySmoke\bin\Release\net472'
+          Get-ChildItem -Path $harmony.Directory.FullName -File -Filter '*.dll' |
+            Copy-Item -Destination $testDir -Force
+          $testExe = (Resolve-Path (Join-Path $testDir 'JotunnCompat.HarmonySmoke.exe')).Path
+          $failures = @()
+          # 'struct-instance' / 'struct-mixed' are isolated negative repros:
+          # object __instance into an internal value type faults with 0xc0000005.
+          # Keep them manually invocable but NEVER use that ABI in production.
+          # Test the older InvokeCallbacks prefix as well. Its ref Object
+          # field injection predates this PR and is a plausible independent
+          # native-Harmony ABI risk during world generation.
+          $smokeCases = @('class-control', 'struct-control', 'struct-field', 'struct-byref', 'struct-registry', 'callback-control', 'callback-field-ref', 'callback-struct-byref')
+          foreach ($scenario in $smokeCases) {
+            Write-Host "==== Harmony scenario: $scenario ===="
+            $outPath = Join-Path $env:RUNNER_TEMP "harmony-$scenario.stdout.txt"
+            $errPath = Join-Path $env:RUNNER_TEMP "harmony-$scenario.stderr.txt"
+            $process = Start-Process -FilePath $testExe -ArgumentList $scenario -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outPath -RedirectStandardError $errPath
+            Write-Host "Scenario $scenario exit code: $($process.ExitCode)"
+            if (Test-Path $outPath) { Get-Content -Path $outPath | ForEach-Object { Write-Host $_ } }
+            if (Test-Path $errPath) { Get-Content -Path $errPath | ForEach-Object { Write-Host $_ } }
+            $tracePath = Join-Path $testDir "harmony-smoke-$scenario.txt"
+            if (Test-Path $tracePath) {
+              Get-Content -Path $tracePath | ForEach-Object { Write-Host "TRACE $_" }
+            } else {
+              Write-Host "TRACE $scenario did not enter Main or record checkpoints"
+            }
+            if ($process.ExitCode -ne 0) { $failures += $scenario }
+          }
+          if ($failures.Count -ne 0) {
+            throw "Synthetic Harmony scenarios failed: $($failures -join ', ')"
+          }
+
       - name: Build slim Jotunn runtime
         shell: pwsh
         run: |
@@ -445,6 +486,15 @@ jobs:
             if (-not (Test-Path $file)) { throw "Build output missing: $file" }
             Get-FileHash $file -Algorithm SHA256
           }
+
+      - name: Upload Jotunn candidate build for runtime verification
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: JotunnCompat-candidate
+          path: valheim-jotunn-compat/bin/Release/JotunnCompat.zip
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Publish Valheim artifacts to gpages
         if: github.event_name != 'pull_request'

@@ -216,8 +216,9 @@ try
             {
                 warnings++;
                 Console.WriteLine(
-                    "RISK: This value-type callback uses Harmony field injections " +
-                    "instead of the upstream ref AssetLoader __instance contract.");
+                    "RISK: Internal value-type AssetLoader still uses existing " +
+                    "Harmony field injections in its InvokeCallbacks prefix; " +
+                    "full struct byref is inaccessible with raw game references.");
             }
             foreach (var param in hook.Parameters.Where(p =>
                          p.Name.StartsWith("___", StringComparison.Ordinal)))
@@ -250,6 +251,45 @@ try
             Console.WriteLine("ASSET HOOK dynamically targets a " +
                 (loader.IsValueType ? "value-type" : "reference-type") +
                 " method; managed metadata alone cannot validate native Mono/Harmony JIT behavior.");
+        }
+
+        var releasePatchType = AllTypes(jotunn.Types).FirstOrDefault(t =>
+            t.FullName == "Jotunn.Managers.AssetManager/ReleasePatches");
+        var releasePatch = releasePatchType?.Methods.FirstOrDefault(m =>
+            m.Name == "Released" && IsAttributePresent(m, "HarmonyPostfix"));
+        bool hasTargetSelector = releasePatchType?.Methods.Any(m =>
+            m.Name == "TargetMethod" && m.IsStatic) ?? false;
+        // Never regress to boxing the game's internal value type through
+        // Harmony's unsafe object __instance injection. CI has reproduced
+        // an actual AccessViolationException with that signature.
+        bool safeRelease = releasePatch != null &&
+            hasTargetSelector && releasePatch.Parameters.Count == 1 &&
+            releasePatch.Parameters[0].Name == "___m_assetID" &&
+            releasePatch.Parameters[0].ParameterType.FullName ==
+                "SoftReferenceableAssets.AssetID";
+        Console.WriteLine("ASSET RELEASE PATCH FIELD-ONLY (NO __instance): " +
+            safeRelease);
+        if (!safeRelease)
+        {
+            failures.Add("Release postfix must inject only AssetID, never boxed __instance");
+        }
+
+        // The safe postfix retrieves the boxed loader via the owner registry.
+        // Verify that the private array's element type and lookup field are
+        // still available in the exact shipped game assemblies.
+        bool validRegistry = types.TryGetValue(
+            "SoftReferenceableAssets.AssetBundleLoader", out var bundleRegistry) &&
+            bundleRegistry.Fields.Any(f =>
+                f.Name == "m_assetIDToLoaderIndex" &&
+                f.FieldType.FullName.Contains("Dictionary")) &&
+            bundleRegistry.Fields.Any(f =>
+                f.Name == "m_assetLoaders" &&
+                f.FieldType is ArrayType arr &&
+                arr.ElementType.FullName == loader.FullName);
+        Console.WriteLine("ASSET RELEASE REGISTRY CONTRACT: " + validRegistry);
+        if (!validRegistry)
+        {
+            failures.Add("Release postfix cannot reflect AssetID-to-loader registry");
         }
     }
     else

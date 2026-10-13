@@ -337,6 +337,18 @@ namespace Jotunn.Managers
             if (context.Asset) asset = context.Asset;
         }
 
+        internal void OnReleased(AssetID assetID, uint remainingReferences)
+        {
+            // Match upstream Jotunn's resolved-asset lifecycle. The
+            // SoftReferenceableAssets loader owns the reference count;
+            // callbacks get a fresh resolved clone on a later reload.
+            if (remainingReferences == 0 &&
+                resolve.TryGetValue(assetID, out var context))
+            {
+                context.Release();
+            }
+        }
+
         private sealed class ResolutionContext
         {
             public Transform Parent;
@@ -351,6 +363,16 @@ namespace Jotunn.Managers
                 if (Asset is GameObject go) go.FixReferences(true);
                 Callback?.Invoke(Asset);
             }
+
+            public void Release()
+            {
+                if (Asset)
+                {
+                    Object.Destroy(Asset);
+                }
+
+                Asset = null;
+            }
         }
 
         [HarmonyPatch]
@@ -362,9 +384,101 @@ namespace Jotunn.Managers
                 return AccessTools.Method(assetLoader, "InvokeCallbacks");
             }
 
+            // The raw game assembly declares AssetLoader as internal. Our
+            // runtime deliberately compiles against those exact assemblies
+            // (rather than publicized/rewritten copies), so keep the known
+            // working Harmony field injections for this callback.
             [HarmonyPrefix]
             private static void Loaded(AssetID ___m_assetID, ref Object ___m_asset, LoadResult result)
                 => Instance.OnLoaded(___m_assetID, ref ___m_asset, result);
+        }
+
+        [HarmonyPatch]
+        internal static class ReleasePatches
+        {
+            private static readonly Type AssetLoaderType =
+                AccessTools.TypeByName("SoftReferenceableAssets.AssetLoader");
+            private static readonly Type BundleLoaderType =
+                AccessTools.TypeByName("SoftReferenceableAssets.AssetBundleLoader");
+            private static readonly MethodInfo ReferenceCountGetter =
+                AccessTools.PropertyGetter(AssetLoaderType, "ReferenceCount");
+            private static readonly FieldInfo LoaderIndexMap =
+                AccessTools.Field(BundleLoaderType, "m_assetIDToLoaderIndex");
+            private static readonly FieldInfo AssetLoaders =
+                AccessTools.Field(BundleLoaderType, "m_assetLoaders");
+
+            private static bool warned;
+
+            private static MethodBase TargetMethod() =>
+                AccessTools.Method(AssetLoaderType, "Release");
+
+            [HarmonyPostfix]
+            private static void Released(AssetID ___m_assetID)
+            {
+                // AssetLoader is an internal value type in the unmodified
+                // Valheim binaries. Harmony's object __instance injection on
+                // this struct causes a native AccessViolationException on the
+                // same Windows .NET Framework/Harmony runtime used by CI.
+                // Do not accept an object __instance here.
+                var manager = Instance;
+                if (!manager.resolve.ContainsKey(___m_assetID))
+                {
+                    return;
+                }
+
+                try
+                {
+                    // Read the current struct through the owning array instead.
+                    // Array.GetValue returns an ordinary, correctly boxed copy,
+                    // not a Harmony-generated struct-to-object argument.
+                    var registry = GameInternals.AssetLoaderObject;
+                    if (registry == null || LoaderIndexMap == null ||
+                        AssetLoaders == null || ReferenceCountGetter == null)
+                    {
+                        return;
+                    }
+
+                    var indexMap = LoaderIndexMap.GetValue(registry)
+                        as System.Collections.IDictionary;
+                    if (indexMap == null || !indexMap.Contains(___m_assetID) ||
+                        !(indexMap[___m_assetID] is int index))
+                    {
+                        return;
+                    }
+
+                    var loaders = AssetLoaders.GetValue(registry) as Array;
+                    if (loaders == null || index < 0 || index >= loaders.Length)
+                    {
+                        return;
+                    }
+
+                    var snapshot = loaders.GetValue(index);
+                    if (snapshot == null)
+                    {
+                        return;
+                    }
+
+                    var countValue = ReferenceCountGetter.Invoke(snapshot, null);
+                    if (countValue is uint unsignedCount)
+                    {
+                        manager.OnReleased(___m_assetID, unsignedCount);
+                    }
+                    else if (countValue is int signedCount && signedCount >= 0)
+                    {
+                        manager.OnReleased(___m_assetID, (uint)signedCount);
+                    }
+                }
+                catch (Exception e)
+                {
+                    if (!warned)
+                    {
+                        warned = true;
+                        Logger.LogWarning(
+                            "Could not inspect released soft-reference asset: " +
+                            e.Message);
+                    }
+                }
+            }
         }
     }
 }

@@ -39,6 +39,7 @@ namespace Jotunn
 
             Harmony.PatchAll(typeof(Managers.SlimPatches));
             Harmony.PatchAll(typeof(Managers.AssetManager.Patches));
+            Harmony.PatchAll(typeof(Managers.AssetManager.ReleasePatches));
             PatchMinimapLifecycle();
             Game.isModded = true;
         }
