@@ -8,7 +8,9 @@ A target listed here is a **canary/regression target**, never a runtime dependen
 
 Repository: `jneb802/MoreWorldLocations_All`
 
-Canary package: More World Locations AIO 5.2.0.
+Canary package: More World Locations AIO 5.2.1.
+
+The 5.2.1 release fixes static Underground Ruins stair persistence and extends the default trainer book inventories. The static binary probe still reports the same 28 Jotunn types and 94 Jotunn members as 5.2.0.
 
 MWL was compiled against an older Jotunn assembly identity, while the slim replacement exposes Jotunn 2.30.1-compatible assembly identity. The compatibility probe deliberately binds MWL's Jotunn references to the supplied slim `Jotunn.dll` independent of the compile-time Jotunn version.
 
