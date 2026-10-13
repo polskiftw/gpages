@@ -320,14 +320,41 @@ namespace Jotunn.Managers
 
         private void AddSkillOptions(Terminal.ConsoleCommand command)
         {
-            var previous = command.m_tabOptionsFetcher;
-            command.m_tabOptionsFetcher = () =>
+            // Tab-completion is optional and the field has moved/changed
+            // visibility across game revisions. The skill registry and
+            // gameplay behavior must not depend on it.
+            var optionsField = AccessTools.Field(
+                command.GetType(),
+                "m_tabOptionsFetcher");
+            if (optionsField == null)
             {
-                var options = previous?.Invoke() ?? new List<string>();
-                options.AddRange(
-                    CustomSkills.Values.Select(config => config.LocalizedName));
-                return options;
-            };
+                return;
+            }
+
+            try
+            {
+                var previous = optionsField.GetValue(command) as Delegate;
+                Func<List<string>> fetcher = () =>
+                {
+                    var options = previous?.DynamicInvoke() as List<string>
+                        ?? new List<string>();
+                    options.AddRange(
+                        CustomSkills.Values.Select(config => config.LocalizedName));
+                    return options;
+                };
+
+                var replacement = Delegate.CreateDelegate(
+                    optionsField.FieldType,
+                    fetcher.Target,
+                    fetcher.Method);
+                optionsField.SetValue(command, replacement);
+            }
+            catch (Exception exception)
+            {
+                Logger.LogDebug(
+                    "Custom skill tab-completion unavailable: " +
+                    exception.Message);
+            }
         }
 
         private static class Patches
