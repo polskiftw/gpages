@@ -259,18 +259,37 @@ try
             m.Name == "Released" && IsAttributePresent(m, "HarmonyPostfix"));
         bool hasTargetSelector = releasePatchType?.Methods.Any(m =>
             m.Name == "TargetMethod" && m.IsStatic) ?? false;
-        bool validRelease = releasePatch != null &&
-            hasTargetSelector &&
-            releasePatch.Parameters.Any(p =>
-                p.Name == "__instance" &&
-                p.ParameterType.FullName == "System.Object") &&
-            releasePatch.Parameters.Any(p =>
-                p.Name == "___m_assetID" &&
-                p.ParameterType.FullName == "SoftReferenceableAssets.AssetID");
-        Console.WriteLine("ASSET RELEASE PATCH REFLECTED INTERNAL STRUCT: " + validRelease);
-        if (!validRelease)
+        // Never regress to boxing the game's internal value type through
+        // Harmony's unsafe object __instance injection. CI has reproduced
+        // an actual AccessViolationException with that signature.
+        bool safeRelease = releasePatch != null &&
+            hasTargetSelector && releasePatch.Parameters.Count == 1 &&
+            releasePatch.Parameters[0].Name == "___m_assetID" &&
+            releasePatch.Parameters[0].ParameterType.FullName ==
+                "SoftReferenceableAssets.AssetID";
+        Console.WriteLine("ASSET RELEASE PATCH FIELD-ONLY (NO __instance): " +
+            safeRelease);
+        if (!safeRelease)
         {
-            failures.Add("Missing release postfix with boxed loader and validated AssetID field injection");
+            failures.Add("Release postfix must inject only AssetID, never boxed __instance");
+        }
+
+        // The safe postfix retrieves the boxed loader via the owner registry.
+        // Verify that the private array's element type and lookup field are
+        // still available in the exact shipped game assemblies.
+        bool validRegistry = types.TryGetValue(
+            "SoftReferenceableAssets.AssetBundleLoader", out var bundleRegistry) &&
+            bundleRegistry.Fields.Any(f =>
+                f.Name == "m_assetIDToLoaderIndex" &&
+                f.FieldType.FullName.Contains("Dictionary")) &&
+            bundleRegistry.Fields.Any(f =>
+                f.Name == "m_assetLoaders" &&
+                f.FieldType is ArrayType arr &&
+                arr.ElementType.FullName == loader.FullName);
+        Console.WriteLine("ASSET RELEASE REGISTRY CONTRACT: " + validRegistry);
+        if (!validRegistry)
+        {
+            failures.Add("Release postfix cannot reflect AssetID-to-loader registry");
         }
     }
     else
