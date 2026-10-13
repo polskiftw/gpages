@@ -337,6 +337,18 @@ namespace Jotunn.Managers
             if (context.Asset) asset = context.Asset;
         }
 
+        internal void OnReleased(AssetID assetID, uint remainingReferences)
+        {
+            // Match upstream Jotunn's resolved-asset lifecycle. The
+            // SoftReferenceableAssets loader owns the reference count;
+            // callbacks get a fresh resolved clone on a later reload.
+            if (remainingReferences == 0 &&
+                resolve.TryGetValue(assetID, out var context))
+            {
+                context.Release();
+            }
+        }
+
         private sealed class ResolutionContext
         {
             public Transform Parent;
@@ -351,6 +363,16 @@ namespace Jotunn.Managers
                 if (Asset is GameObject go) go.FixReferences(true);
                 Callback?.Invoke(Asset);
             }
+
+            public void Release()
+            {
+                if (Asset)
+                {
+                    Object.Destroy(Asset);
+                }
+
+                Asset = null;
+            }
         }
 
         [HarmonyPatch]
@@ -363,8 +385,16 @@ namespace Jotunn.Managers
             }
 
             [HarmonyPrefix]
-            private static void Loaded(AssetID ___m_assetID, ref Object ___m_asset, LoadResult result)
-                => Instance.OnLoaded(___m_assetID, ref ___m_asset, result);
+            private static void Loaded(ref AssetLoader __instance, LoadResult result)
+                => Instance.OnLoaded(__instance.m_assetID, ref __instance.m_asset, result);
+        }
+
+        [HarmonyPatch(typeof(AssetLoader), nameof(AssetLoader.Release))]
+        internal static class ReleasePatches
+        {
+            [HarmonyPostfix]
+            private static void Released(ref AssetLoader __instance)
+                => Instance.OnReleased(__instance.m_assetID, __instance.ReferenceCount);
         }
     }
 }
