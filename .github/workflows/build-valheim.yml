@@ -330,7 +330,7 @@ jobs:
 
           # First compatibility canary. Target-specific knowledge lives only in CI/tests;
           # production runtime code remains completely generic.
-          $mwlVersion = '5.1.4'
+          $mwlVersion = '5.2.0'
           $mwlUrl = "https://thunderstore.io/package/download/warpalicious/More_World_Locations_AIO/$mwlVersion/"
           $mwlZip = Join-Path $env:RUNNER_TEMP "More_World_Locations_AIO-$mwlVersion.zip"
           $mwlExtract = Join-Path $env:RUNNER_TEMP "More_World_Locations_AIO-$mwlVersion"
@@ -369,7 +369,7 @@ jobs:
           # Second compatibility canary: ValheimRAFT. Like MWL, this is test-only
           # knowledge used to expand generic Jotunn API coverage. Track the
           # current upstream release rather than an obsolete pre-Valheim-1.0 build.
-          $raftVersion = '5.0.7'
+          $raftVersion = '5.0.9'
           $raftUrl = "https://thunderstore.io/package/download/zolantris/ValheimRAFT/$raftVersion/"
           $raftZip = Join-Path $env:RUNNER_TEMP "ValheimRAFT-$raftVersion.zip"
           $raftExtract = Join-Path $env:RUNNER_TEMP "ValheimRAFT-$raftVersion"

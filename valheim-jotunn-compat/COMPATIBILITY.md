@@ -8,7 +8,7 @@ A target listed here is a **canary/regression target**, never a runtime dependen
 
 Repository: `jneb802/MoreWorldLocations_All`
 
-Canary package: More World Locations AIO 5.1.4.
+Canary package: More World Locations AIO 5.2.0.
 
 MWL was compiled against an older Jotunn assembly identity, while the slim replacement exposes Jotunn 2.30.1-compatible assembly identity. The compatibility probe deliberately binds MWL's Jotunn references to the supplied slim `Jotunn.dll` independent of the compile-time Jotunn version.
 
@@ -21,6 +21,7 @@ The current MWL binary uses a broad cross-section of Jotunn:
 - `DungeonManager`: lifecycle event, custom rooms and dungeon themes
 - `ItemManager`: custom items, status effects, item-registration lifecycle
 - `CustomPrefab`, `CustomItem`, `CustomLocation`, `CustomRoom`, `CustomStatusEffect`
+- `SkillManager`, `SkillConfig`, and reflection-compatible `CustomSkills` registry (new in the 5.2.0 skill-book feature)
 - `LocationConfig` and `RoomConfig`
 - `FixReferences` / JVLmock-style resolution
 - localization helpers
@@ -41,6 +42,7 @@ The slim runtime currently provides generic implementations for the MWL-facing s
 - custom location registration and ZoneSystem lifecycle timing
 - custom dungeon rooms and custom dungeon-theme handling
 - custom item/status-effect registration
+- custom skill registration and game lifecycle hooks
 - localization storage/application
 - JVLmock-style reference fixing
 - custom RPC registration and Jotunn-compatible package framing
@@ -49,7 +51,7 @@ The slim runtime currently provides generic implementations for the MWL-facing s
 
 ### Exact-game validation
 
-CI downloads a private draft-release `Managed.zip` made from the current Valheim `Valheim_Data/Managed` directory and verifies its pinned SHA-256 before use.
+CI downloads a private draft-release `ValheimDebug.tar.gz` containing the current Valheim `Valheim_Data/Managed` binaries and verifies its pinned SHA-256 before use.
 
 A Cecil contract checker validates the private game members and SoftReferenceableAssets internals used by our reflection/Harmony bridge before the slim runtime is compiled.
 
@@ -66,8 +68,8 @@ CI probes every DLL shipped in the MWL AIO package.
 
 For the main MWL assembly:
 
-- referenced Jotunn types: **26**
-- referenced Jotunn members: **92**
+- referenced Jotunn types: **28**
+- referenced Jotunn members: **94**
 - all referenced symbols resolve against the source-built slim `Jotunn.dll`
 
 This is a static binary/API compatibility result. It does not prove full Unity runtime behavior.
@@ -88,7 +90,7 @@ A failure found with this target must be fixed at the underlying generic Jotunn 
 
 ## ValheimRAFT
 
-Canary package: ValheimRAFT 5.0.7 (`zolantris/ValheimRAFT` on Thunderstore).
+Canary package: ValheimRAFT 5.0.9 (`zolantris/ValheimRAFT` on Thunderstore).
 
 ValheimRAFT is the second broad canary. It expands coverage beyond world-generation APIs into Jotunn's item/recipe/piece registration, GUI helpers, minimap lifecycle events, runtime texture loading, transform extensions, and network helpers.
 
@@ -112,7 +114,7 @@ The implementation remains generic: ValheimRAFT identifiers are rejected from pr
 
 ### ValheimRAFT binary compatibility status
 
-CI probes every DLL shipped in ValheimRAFT 5.0.7 against the source-built slim `Jotunn.dll`.
+CI probes every DLL shipped in ValheimRAFT 5.0.9 against the source-built slim `Jotunn.dll`.
 
 Jotunn-referencing assemblies:
 
@@ -129,7 +131,7 @@ The generic runtime has also been advanced beyond the original static milestone 
 
 ### Current-game binary validation
 
-The same CI run compiles the slim runtime against the SHA-256-pinned unpublished-draft `Managed.zip` from the current Valheim installation. The Cecil contract checker also verifies current private/version-sensitive bridges used for:
+The same CI run compiles the slim runtime against the SHA-256-pinned unpublished-draft `ValheimDebug.tar.gz` from the current Valheim installation. The Cecil contract checker also verifies current private/version-sensitive bridges used for:
 
 - `ZNet` admin-list lookup
 - `GameCamera` mouse capture/input blocking

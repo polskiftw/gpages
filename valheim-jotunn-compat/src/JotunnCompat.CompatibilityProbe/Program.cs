@@ -116,6 +116,27 @@ foreach (var member in jotunnMembers)
     }
 }
 
+// A mod may reflect on public Jotunn types rather than directly call
+// the members it needs. Validate known generic reflection contracts too,
+// so static TypeRef/MemberRef compatibility isn't mistaken for runtime parity.
+if (jotunnTypes.Any(t => t.FullName == "Jotunn.Managers.SkillManager"))
+{
+    var manager = jotunn.MainModule.GetType("Jotunn.Managers.SkillManager");
+    var registry = manager?.Fields.FirstOrDefault(f => f.Name == "CustomSkills");
+    var registryType = registry?.FieldType as GenericInstanceType;
+    if (registry == null ||
+        registry.IsStatic ||
+        registryType?.ElementType.FullName != "System.Collections.Generic.Dictionary`2" ||
+        registryType.GenericArguments.Count != 2 ||
+        registryType.GenericArguments[0].FullName != "Skills/SkillType" ||
+        registryType.GenericArguments[1].FullName != "Jotunn.Configs.SkillConfig")
+    {
+        failures.Add(
+            "REFLECTION Jotunn.Managers.SkillManager::CustomSkills must be an " +
+            "instance Dictionary<Skills.SkillType, Jotunn.Configs.SkillConfig>");
+    }
+}
+
 Console.WriteLine(
     $"Dependent assembly: {mod.Name.FullName}");
 Console.WriteLine(

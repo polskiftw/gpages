@@ -30,6 +30,7 @@ namespace Jotunn
             _ = ZoneManager.Instance;
             _ = DungeonManager.Instance;
             _ = ItemManager.Instance;
+            _ = SkillManager.Instance;
             _ = LocalizationManager.Instance;
             _ = NetworkManager.Instance;
             _ = GUIManager.Instance;

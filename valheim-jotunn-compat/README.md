@@ -22,7 +22,7 @@ The ZIP installs:
 - `BepInEx/plugins/JotunnCompat/Jotunn.dll` — our source-built slim Jotunn-compatible runtime
 - `BepInEx/plugins/JotunnCompat/YamlDotNet.dll` — localization/config parsing dependency
 
-The slim runtime implements the Jotunn-facing managers and entities needed by current compatibility targets, including prefab lookup/registration, locations, dungeons, items/status effects, recipes, pieces and piece tables, localization, custom RPCs, GUI helpers, minimap lifecycle notifications, runtime texture loading, transform/network helpers, JVLmock-style reference resolution, resource helpers, and the Valheim SoftReferenceableAssets bridge.
+The slim runtime implements the Jotunn-facing managers and entities needed by current compatibility targets, including prefab lookup/registration, locations, dungeons, items/status effects, custom skills, recipes, pieces and piece tables, localization, custom RPCs, GUI helpers, minimap lifecycle notifications, runtime texture loading, transform/network helpers, JVLmock-style reference resolution, resource helpers, and the Valheim SoftReferenceableAssets bridge.
 
 Production runtime code is generic. Canary mods may drive coverage and tests, but their names or special cases are forbidden in the runtime.
 
@@ -39,7 +39,7 @@ These are generic Jotunn behaviors, not ValheimRAFT-specific patches.
 
 ## Exact Valheim runtime validation
 
-CI compiles and validates the slim runtime against a pinned `Managed.zip` from the current Valheim installation.
+CI compiles and validates the slim runtime against the SHA-256-verified `ValheimDebug.tar.gz` private draft asset from the current Valheim installation.
 
 The draft-release asset is pinned by SHA-256 and is used only as CI input; the game binaries are never committed to this repository or copied into the public package.
 
@@ -47,20 +47,20 @@ A Cecil contract checker verifies the private Valheim and SoftReferenceableAsset
 
 ## More World Locations canary
 
-More World Locations AIO 5.1.4 is the first broad compatibility canary.
+More World Locations AIO 5.2.0 is the first broad compatibility canary.
 
 CI checks every DLL in the downloaded MWL package against the source-built slim `Jotunn.dll`. The main MWL assembly currently references:
 
-- 26 Jotunn types
-- 92 Jotunn members
+- 28 Jotunn types
+- 94 Jotunn members
 
 All of those references resolve against the slim build.
 
-This proves binary/API compatibility for the exercised surface. It does not replace an actual in-game regression test; world generation, asset lifetime, networking, and other Unity runtime behavior still need live-game testing.
+The 5.2.0 canary additionally covers the public custom-skill types and the reflection-only `SkillManager.CustomSkills` registry used by its skill books. This proves binary/API compatibility for the exercised surface. It does not replace an actual in-game regression test; world generation, asset lifetime, networking, and other Unity runtime behavior still need live-game testing.
 
 ## ValheimRAFT canary
 
-ValheimRAFT 5.0.7 is the second broad compatibility canary. CI probes every DLL in the Thunderstore package against the same source-built slim `Jotunn.dll`.
+ValheimRAFT 5.0.9 is the second broad compatibility canary. CI probes every DLL in the Thunderstore package against the same source-built slim `Jotunn.dll`.
 
 Jotunn-dependent assemblies currently resolve completely:
 
@@ -90,7 +90,7 @@ The ZIP contains the correct `BepInEx/plugins/JotunnCompat/` layout.
 CI:
 
 - rejects target-mod identifiers in production runtime source;
-- downloads and SHA-256-verifies the pinned exact Valheim `Managed.zip`;
+- downloads and SHA-256-verifies the SHA-256-verified private Valheim `ValheimDebug.tar.gz`;
 - validates every private Valheim/SoftReferenceableAssets hook used by the runtime, including current ZNet admin, GameCamera input, minimap lifecycle, and image-decoding bridges;
 - builds the slim `Jotunn.dll` against those exact managed assemblies;
 - probes every DLL in the MWL and ValheimRAFT canary packages for Jotunn symbol compatibility;
