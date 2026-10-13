@@ -325,8 +325,20 @@ jobs:
           $testDir = '.\valheim-jotunn-compat\src\JotunnCompat.HarmonySmoke\bin\Release\net472'
           Get-ChildItem -Path $harmony.Directory.FullName -File -Filter '*.dll' |
             Copy-Item -Destination $testDir -Force
-          & '.\valheim-jotunn-compat\src\JotunnCompat.HarmonySmoke\bin\Release\net472\JotunnCompat.HarmonySmoke.exe'
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $testExe = Join-Path $testDir 'JotunnCompat.HarmonySmoke.exe'
+          $outPath = Join-Path $env:RUNNER_TEMP 'harmony-smoke.stdout.txt'
+          $errPath = Join-Path $env:RUNNER_TEMP 'harmony-smoke.stderr.txt'
+          $process = Start-Process -FilePath (Resolve-Path $testExe).Path -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outPath -RedirectStandardError $errPath
+          Write-Host "Synthetic Harmony process exit code: $($process.ExitCode)"
+          if (Test-Path $outPath) { Get-Content -Path $outPath | ForEach-Object { Write-Host $_ } }
+          if (Test-Path $errPath) { Get-Content -Path $errPath | ForEach-Object { Write-Host $_ } }
+          $tracePath = Join-Path $testDir 'harmony-smoke-trace.txt'
+          if (Test-Path $tracePath) {
+            Get-Content -Path $tracePath | ForEach-Object { Write-Host "TRACE $_" }
+          } else {
+            Write-Host 'TRACE Main was not entered or test did not create a trace.'
+          }
+          if ($process.ExitCode -ne 0) { throw "Synthetic Harmony smoke process failed with exit $($process.ExitCode)" }
 
       - name: Build slim Jotunn runtime
         shell: pwsh
