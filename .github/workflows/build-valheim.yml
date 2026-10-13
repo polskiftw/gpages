@@ -446,6 +446,15 @@ jobs:
             Get-FileHash $file -Algorithm SHA256
           }
 
+      - name: Upload Jotunn candidate build for runtime verification
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: JotunnCompat-candidate
+          path: valheim-jotunn-compat/bin/Release/JotunnCompat.zip
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Publish Valheim artifacts to gpages
         if: github.event_name != 'pull_request'
         shell: pwsh
