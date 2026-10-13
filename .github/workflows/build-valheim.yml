@@ -325,20 +325,28 @@ jobs:
           $testDir = '.\valheim-jotunn-compat\src\JotunnCompat.HarmonySmoke\bin\Release\net472'
           Get-ChildItem -Path $harmony.Directory.FullName -File -Filter '*.dll' |
             Copy-Item -Destination $testDir -Force
-          $testExe = Join-Path $testDir 'JotunnCompat.HarmonySmoke.exe'
-          $outPath = Join-Path $env:RUNNER_TEMP 'harmony-smoke.stdout.txt'
-          $errPath = Join-Path $env:RUNNER_TEMP 'harmony-smoke.stderr.txt'
-          $process = Start-Process -FilePath (Resolve-Path $testExe).Path -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outPath -RedirectStandardError $errPath
-          Write-Host "Synthetic Harmony process exit code: $($process.ExitCode)"
-          if (Test-Path $outPath) { Get-Content -Path $outPath | ForEach-Object { Write-Host $_ } }
-          if (Test-Path $errPath) { Get-Content -Path $errPath | ForEach-Object { Write-Host $_ } }
-          $tracePath = Join-Path $testDir 'harmony-smoke-trace.txt'
-          if (Test-Path $tracePath) {
-            Get-Content -Path $tracePath | ForEach-Object { Write-Host "TRACE $_" }
-          } else {
-            Write-Host 'TRACE Main was not entered or test did not create a trace.'
+          $testExe = (Resolve-Path (Join-Path $testDir 'JotunnCompat.HarmonySmoke.exe')).Path
+          $failures = @()
+          $smokeCases = @('class-control', 'struct-control', 'struct-instance', 'struct-field', 'struct-mixed', 'struct-byref')
+          foreach ($scenario in $smokeCases) {
+            Write-Host "==== Harmony scenario: $scenario ===="
+            $outPath = Join-Path $env:RUNNER_TEMP "harmony-$scenario.stdout.txt"
+            $errPath = Join-Path $env:RUNNER_TEMP "harmony-$scenario.stderr.txt"
+            $process = Start-Process -FilePath $testExe -ArgumentList $scenario -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outPath -RedirectStandardError $errPath
+            Write-Host "Scenario $scenario exit code: $($process.ExitCode)"
+            if (Test-Path $outPath) { Get-Content -Path $outPath | ForEach-Object { Write-Host $_ } }
+            if (Test-Path $errPath) { Get-Content -Path $errPath | ForEach-Object { Write-Host $_ } }
+            $tracePath = Join-Path $testDir "harmony-smoke-$scenario.txt"
+            if (Test-Path $tracePath) {
+              Get-Content -Path $tracePath | ForEach-Object { Write-Host "TRACE $_" }
+            } else {
+              Write-Host "TRACE $scenario did not enter Main or record checkpoints"
+            }
+            if ($process.ExitCode -ne 0) { $failures += $scenario }
           }
-          if ($process.ExitCode -ne 0) { throw "Synthetic Harmony smoke process failed with exit $($process.ExitCode)" }
+          if ($failures.Count -ne 0) {
+            throw "Synthetic Harmony scenarios failed: $($failures -join ', ')"
+          }
 
       - name: Build slim Jotunn runtime
         shell: pwsh
