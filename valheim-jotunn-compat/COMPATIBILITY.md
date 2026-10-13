@@ -74,6 +74,27 @@ For the main MWL assembly:
 
 This is a static binary/API compatibility result. It does not prove full Unity runtime behavior.
 
+### October 13 live-game follow-up
+
+After the generic custom-skill API fix, the MWL 5.2.0 run reaches
+`LootDB and CreatureDB initialized successfully` without the earlier
+`Jotunn.Configs` type-load failure in the captured startup excerpt.
+
+The same run reports two trader-item lookups that returned GameObjects
+without `ItemDrop`, despite the current game's canonical prefab list
+identifying both as valid items. Our generic prefab cache now prefers the
+populated vanilla menu `ObjectDB` item root whenever a same-named
+non-item asset would otherwise win the lookup.
+
+The previous `MockResolver` walked primitive/obsolete Unity property
+getters even though they cannot contain Unity object mocks. The resulting
+legacy AudioSource access is a plausible cause of repeated
+`minVolume`/`maxVolume`/`rolloffFactor` error logs. The resolver now
+skips value-type members and obsolete getters generically.
+
+**Both changes still require a live-game confirmation.** This is not a
+target-mod-specific compatibility patch.
+
 ### Remaining validation
 
 The next required validation is live Valheim testing with:
