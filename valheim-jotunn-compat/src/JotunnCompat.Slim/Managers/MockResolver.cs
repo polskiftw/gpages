@@ -116,7 +116,13 @@ namespace Jotunn.Managers
             foreach (var member in GetMembers(value.GetType()))
             {
                 Type memberType = GetMemberType(member);
-                if (memberType == null || memberType == typeof(string))
+                // Scalar/value-type members cannot contain Unity object mocks.
+                // Reading Unity's obsolete AudioSource float getters has
+                // side effects (minVolume/maxVolume/rolloffFactor log errors),
+                // even when reflection exceptions are caught by this caller.
+                if (memberType == null ||
+                    memberType == typeof(string) ||
+                    memberType.IsValueType)
                 {
                     continue;
                 }
@@ -552,12 +558,16 @@ namespace Jotunn.Managers
                         .Where(field =>
                             !field.IsStatic &&
                             !field.IsLiteral &&
+                            !field.IsDefined(typeof(ObsoleteAttribute), true) &&
                             field.GetCustomAttribute<NonSerializedAttribute>() == null));
 
                     members.AddRange(current.GetProperties(flags)
                         .Where(property =>
                             property.GetIndexParameters().Length == 0 &&
-                            property.GetGetMethod(true) != null));
+                            property.GetGetMethod(true) != null &&
+                            !property.IsDefined(typeof(ObsoleteAttribute), true) &&
+                            !property.GetGetMethod(true)
+                                .IsDefined(typeof(ObsoleteAttribute), true)));
                 }
 
                 cached = members.ToArray();
