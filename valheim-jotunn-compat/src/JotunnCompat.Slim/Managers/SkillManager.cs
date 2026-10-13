@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using System.IO;
 using System.Linq;
 using BepInEx;
@@ -42,7 +44,24 @@ namespace Jotunn.Managers
                 "GetSkill",
                 "SkillsGetSkill",
                 true);
+
+            // Terminal command registration also moved in Valheim 1.0.
+            // Hook its initialization when available, not just Awake.
+            var terminalInit = AccessTools.Method(typeof(Terminal), "InitTerminal");
+            var terminalPatch = AccessTools.Method(typeof(Patches), "TerminalAwake");
+            if (terminalInit != null && terminalPatch != null)
+            {
+                Main.Harmony.Patch(
+                    terminalInit,
+                    postfix: new HarmonyMethod(terminalPatch));
+            }
         }
+
+        private static readonly FieldInfo SkillDataField =
+            AccessTools.Field(typeof(Skills), "m_skillData");
+
+        private static readonly FieldInfo CommandsField =
+            AccessTools.Field(typeof(Terminal), "commands");
 
         private static void PatchOptionalSkillMethod(
             string targetName,
@@ -208,24 +227,46 @@ namespace Jotunn.Managers
                     continue;
                 }
 
-                var skill = skills.GetSkill(config.UID);
-                if (skill == null)
+                // Valheim 1.0 removed the previous public Skills.GetSkill
+                // accessor. Retrieve the live skill from its backing data
+                // store without depending on whether the field is public.
+                var data = SkillDataField?.GetValue(skills) as IDictionary;
+                object skill = data != null && data.Contains(config.UID)
+                    ? data[config.UID]
+                    : null;
+
+                var levelField = skill == null
+                    ? null
+                    : AccessTools.Field(skill.GetType(), "m_level");
+
+                if (levelField == null)
                 {
+                    // The game can fall through to its own command handling
+                    // if this particular skill is not initialized yet.
                     return true;
                 }
 
-                skill.m_level = Mathf.Clamp(skill.m_level + amount, 0f, 100f);
-                skills.m_player.Message(
-                    MessageHud.MessageType.TopLeft,
-                    "Skill increased " + config.LocalizedName + ": " +
-                    (int)skill.m_level,
-                    0,
-                    skill.m_info.m_icon);
+                float level = Mathf.Clamp(
+                    Convert.ToSingle(levelField.GetValue(skill)) + amount,
+                    0f,
+                    100f);
+                levelField.SetValue(skill, level);
+
+                var player = Player.m_localPlayer;
+                if (player != null)
+                {
+                    player.Message(
+                        MessageHud.MessageType.TopLeft,
+                        "Skill increased " + config.LocalizedName + ": " +
+                        (int)level,
+                        0,
+                        config.Icon);
+                }
 
                 if (Console.instance != null)
                 {
                     Console.instance.Print(
-                        "Skill " + config.LocalizedName + " = " + skill.m_level);
+                        "Skill " + config.LocalizedName + " = " + level);
                 }
 
                 return false;
@@ -258,23 +299,27 @@ namespace Jotunn.Managers
 
         private void AddSkillsToTerminal()
         {
-            if (!Terminal.m_terminalInitialized || addedSkillsToTerminal)
+            if (addedSkillsToTerminal)
             {
                 return;
             }
 
+            var commands = CommandsField?.GetValue(null) as
+                IDictionary<string, Terminal.ConsoleCommand>;
+            if (commands == null ||
+                !commands.ContainsKey("raiseskill") ||
+                !commands.ContainsKey("resetskill"))
+            {
+                return;
+            }
+
+            AddSkillOptions(commands["raiseskill"]);
+            AddSkillOptions(commands["resetskill"]);
             addedSkillsToTerminal = true;
-            AddSkillOptions("raiseskill");
-            AddSkillOptions("resetskill");
         }
 
-        private void AddSkillOptions(string commandName)
+        private void AddSkillOptions(Terminal.ConsoleCommand command)
         {
-            if (!Terminal.commands.TryGetValue(commandName, out var command))
-            {
-                return;
-            }
-
             var previous = command.m_tabOptionsFetcher;
             command.m_tabOptionsFetcher = () =>
             {
