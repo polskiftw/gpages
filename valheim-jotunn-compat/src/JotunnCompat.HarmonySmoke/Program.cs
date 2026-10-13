@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using HarmonyLib;
@@ -76,10 +77,17 @@ namespace JotunnCompat.HarmonySmoke
     {
         private static int Main()
         {
+            string tracePath = Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory, "harmony-smoke-trace.txt");
+            File.WriteAllText(tracePath, "Main entered" + Environment.NewLine);
+            Console.WriteLine("Harmony smoke: entered Main");
             try
             {
+                File.AppendAllText(tracePath, "Creating Harmony instance" + Environment.NewLine);
                 var harmony = new Harmony("test.jotunn.assetloader.release");
+                File.AppendAllText(tracePath, "Installing synthetic release postfix" + Environment.NewLine);
                 harmony.PatchAll(typeof(ReleasePatch));
+                File.AppendAllText(tracePath, "Harmony patch installed" + Environment.NewLine);
 
                 var loader = new HiddenAssetLoader(117, 2);
                 loader.Release();
@@ -107,6 +115,7 @@ namespace JotunnCompat.HarmonySmoke
             }
             catch (Exception error)
             {
+                File.AppendAllText(tracePath, "EXCEPTION: " + error + Environment.NewLine);
                 Console.Error.WriteLine("Harmony smoke test FAILED: " + error);
                 return 1;
             }
