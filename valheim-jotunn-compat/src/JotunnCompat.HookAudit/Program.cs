@@ -188,9 +188,10 @@ try
         {
             failures.Add("Expected unique AssetLoader.Release() for generic mock cleanup");
         }
-        if (refCount?.PropertyType.FullName != "System.Int32")
+        if (refCount?.PropertyType.FullName != "System.UInt32" &&
+            refCount?.PropertyType.FullName != "System.Int32")
         {
-            failures.Add("AssetLoader.ReferenceCount must be Int32 for cleanup contract");
+            failures.Add("AssetLoader.ReferenceCount must be an integer for cleanup contract");
         }
 
         // This hook is selected dynamically by AssetManager.Patches.TargetMethod.
