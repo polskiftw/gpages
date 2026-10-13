@@ -30,6 +30,52 @@ namespace Jotunn.Managers
         {
             Main.LogInit("SkillManager");
             Main.Harmony.PatchAll(typeof(Patches));
+
+            // Some Valheim versions expose these methods on Skills; others
+            // move/remove them. Never abort Jotunn startup for an obsolete
+            // optional hook, but patch the instance method when available.
+            PatchOptionalSkillMethod(
+                "IsSkillValid",
+                "SkillsIsValid",
+                false);
+            PatchOptionalSkillMethod(
+                "GetSkill",
+                "SkillsGetSkill",
+                true);
+        }
+
+        private static void PatchOptionalSkillMethod(
+            string targetName,
+            string patchName,
+            bool prefix)
+        {
+            var target = AccessTools.Method(typeof(Skills), targetName);
+            var patch = AccessTools.Method(typeof(Patches), patchName);
+            if (target == null || patch == null)
+            {
+                Logger.LogDebug(
+                    "Optional custom-skill hook unavailable: Skills." + targetName);
+                return;
+            }
+
+            try
+            {
+                var harmonyMethod = new HarmonyMethod(patch);
+                if (prefix)
+                {
+                    Main.Harmony.Patch(target, prefix: harmonyMethod);
+                }
+                else
+                {
+                    Main.Harmony.Patch(target, postfix: harmonyMethod);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(
+                    "Could not attach optional Skills." + targetName +
+                    " hook: " + ex.Message);
+            }
         }
 
         public Skills.SkillType AddSkill(SkillConfig skillConfig)
@@ -248,8 +294,6 @@ namespace Jotunn.Managers
                 Instance.RegisterCustomSkills(__instance);
             }
 
-            [HarmonyPatch(typeof(Skills), nameof(Skills.IsSkillValid))]
-            [HarmonyPostfix]
             private static void SkillsIsValid(
                 Skills.SkillType type,
                 ref bool __result)
@@ -263,8 +307,6 @@ namespace Jotunn.Managers
                 }
             }
 
-            [HarmonyPatch(typeof(Skills), nameof(Skills.GetSkill))]
-            [HarmonyPrefix]
             private static void SkillsGetSkill(ref Skills.SkillType skillType)
             {
                 int number = (int)skillType;
