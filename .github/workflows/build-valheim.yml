@@ -318,6 +318,13 @@ jobs:
         run: |
           dotnet build .\valheim-jotunn-compat\src\JotunnCompat.HarmonySmoke\JotunnCompat.HarmonySmoke.csproj -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # The stand-alone test must load the *whole* 0Harmony dependency
+          # set from the same BepInEx pack used for the real Valheim build.
+          $harmony = Get-ChildItem -Path "$env:RUNNER_TEMP\bepinex" -Recurse -File -Filter '0Harmony.dll' | Select-Object -First 1
+          if (-not $harmony) { throw 'Missing downloaded Harmony runtime for smoke test' }
+          $testDir = '.\valheim-jotunn-compat\src\JotunnCompat.HarmonySmoke\bin\Release\net472'
+          Get-ChildItem -Path $harmony.Directory.FullName -File -Filter '*.dll' |
+            Copy-Item -Destination $testDir -Force
           & '.\valheim-jotunn-compat\src\JotunnCompat.HarmonySmoke\bin\Release\net472\JotunnCompat.HarmonySmoke.exe'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
