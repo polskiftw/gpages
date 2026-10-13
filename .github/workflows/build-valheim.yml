@@ -303,6 +303,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet build .\valheim-jotunn-compat\src\JotunnCompat.ValheimContractCheck\JotunnCompat.ValheimContractCheck.csproj -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build .\valheim-jotunn-compat\src\JotunnCompat.HookAudit\JotunnCompat.HookAudit.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Validate exact Valheim runtime contract
         shell: pwsh
@@ -315,6 +317,14 @@ jobs:
         shell: pwsh
         run: |
           dotnet build .\valheim-jotunn-compat\src\JotunnCompat.Slim\JotunnCompat.Slim.csproj -c Release /p:ValheimManaged="$env:VALHEIM_MANAGED"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Validate Harmony hooks against actual Valheim managed signatures
+        shell: pwsh
+        run: |
+          $audit = '.\valheim-jotunn-compat\src\JotunnCompat.HookAudit\bin\Release\net8.0\JotunnCompat.HookAudit.dll'
+          $slim = '.\valheim-jotunn-compat\src\JotunnCompat.Slim\bin\Release\net472\Jotunn.dll'
+          dotnet $audit $slim "$env:VALHEIM_MANAGED"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build Jotunn compatibility package
