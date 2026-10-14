@@ -99,6 +99,7 @@ namespace ServerTorchRefillMod
         private double _nextInGameAt;
         private int _firstWarnings;
         private int _suppressedWarnings;
+        private int _successLogs;
 
         private long _checks;
         private long _needsFuel;
@@ -122,7 +123,7 @@ namespace ServerTorchRefillMod
 
             _checks = _needsFuel = _nearbyChests = _inventoryReads = 0;
             _ownershipDelays = _transfers = _missingFuel = _scanTicks = 0;
-            _firstWarnings = _suppressedWarnings = 0;
+            _firstWarnings = _suppressedWarnings = _successLogs = 0;
             _nextSummaryAt = Time.realtimeSinceStartupAsDouble + 120.0;
             _nextInGameAt = 0.0;
 
@@ -163,7 +164,7 @@ namespace ServerTorchRefillMod
                 return ScheduleReprocessing(Mathf.Max(180f, interval));
 
             float fuel = Mathf.Max(0f, zdo.Vars.GetFuel());
-            float trigger = cfg.RefillWheneverMissing.Value ? 1f : Mathf.Clamp01(cfg.RefillBelowPercent.Value);
+            float trigger = cfg.RefillWheneverMissing.Value ? Mathf.Clamp01(cfg.RefillToPercent.Value) : Mathf.Clamp01(cfg.RefillBelowPercent.Value);
             float refillTo = Mathf.Max(trigger, Mathf.Clamp01(cfg.RefillToPercent.Value));
             float target = Mathf.Min(maxFuel, maxFuel * refillTo);
             int needed = FuelPolicy.UnitsNeeded(fuel, maxFuel, trigger, refillTo);
@@ -181,6 +182,7 @@ namespace ServerTorchRefillMod
             Vector3 pos = zdo.ZDO.GetPosition();
             ItemDrop.ItemData fuelItem = fireplace.m_fuelItem.m_itemData;
             int request = needed;
+            bool wasDark = fuel <= 0.001f;
 
             if (range <= 0f || _containers == null)
             {
@@ -287,7 +289,7 @@ namespace ServerTorchRefillMod
                     if (_warnedLights.Remove(zdo))
                         zdo.Destroyed -= OnLightDestroyed;
 
-                    if (cfg.LogRefills.Value)
+                    if (cfg.LogRefills.Value && _successLogs++ < 12)
                         Logger.LogMessage($"[Server Torch Refill] REFILLED {prefabInfo.PrefabInfo.PrefabName} " +
                             $"at {pos}: +{consumed} {fuelItem.m_shared.m_name}, now {fuel:0.##}/{maxFuel:0.##}; " +
                             $"source chest {candidate.ZDO.GetPosition()}.");
@@ -322,7 +324,7 @@ namespace ServerTorchRefillMod
             }
             else
             {
-                if (fuel > 0f)
+                if (wasDark && fuel > 0f)
                     AnnounceSuccess(peers, zdo, $"Torch Refill: lit {prefabInfo.PrefabInfo.PrefabName} from a nearby chest.");
                 if (needed == 0)
                     return ScheduleReprocessing(Mathf.Max(180f, interval));
@@ -392,7 +394,7 @@ namespace ServerTorchRefillMod
             double scanMs = _scanTicks * 1000.0 / Stopwatch.Frequency;
             Logger.LogWarning($"[Server Torch Refill] 2-minute activity: checked={_checks}, needFuel={_needsFuel}, " +
                 $"nearbyChests={_nearbyChests}, inventoryReads={_inventoryReads}, refills={_transfers}, " +
-                $"unfilled={_missingFuel}, waitingForOwnership={_ownershipDelays}, scanCPU={scanMs:0.#}ms, " +
+                $"unfilled={_missingFuel}, waitingForOwnership={_ownershipDelays}, scanTime={scanMs:0.#}ms, " +
                 $"suppressedWarnings={_suppressedWarnings}. " +
                 "If checked=0, no eligible lights were processed near players.");
 
@@ -400,6 +402,7 @@ namespace ServerTorchRefillMod
             _ownershipDelays = _transfers = _missingFuel = _scanTicks = 0;
             _suppressedWarnings = 0;
             _firstWarnings = 0;
+            _successLogs = 0;
         }
 
         private bool LooksLikeLighting(string prefabName, string localizedName)
