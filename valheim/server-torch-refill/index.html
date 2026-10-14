@@ -36,7 +36,7 @@
 
 <div class="card">
   <div class="title">Default behavior</div>
-  <p class="meta"><strong>Storage range:</strong> 10 m<br><strong>Refill trigger:</strong> 25% fuel or lower<br><strong>Refill toward:</strong> 100%<br><strong>Fuel left behind:</strong> 0<br><strong>Fallback check:</strong> every 30 seconds, plus immediate checks after nearby chest changes<br><strong>Server logging:</strong> successful fuel transfers logged by default; optional first-skip diagnostics<br><strong>Open chests:</strong> never modified<br><strong>Fuel type:</strong> read from each Fireplace's real <code>m_fuelItem</code>; never hardcoded</p>
+  <p class="meta"><strong>Storage range:</strong> 10 m<br><strong>Refill trigger:</strong> whenever missing (including newly placed torches)<br><strong>Refill toward:</strong> 100%<br><strong>Fuel left behind:</strong> 0<br><strong>Check cadence:</strong> 30s for unlit lights that need fuel; 60s+ for partially-lit blocked lights; 180s+ for full lights<br><strong>Diagnostics:</strong> warnings in console by default, 2-minute workload summaries, and rate-limited in-game notices<br><strong>Open chests:</strong> never modified<br><strong>Fuel type:</strong> read from each Fireplace's real <code>m_fuelItem</code>; never hardcoded</p>
 </div>
 
 <div class="card">
@@ -46,7 +46,17 @@
 
 <div class="card">
   <div class="title">Quick test and diagnostics</div>
-  <p class="meta">The default 25% threshold means a newly placed ground torch at 2/6 fuel (33%) is not yet eligible. For an immediate test, place resin in a <strong>closed, non-private chest within 10 m</strong> of a partly empty ground torch and temporarily set <code>RefillBelowPercent = 1</code> in the server config. Wait up to 30 seconds. Successful transfers are logged on the server. If nothing happens, set <code>DiagnosticLogs = true</code> to log a one-time reason per checked light. Config may be unified or per-world if ServersideQoL is configured that way.</p>
+  <p class="meta"><strong>No settings changes required.</strong> Put resin in a <strong>closed, normal (non-private) chest within 10 m</strong> of a ground torch, then start the server. Newly placed torches should refill automatically. Watch the dedicated server console or <code>BepInEx/LogOutput.log</code> for <code>[Server Torch Refill]</code>. You will see startup, successful transfers, explicit <code>NOT REFILLED</code> reasons, and workload summaries automatically. Failed refills on completely dark lights can also show a nearby in-game message (rate limited).</p>
+</div>
+
+<div class="card">
+  <div class="title">Where is the configuration file?</div>
+  <p class="meta">It's on the <strong>dedicated server, not this website or your game client</strong>. Standard location: <code>&lt;Valheim server root&gt;/BepInEx/config/claire.valheim.servertorchrefill.cfg</code>, under <code>[General]</code>. The server's startup console warning prints the <strong>exact actual path</strong> (which can differ if ServersideQoL uses unified or per-world configuration). The new setting <code>RefillWheneverMissing = true</code> is on by default, even with your old 25% threshold still in the file. Restart the server after replacing the DLL.</p>
+</div>
+
+<div class="card">
+  <div class="title">Performance changes in v1.2</div>
+  <p class="meta">No repeated 0.1-second chest-ownership retry loop. No global item-by-item chest index or chest-change flood. Nearby chest inventories are only read if a light actually needs fuel. Full lights are checked infrequently, and in-game/console diagnostics are rate-limited. The 2-minute console summary includes inventory scan counts and CPU time to help confirm behavior on your world.</p>
 </div>
 
 <div class="card">
@@ -55,7 +65,7 @@
 </div>
 
 <div class="card">
-  <p class="meta"><strong>Plugin:</strong> Server Torch Refill 1.1.0<br><strong>BepInEx GUID:</strong> <code>claire.valheim.servertorchrefill</code><br><strong>Config:</strong> <code>BepInEx/config/claire.valheim.servertorchrefill.cfg</code> unless ServersideQoL unified/per-world config is enabled<br><strong>Required server framework:</strong> ServersideQoL 2.3.1+<br><strong>Client install:</strong> none</p>
+  <p class="meta"><strong>Plugin:</strong> Server Torch Refill 1.2.0<br><strong>BepInEx GUID:</strong> <code>claire.valheim.servertorchrefill</code><br><strong>Config:</strong> <code>BepInEx/config/claire.valheim.servertorchrefill.cfg</code> unless ServersideQoL unified/per-world config is enabled<br><strong>Required server framework:</strong> ServersideQoL 2.3.1+<br><strong>Client install:</strong> none</p>
 </div>
 </main>
 <script>
