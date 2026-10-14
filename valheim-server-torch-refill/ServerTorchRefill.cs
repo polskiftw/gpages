@@ -5,6 +5,7 @@ using ServersideQoL.Processors;
 using ServersideQoL.Utilities;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using UnityEngine;
 
@@ -15,7 +16,7 @@ namespace ServerTorchRefillMod
     {
         public const string PluginGuid = "claire.valheim.servertorchrefill";
         public const string PluginName = "Server Torch Refill";
-        public const string PluginVersion = "1.1.0";
+        public const string PluginVersion = "1.2.0";
 
         protected override ModConfig CreateConfigSingleton(ConfigFile configFile, ServersideQoL.Logger logger)
             => new ModConfig(configFile, logger);
@@ -28,6 +29,7 @@ namespace ServerTorchRefillMod
     {
         public override ConfigEntry<bool> Enabled { get; }
         public ConfigEntry<float> Range { get; }
+        public ConfigEntry<bool> RefillWheneverMissing { get; }
         public ConfigEntry<float> RefillBelowPercent { get; }
         public ConfigEntry<float> RefillToPercent { get; }
         public ConfigEntry<int> LeaveFuelInContainer { get; }
@@ -36,58 +38,50 @@ namespace ServerTorchRefillMod
         public ConfigEntry<string> LightingNameTokens { get; }
         public ConfigEntry<bool> LogRefills { get; }
         public ConfigEntry<bool> DiagnosticLogs { get; }
+        public ConfigEntry<bool> AnnounceInGame { get; }
 
         public ModConfig(ConfigFile cfg, ServersideQoL.Logger logger) : base(cfg, logger)
         {
-            Enabled = BindEx(
-                cfg,
-                true,
-                "Enables/disables Server Torch Refill.");
+            Enabled = BindEx(cfg, true,
+                "Enable server-side refilling.");
 
-            Range = BindEx(
-                cfg,
-                10f,
-                "Maximum distance in metres between a light and a storage container used as its fuel source. Set to 0 to disable refilling.");
+            Range = BindEx(cfg, 10f,
+                "Maximum distance in metres from a fireplace to a source chest. 0 disables refilling.");
 
-            RefillBelowPercent = BindEx(
-                cfg,
-                0.25f,
-                "Start refilling when current fuel is at or below this fraction of capacity. Values are clamped to 0..1.");
+            // A NEW setting, deliberately default true even for existing v1.1 config files.
+            // This avoids carrying forward the old 25% default that makes fresh torches seem broken.
+            RefillWheneverMissing = BindEx(cfg, true,
+                "Refill any eligible torch with room for at least one fuel item. This overrides RefillBelowPercent unless set false.");
 
-            RefillToPercent = BindEx(
-                cfg,
-                1f,
-                "Refill toward this fraction of the light's capacity. Values are clamped to 0..1 and never below RefillBelowPercent.");
+            RefillBelowPercent = BindEx(cfg, 0.25f,
+                "Legacy low-fuel trigger (0..1), used only when RefillWheneverMissing is false.");
 
-            LeaveFuelInContainer = BindEx(
-                cfg,
-                0,
-                "Minimum number of matching fuel items to leave behind across each candidate container.");
+            RefillToPercent = BindEx(cfg, 1f,
+                "Refill to this fraction of capacity (0..1).");
 
-            CheckIntervalSeconds = BindEx(
-                cfg,
-                30f,
-                "Fallback interval in seconds between checks. Nearby container changes also wake affected lights immediately.");
+            LeaveFuelInContainer = BindEx(cfg, 0,
+                "How many matching items to leave in each source chest.");
 
-            IncludeAllFireplaces = BindEx(
-                cfg,
-                false,
-                "If true, refill every refillable Fireplace (including campfires/hearths/bonfires). If false, only names matching LightingNameTokens are handled.");
+            CheckIntervalSeconds = BindEx(cfg, 30f,
+                "Minimum retry period in seconds when a torch needs fuel. Full torches are checked much less often, and chest ownership retries are never fast-loops.");
 
-            LightingNameTokens = BindEx(
-                cfg,
+            IncludeAllFireplaces = BindEx(cfg, false,
+                "If true, also refill campfires, hearths, and other refillable fireplaces.");
+
+            LightingNameTokens = BindEx(cfg,
                 "torch,sconce,brazier,candle,jackoturnip,lantern",
-                "Comma-separated case-insensitive prefab/localization-name fragments used to identify lighting when IncludeAllFireplaces is false. Fuel type is never inferred from these names; the Fireplace's real m_fuelItem is always used.");
+                "Comma-separated prefab/name fragments used to identify lighting. Actual fuel type comes from the Fireplace component.");
 
-            LogRefills = BindEx(
-                cfg,
-                true,
-                "Log a short message to the server console every time fuel is actually transferred.");
+            LogRefills = BindEx(cfg, true,
+                "Log successful fuel transfers in server console.");
 
-            DiagnosticLogs = BindEx(
-                cfg,
-                false,
-                "Log the first decision for each light (above threshold, no eligible fuel storage, or waiting for ownership). Useful for troubleshooting; restart or reload config to repeat diagnostics.");
+            // Preserved for old config compatibility, but skipped-refill reasons are
+            // ALWAYS logged (bounded), regardless of the value of DiagnosticLogs.
+            DiagnosticLogs = BindEx(cfg, false,
+                "Enable additional fine-grained diagnostic logs. Basic missing-fuel warnings, activity reports, and startup messages are always on.");
+
+            AnnounceInGame = BindEx(cfg, true,
+                "Send at most one nearby vanilla-client message every 90s for unlit lights that cannot refuel, plus sparse success notices. Does not require a client mod.");
         }
     }
 
@@ -95,26 +89,48 @@ namespace ServerTorchRefillMod
     [RunAfter<ContainerRegistryProcessor>]
     public sealed class TorchRefillProcessor : Processor<ProcessorPrefabInfo<Fireplace>>
     {
-        private SectorDictionary<SharedItemDataKey, HashSet<ServersideQoLZDO>> _containersByItemName;
-        private SectorDictionary<HashSet<ServersideQoLZDO>> _lights;
+        // A spatial chest-only index, not a global item index. Index construction
+        // does NOT deserialize the inventory of every registered chest.
+        private SectorDictionary<HashSet<ServersideQoLZDO>> _containers;
         private string[] _lightingTokens = Array.Empty<string>();
-        private readonly HashSet<ServersideQoLZDO> _loggedDiagnostics = new HashSet<ServersideQoLZDO>();
+        private readonly HashSet<ServersideQoLZDO> _warnedLights = new HashSet<ServersideQoLZDO>();
+
+        private double _nextSummaryAt;
+        private double _nextInGameAt;
+        private int _firstWarnings;
+        private int _suppressedWarnings;
+
+        private long _checks;
+        private long _needsFuel;
+        private long _nearbyChests;
+        private long _inventoryReads;
+        private long _ownershipDelays;
+        private long _transfers;
+        private long _missingFuel;
+        private long _scanTicks;
 
         protected override void Initialize()
         {
-            ContainerRegistryProcessor registry = Instance<ContainerRegistryProcessor>();
-            registry.ContainerChanged -= OnContainerChanged;
-            foreach (ServersideQoLZDO traced in _loggedDiagnostics)
-                traced.Destroyed -= OnTracedDestroyed;
-            _loggedDiagnostics.Clear();
+            foreach (ServersideQoLZDO light in _warnedLights)
+                light.Destroyed -= OnLightDestroyed;
+            _warnedLights.Clear();
 
-            float sectorWidth = Mathf.Max(1f, ModConfig.Instance.Range.Value);
-            _lights = new SectorDictionary<HashSet<ServersideQoLZDO>>(sectorWidth);
-            _containersByItemName = registry.GetContainersByItemName(_lights.SectorWidth);
-            _lightingTokens = ParseTokens(ModConfig.Instance.LightingNameTokens.Value);
+            ModConfig cfg = ModConfig.Instance;
+            _containers = Instance<ContainerRegistryProcessor>()
+                .GetContainers(Mathf.Max(1f, cfg.Range.Value));
+            _lightingTokens = ParseTokens(cfg.LightingNameTokens.Value);
 
-            registry.ContainerChanged += OnContainerChanged;
-            Logger.LogInfo($"Server Torch Refill {ServerTorchRefillPlugin.PluginVersion} initialized: range {ModConfig.Instance.Range.Value:0.##} m, threshold {ModConfig.Instance.RefillBelowPercent.Value:P0}, interval {ModConfig.Instance.CheckIntervalSeconds.Value:0.##} s.");
+            _checks = _needsFuel = _nearbyChests = _inventoryReads = 0;
+            _ownershipDelays = _transfers = _missingFuel = _scanTicks = 0;
+            _firstWarnings = _suppressedWarnings = 0;
+            _nextSummaryAt = Time.realtimeSinceStartupAsDouble + 120.0;
+            _nextInGameAt = 0.0;
+
+            // Warning level intentionally bypasses BepInEx Info/Debug filters.
+            Logger.LogWarning($"[Server Torch Refill v1.2.0] RUNNING. Config: {cfg.ConfigFile.ConfigFilePath}. " +
+                $"Range={cfg.Range.Value:0.#}m; refill whenever missing={cfg.RefillWheneverMissing.Value}; " +
+                "fuel-transfer and missing-source messages are enabled by default. " +
+                "No client installation required.");
         }
 
         protected override ProcessResult Process(
@@ -125,189 +141,269 @@ namespace ServerTorchRefillMod
             ModConfig cfg = ModConfig.Instance;
             Fireplace fireplace = prefabInfo.Component;
 
-            if (!cfg.Enabled.Value ||
-                fireplace == null ||
+            // Non-fuelled/non-refillable decorative candles are intentionally excluded.
+            if (!cfg.Enabled.Value || fireplace == null ||
                 fireplace.m_fuelItem == null ||
                 fireplace.m_fuelItem.m_itemData == null ||
                 fireplace.m_fuelItem.m_itemData.m_shared == null ||
                 fireplace.m_maxFuel <= 0f ||
-                fireplace.m_infiniteFuel ||
-                !fireplace.m_canRefill)
-            {
+                fireplace.m_infiniteFuel || !fireplace.m_canRefill)
                 return ProcessResult.UnregisterProcessor;
-            }
 
             if (!cfg.IncludeAllFireplaces.Value &&
                 !LooksLikeLighting(prefabInfo.PrefabInfo.PrefabName, fireplace.m_name))
-            {
                 return ProcessResult.UnregisterProcessor;
-            }
 
-            _lights?.TryAdd(zdo);
+            MaybeWriteSummary();
+            _checks++;
 
-            float interval = Mathf.Max(5f, cfg.CheckIntervalSeconds.Value);
-            ProcessResult result = ScheduleReprocessing(interval);
-
-            float range = Mathf.Max(0f, cfg.Range.Value);
-            if (range <= 0f || _containersByItemName == null)
-                return result;
-
+            float interval = Mathf.Max(30f, cfg.CheckIntervalSeconds.Value);
             float maxFuel = zdo.Fields<Fireplace>().GetFloat(static () => x => x.m_maxFuel);
             if (maxFuel <= 0f)
-                return result;
+                return ScheduleReprocessing(Mathf.Max(180f, interval));
 
-            float currentFuel = Mathf.Max(0f, zdo.Vars.GetFuel());
-            float refillBelow = Mathf.Clamp01(cfg.RefillBelowPercent.Value);
-            float refillTo = Mathf.Max(refillBelow, Mathf.Clamp01(cfg.RefillToPercent.Value));
-            float targetFuel = Mathf.Min(maxFuel, maxFuel * refillTo);
-            int fuelNeeded = FuelPolicy.UnitsNeeded(currentFuel, maxFuel, refillBelow, refillTo);
-            if (fuelNeeded <= 0)
+            float fuel = Mathf.Max(0f, zdo.Vars.GetFuel());
+            float trigger = cfg.RefillWheneverMissing.Value ? 1f : Mathf.Clamp01(cfg.RefillBelowPercent.Value);
+            float refillTo = Mathf.Max(trigger, Mathf.Clamp01(cfg.RefillToPercent.Value));
+            float target = Mathf.Min(maxFuel, maxFuel * refillTo);
+            int needed = FuelPolicy.UnitsNeeded(fuel, maxFuel, trigger, refillTo);
+
+            if (needed <= 0)
             {
-                LogDiagnosticOnce(zdo, $"{prefabInfo.PrefabInfo.PrefabName} at {zdo.ZDO.GetPosition()}: fuel {currentFuel:0.##}/{maxFuel:0.##} is above the {refillBelow:P0} trigger (or already at target).");
-                return result;
+                // Full / not eligible: do not search ANY inventory and do not
+                // run again every 30 s. ZDO changes are still processed promptly
+                // by the framework's changed-object tracking.
+                return ScheduleReprocessing(Mathf.Max(180f, interval));
             }
 
+            _needsFuel++;
+            float range = Mathf.Max(0f, cfg.Range.Value);
+            Vector3 pos = zdo.ZDO.GetPosition();
             ItemDrop.ItemData fuelItem = fireplace.m_fuelItem.m_itemData;
-            Vector3 lightPosition = zdo.ZDO.GetPosition();
-            float rangeSqr = range * range;
-            ContainerRegistryProcessor registry = Instance<ContainerRegistryProcessor>();
-            bool waitingForOwnership = false;
-            int totalAdded = 0;
+            int request = needed;
 
-            foreach (HashSet<ServersideQoLZDO> containers in
-                     _containersByItemName.EnumerateAdjacent((lightPosition, fuelItem.m_shared)))
+            if (range <= 0f || _containers == null)
             {
-                foreach (ServersideQoLZDO containerZdo in containers)
+                WarnOnce(zdo, $"No fuel lookup: Range={range:0.#}m is disabled or the chest index is unavailable.");
+                AnnounceFailure(peers, zdo, fuel, "Torch Refill: no chest range configured");
+                return ScheduleReprocessing(Mathf.Max(60f, interval));
+            }
+
+            long start = Stopwatch.GetTimestamp();
+            ContainerRegistryProcessor registry = Instance<ContainerRegistryProcessor>();
+            float rangeSqr = range * range;
+            int nearby = 0;
+            int open = 0;
+            int matching = 0;
+            int reserved = 0;
+            int awaitingOwnership = 0;
+            int addedTotal = 0;
+
+            foreach (HashSet<ServersideQoLZDO> group in _containers.EnumerateAdjacent(pos))
+            {
+                foreach (ServersideQoLZDO candidate in group)
                 {
-                    if (fuelNeeded <= 0)
+                    if (needed <= 0)
                         break;
 
-                    ContainerState containerState = registry.GetState(containerZdo);
-                    if (containerState == null)
+                    if (Utils.DistanceSqr(pos, candidate.ZDO.GetPosition()) > rangeSqr)
                         continue;
 
-                    // Never mutate a chest while a player has it open.
-                    if (containerZdo.Vars.GetInUse())
+                    ContainerState state = registry.GetState(candidate);
+                    if (state == null)
                         continue;
 
-                    if (Utils.DistanceSqr(lightPosition, containerZdo.ZDO.GetPosition()) > rangeSqr)
-                        continue;
+                    nearby++;
+                    _nearbyChests++;
 
-                    ContainerState.IInventory inventory = containerState.GetInventory();
-                    int leave = Math.Max(0, cfg.LeaveFuelInContainer.Value);
-                    int addFuel = 0;
-                    bool requestOwnership = false;
-                    List<ItemDrop.ItemData> removeSlots = null;
-
-                    foreach (ItemDrop.ItemData slot in inventory.Items
-                                 .Where(x => new ItemDataKey(x) == fuelItem)
-                                 .OrderBy(x => x.m_stack))
+                    if (candidate.Vars.GetInUse())
                     {
-                        int leaveHere = Math.Min(slot.m_stack, leave);
-                        int take = Math.Min(fuelNeeded, slot.m_stack - leaveHere);
-                        leave -= leaveHere;
+                        open++;
+                        continue;
+                    }
 
+                    ContainerState.IInventory inventory = state.GetInventory();
+                    _inventoryReads++;
+                    int leave = Math.Max(0, cfg.LeaveFuelInContainer.Value);
+                    int consumed = 0;
+                    bool mustRequestOwnership = false;
+                    List<ItemDrop.ItemData> emptied = null;
+
+                    // No LINQ/sort/allocation in the hot path. One pass over only
+                    // nearby closed chests that the SQoL registry permits.
+                    foreach (ItemDrop.ItemData slot in inventory.Items)
+                    {
+                        if (slot == null || slot.m_stack <= 0 ||
+                            !(new ItemDataKey(slot) == fuelItem))
+                            continue;
+
+                        matching += slot.m_stack;
+                        int leaveHere = Math.Min(leave, slot.m_stack);
+                        leave -= leaveHere;
+                        reserved += leaveHere;
+                        int take = Math.Min(needed, slot.m_stack - leaveHere);
                         if (take <= 0)
                             continue;
 
-                        if (!containerZdo.IsOwnerOrUnassigned())
+                        if (!candidate.IsOwnerOrUnassigned())
                         {
-                            requestOwnership = true;
+                            mustRequestOwnership = true;
                             break;
                         }
 
                         slot.m_stack -= take;
-                        addFuel += take;
-                        fuelNeeded -= take;
-
+                        consumed += take;
+                        needed -= take;
                         if (slot.m_stack == 0)
-                            (removeSlots ??= new List<ItemDrop.ItemData>()).Add(slot);
+                            (emptied ??= new List<ItemDrop.ItemData>()).Add(slot);
 
-                        if (fuelNeeded == 0)
+                        if (needed <= 0)
                             break;
                     }
 
-                    if (requestOwnership)
+                    if (mustRequestOwnership)
                     {
-                        waitingForOwnership = true;
-                        result |= ScheduleReprocessing(registry.RequestOwnership(containerZdo, default));
+                        awaitingOwnership++;
+                        // Request at the SQoL-managed rate, but DO NOT turn its
+                        // 0.1-second returned delay into a tight rescheduling loop.
+                        registry.RequestOwnership(candidate, default);
                         continue;
                     }
 
-                    if (addFuel <= 0)
+                    if (consumed <= 0)
                         continue;
 
-                    if (removeSlots != null)
-                    {
-                        foreach (ItemDrop.ItemData remove in removeSlots)
-                            inventory.Items.Remove(remove);
-                    }
+                    if (emptied != null)
+                        foreach (ItemDrop.ItemData entry in emptied)
+                            inventory.Items.Remove(entry);
 
-                    // Match ServersideQoL's own AutoProcess ownership pattern:
-                    // make the target ZDO unowned, write the authoritative fuel,
-                    // then serialize/send the chest inventory change.
                     zdo.ReleaseOwnership();
-                    currentFuel = Mathf.Min(targetFuel, currentFuel + addFuel);
-                    zdo.Vars.SetFuel(currentFuel);
+                    fuel = Mathf.Min(target, fuel + consumed);
+                    zdo.Vars.SetFuel(fuel);
                     inventory.Save();
-                    totalAdded += addFuel;
-                    if (_loggedDiagnostics.Remove(zdo))
-                        zdo.Destroyed -= OnTracedDestroyed;
+                    addedTotal += consumed;
+                    _transfers++;
+
+                    if (_warnedLights.Remove(zdo))
+                        zdo.Destroyed -= OnLightDestroyed;
+
                     if (cfg.LogRefills.Value)
-                        Logger.LogInfo($"Refilled {prefabInfo.PrefabInfo.PrefabName} at {lightPosition} with {addFuel} x {fuelItem.m_shared.m_name} from {containerZdo.ZDO.GetPosition()} ({currentFuel:0.##}/{maxFuel:0.##} fuel).");
+                        Logger.LogMessage($"[Server Torch Refill] REFILLED {prefabInfo.PrefabInfo.PrefabName} " +
+                            $"at {pos}: +{consumed} {fuelItem.m_shared.m_name}, now {fuel:0.##}/{maxFuel:0.##}; " +
+                            $"source chest {candidate.ZDO.GetPosition()}.");
                 }
 
-                if (fuelNeeded <= 0)
+                if (needed <= 0)
                     break;
             }
 
-            if (totalAdded == 0)
-                LogDiagnosticOnce(zdo, $"{prefabInfo.PrefabInfo.PrefabName} at {lightPosition}: needs {fuelNeeded} x {fuelItem.m_shared.m_name}, but {(waitingForOwnership ? "is waiting for chest ownership" : "no accessible matching fuel was found in closed chests within range")}.");
+            _scanTicks += Stopwatch.GetTimestamp() - start;
 
-            return result;
-        }
-
-        private void LogDiagnosticOnce(ServersideQoLZDO zdo, string message)
-        {
-            if (!ModConfig.Instance.DiagnosticLogs.Value || !_loggedDiagnostics.Add(zdo))
-                return;
-            zdo.Destroyed += OnTracedDestroyed;
-            Logger.LogInfo($"Server Torch Refill diagnostic: {message}");
-        }
-
-        private void OnTracedDestroyed(ServersideQoLZDO zdo)
-        {
-            _loggedDiagnostics.Remove(zdo);
-            zdo.Destroyed -= OnTracedDestroyed;
-        }
-
-        private void OnContainerChanged(ServersideQoLZDO containerZdo, ContainerState state)
-        {
-            if (_lights == null)
-                return;
-
-            float range = Mathf.Max(0f, ModConfig.Instance.Range.Value);
-            if (range <= 0f)
-                return;
-
-            float rangeSqr = range * range;
-            Vector3 containerPosition = containerZdo.ZDO.GetPosition();
-
-            foreach (HashSet<ServersideQoLZDO> lights in _lights.EnumerateAdjacent(containerPosition))
+            if (addedTotal == 0)
             {
-                foreach (ServersideQoLZDO light in lights)
-                {
-                    if (Utils.DistanceSqr(light.ZDO.GetPosition(), containerPosition) <= rangeSqr)
-                        ScheduleReprocessing(light);
-                }
+                _missingFuel++;
+                if (awaitingOwnership != 0)
+                    _ownershipDelays++;
+
+                string reason;
+                if (nearby == 0)
+                    reason = $"No eligible NON-PRIVATE chest within {range:0.#}m (personal/private containers are excluded by ServersideQoL).";
+                else if (open == nearby)
+                    reason = $"All {nearby} nearby eligible chests are currently open; close a chest to allow refilling.";
+                else if (matching == 0)
+                    reason = $"{nearby} nearby chest(s), but none contains matching {fuelItem.m_shared.m_name}.";
+                else if (awaitingOwnership > 0)
+                    reason = $"Found {fuelItem.m_shared.m_name}, but {awaitingOwnership} chest(s) are client-owned; waiting for ownership.";
+                else
+                    reason = $"Matching fuel exists but cannot be taken (reserved {reserved} item(s) by LeaveFuelInContainer, or chest unavailable).";
+
+                WarnOnce(zdo, $"{prefabInfo.PrefabInfo.PrefabName} at {pos}: fuel {fuel:0.##}/{maxFuel:0.##}; needs {request} x {fuelItem.m_shared.m_name}. {reason}");
+                AnnounceFailure(peers, zdo, fuel, $"Torch Refill: {reason}");
             }
+            else
+            {
+                if (fuel > 0f)
+                    AnnounceSuccess(peers, zdo, $"Torch Refill: lit {prefabInfo.PrefabInfo.PrefabName} from a nearby chest.");
+                if (needed == 0)
+                    return ScheduleReprocessing(Mathf.Max(180f, interval));
+            }
+
+            // Retry modestly while dark, and less often while partially lit.
+            // Ownership retries are NEVER faster than 10s even if the upstream
+            // container registry suggests 0.1s. Other repeated failures wait
+            // at least 30-60s, dramatically reducing idle workload.
+            float retry = awaitingOwnership > 0 ? Mathf.Max(10f, interval) :
+                fuel <= 0.001f ? interval : Mathf.Max(60f, interval);
+            return ScheduleReprocessing(retry);
+        }
+
+        private void WarnOnce(ServersideQoLZDO zdo, string message)
+        {
+            if (_warnedLights.Contains(zdo))
+                return;
+
+            if (_warnedLights.Count < 256)
+            {
+                _warnedLights.Add(zdo);
+                zdo.Destroyed += OnLightDestroyed;
+            }
+
+            if (_firstWarnings++ < 12)
+                Logger.LogWarning($"[Server Torch Refill] NOT REFILLED: {message}");
+            else
+                _suppressedWarnings++;
+        }
+
+        private void OnLightDestroyed(ServersideQoLZDO zdo)
+        {
+            _warnedLights.Remove(zdo);
+            zdo.Destroyed -= OnLightDestroyed;
+        }
+
+        private void AnnounceFailure(IReadOnlyList<Peer> peers, ServersideQoLZDO zdo, float fuel, string message)
+        {
+            if (fuel > 0.001f)
+                return;
+            Announce(peers, zdo, message);
+        }
+
+        private void AnnounceSuccess(IReadOnlyList<Peer> peers, ServersideQoLZDO zdo, string message)
+        {
+            Announce(peers, zdo, message);
+        }
+
+        private void Announce(IReadOnlyList<Peer> peers, ServersideQoLZDO zdo, string message)
+        {
+            if (!ModConfig.Instance.AnnounceInGame.Value ||
+                Time.realtimeSinceStartupAsDouble < _nextInGameAt)
+                return;
+
+            _nextInGameAt = Time.realtimeSinceStartupAsDouble + 90.0;
+            ShowMessage(peers, zdo, message, MessageTypes.TopLeftFar);
+        }
+
+        private void MaybeWriteSummary()
+        {
+            double now = Time.realtimeSinceStartupAsDouble;
+            if (now < _nextSummaryAt)
+                return;
+
+            _nextSummaryAt = now + 120.0;
+            double scanMs = _scanTicks * 1000.0 / Stopwatch.Frequency;
+            Logger.LogWarning($"[Server Torch Refill] 2-minute activity: checked={_checks}, needFuel={_needsFuel}, " +
+                $"nearbyChests={_nearbyChests}, inventoryReads={_inventoryReads}, refills={_transfers}, " +
+                $"unfilled={_missingFuel}, waitingForOwnership={_ownershipDelays}, scanCPU={scanMs:0.#}ms, " +
+                $"suppressedWarnings={_suppressedWarnings}. " +
+                "If checked=0, no eligible lights were processed near players.");
+
+            _checks = _needsFuel = _nearbyChests = _inventoryReads = 0;
+            _ownershipDelays = _transfers = _missingFuel = _scanTicks = 0;
+            _suppressedWarnings = 0;
+            _firstWarnings = 0;
         }
 
         private bool LooksLikeLighting(string prefabName, string localizedName)
         {
-            if (_lightingTokens == null || _lightingTokens.Length == 0)
-                return false;
-
             string prefab = prefabName ?? string.Empty;
             string display = localizedName ?? string.Empty;
 
@@ -315,11 +411,8 @@ namespace ServerTorchRefillMod
             {
                 if (prefab.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0 ||
                     display.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0)
-                {
                     return true;
-                }
             }
-
             return false;
         }
 

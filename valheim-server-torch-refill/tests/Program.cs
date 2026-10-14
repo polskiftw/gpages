@@ -27,6 +27,9 @@ internal static class Program
         Check("zero capacity", 0f, 0f, .25f, 1f, 0);
         Check("NaN current fuel", float.NaN, 6f, .25f, 1f, 0);
         Check("at configured target", 6f, 6f, 1f, 1f, 0);
+        Check("always-refill fresh ground torch", 2f, 6f, 1f, 1f, 4);
+        Check("always-refill one-slot fractional", .8f, 1f, 1f, 1f, 1);
+        Check("always-refill almost full braziers", 4.2f, 5f, 1f, 1f, 1);
         Console.WriteLine($"PASS: {_checks} fuel-policy regression checks.");
     }
 }
