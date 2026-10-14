@@ -78,7 +78,7 @@ namespace ServerTorchRefillMod
             // Preserved for old config compatibility, but skipped-refill reasons are
             // ALWAYS logged (bounded), regardless of the value of DiagnosticLogs.
             DiagnosticLogs = BindEx(cfg, false,
-                "Enable additional fine-grained diagnostic logs. Basic missing-fuel warnings, activity reports, and startup messages are always on.");
+                "Legacy v1.1 diagnostic switch, retained for existing config files. In v1.2 basic diagnostic messages and workload reports are always on regardless of this setting.");
 
             AnnounceInGame = BindEx(cfg, true,
                 "Send at most one nearby vanilla-client message every 90s for unlit lights that cannot refuel, plus sparse success notices. Does not require a client mod.");
@@ -94,6 +94,7 @@ namespace ServerTorchRefillMod
         private SectorDictionary<HashSet<ServersideQoLZDO>> _containers;
         private string[] _lightingTokens = Array.Empty<string>();
         private readonly HashSet<ServersideQoLZDO> _warnedLights = new HashSet<ServersideQoLZDO>();
+        private readonly HashSet<string> _ignoredPrefabs = new HashSet<string>(StringComparer.Ordinal);
 
         private double _nextSummaryAt;
         private double _nextInGameAt;
@@ -115,6 +116,7 @@ namespace ServerTorchRefillMod
             foreach (ServersideQoLZDO light in _warnedLights)
                 light.Destroyed -= OnLightDestroyed;
             _warnedLights.Clear();
+            _ignoredPrefabs.Clear();
 
             ModConfig cfg = ModConfig.Instance;
             _containers = Instance<ContainerRegistryProcessor>()
@@ -142,18 +144,27 @@ namespace ServerTorchRefillMod
             ModConfig cfg = ModConfig.Instance;
             Fireplace fireplace = prefabInfo.Component;
 
-            // Non-fuelled/non-refillable decorative candles are intentionally excluded.
-            if (!cfg.Enabled.Value || fireplace == null ||
-                fireplace.m_fuelItem == null ||
+            if (!cfg.Enabled.Value || fireplace == null)
+                return ProcessResult.UnregisterProcessor;
+
+            // Name-filter before fuel setup: avoid touching anything unrelated.
+            if (!cfg.IncludeAllFireplaces.Value &&
+                !LooksLikeLighting(prefabInfo.PrefabInfo.PrefabName, fireplace.m_name))
+                return ProcessResult.UnregisterProcessor;
+
+            // The prefab really contains a Fireplace component, but some lights
+            // (notably vanilla resin candles) are not refillable via normal fuel.
+            if (fireplace.m_fuelItem == null ||
                 fireplace.m_fuelItem.m_itemData == null ||
                 fireplace.m_fuelItem.m_itemData.m_shared == null ||
                 fireplace.m_maxFuel <= 0f ||
                 fireplace.m_infiniteFuel || !fireplace.m_canRefill)
+            {
+                string name = prefabInfo.PrefabInfo.PrefabName;
+                if (_ignoredPrefabs.Count < 12 && _ignoredPrefabs.Add(name))
+                    Logger.LogWarning($"[Server Torch Refill] SKIPPED {name}: it has no normal refillable fuel source (infinite / m_canRefill=false / missing fuel item). This is expected for vanilla resin candles.");
                 return ProcessResult.UnregisterProcessor;
-
-            if (!cfg.IncludeAllFireplaces.Value &&
-                !LooksLikeLighting(prefabInfo.PrefabInfo.PrefabName, fireplace.m_name))
-                return ProcessResult.UnregisterProcessor;
+            }
 
             MaybeWriteSummary();
             _checks++;
