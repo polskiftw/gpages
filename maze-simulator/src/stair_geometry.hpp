@@ -31,6 +31,9 @@ struct Flight {
     std::uint32_t steps = 16;
     bool reversed = false; // If true, ascends toward *decreasing* X.
     Sides sides = Sides::Open;
+    // Entire flight is either solidly filled beneath its steps or hollow.
+    // For multi-story runs, set this ONCE from the parent stairwell's seed.
+    bool solid_under = false;
 };
 
 void validate(const Flight& flight);
@@ -40,6 +43,8 @@ void validate(const Player& player);
 // Outside its horizontal footprint this returns nullopt-style false.
 bool in_footprint(const Flight& f, Point2 location);
 double tread_height(const Flight& f, double x);
+// Returns the lowest solid surface over the floor: the sloping slab when
+// hollow, or the floor itself when completely filled underneath.
 double underside_height(const Flight& f, double x);
 
 // Can a player climb the complete staircase as a sequence of small steps?
@@ -48,8 +53,8 @@ bool climbable(const Flight& f, const Player& p);
 
 // Analytic conservative clearance check for a straight ground-level path
 // crossing *perpendicularly across* the width of this staircase. Includes
-// player radius and the sloped underside; any floor-reaching side walls
-// block the crossing. This intentionally does NOT grant access to the
+// player radius and the sloped underside. Solid undercarriage OR
+// floor-reaching side walls blocks crossing; they are independent options. This intentionally does NOT grant access to the
 // staircase's upper surface or override the maze's planned corridor walls.
 // The caller must separately ensure both ends are valid maze corridors.
 bool crosses_under(const Flight& f, Point2 start, Point2 finish, const Player& p);
@@ -60,8 +65,10 @@ bool crosses_under(const Flight& f, Point2 start, Point2 finish, const Player& p
 Flight switchback_story(Flight template_flight, std::uint32_t local_story);
 
 // Write a self-contained OBJ demo room (no material libraries/dependencies).
-// OBJ contains a ground slab, stair treads with sloped thin undersides, an
-// upper landing, and optionally floor-reaching side walls.
+// OBJ contains a ground slab, stair treads, and an upper landing. A solid
+// undercarriage adds infill walls all the way down to the floor; the hollow
+// variant has only a thin supporting slab. Optional enclosure walls are
+// independent and may coexist with either type.
 void write_demo_room_obj(std::ostream& out, const Flight& flight);
 
 } // namespace labyrinth::geometry
