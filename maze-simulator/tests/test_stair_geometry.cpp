@@ -51,6 +51,49 @@ void test_underpass() {
     std::cout << "ok: open underside, enclosure walls, radius/headroom and reversed incline\n";
 }
 
+
+void test_full_flight_undercarriage() {
+    Flight hollow{};
+    Player p{};
+    Flight solid=hollow;
+    solid.solid_under=true;
+    require(climbable(hollow,p) && climbable(solid,p),
+            "both undercarriage styles must preserve the walkable staircase above");
+    const Point2 near_side{3.6,-0.6},far_side{3.6,1.6};
+    require(crosses_under(hollow,near_side,far_side,p),
+            "hollow flight should have a usable high-end underpass");
+    require(!crosses_under(solid,near_side,far_side,p),
+            "the solid UNDERCARRIAGE, even without side walls, blocks the underpass");
+    near(underside_height(solid,3.6),solid.base_z,
+         "solid fill should reach all the way down to the ground floor");
+
+    std::ostringstream hollow_obj,solid_obj;
+    write_demo_room_obj(hollow_obj,hollow);
+    write_demo_room_obj(solid_obj,solid);
+    require(hollow_obj.str().find("g stairs_with_open_underneath\n")!=std::string::npos,
+            "hollow OBJ has no single continuous open staircase group");
+    require(hollow_obj.str().find("g continuous_solid_infill\n")==std::string::npos,
+            "hollow OBJ must never contain random solid pieces");
+    require(solid_obj.str().find("g stairs_with_solid_undercarriage\n")!=std::string::npos,
+            "solid OBJ not labeled as solid");
+    require(solid_obj.str().find("g continuous_solid_infill\n")!=std::string::npos,
+            "solid flight must be closed with a single continuous infill prism");
+    require(solid_obj.str().size()>hollow_obj.str().size(),
+            "solid OBJ needs the extra infill volume");
+
+    // The entire *next* flight may change style, but it must connect at
+    // exactly the story landing, never halfway across a flight/tread.
+    Flight next=switchback_story(hollow,1);
+    next.solid_under=true;
+    Flight first=switchback_story(hollow,0);
+    const double join0=first.reversed?first.origin.x:first.origin.x+first.run;
+    const double join1=next.reversed?next.origin.x+next.run:next.origin.x;
+    near(join0,join1,"solid/hollow change may only occur where full flights join");
+    near(tread_height(first,join0),tread_height(next,join1),
+         "switching underside style must preserve walkable landing continuity");
+    std::cout << "ok: entire-flight solid fill or hollow underside, no partial chunks\n";
+}
+
 void test_step_geometry() {
     Flight f{};
     Player p{};
@@ -131,6 +174,8 @@ void test_invalid() {
     require(bad([]{Flight f;f.rise=0;validate(f);}),"zero rise accepted");
     require(bad([]{Flight f;f.run=std::numeric_limits<double>::infinity();validate(f);}),"infinite run accepted");
     require(bad([]{Player p;p.radius=0;validate(p);}),"zero player radius accepted");
+    require(bad([]{Flight f;f.solid_under=true;f.slab=1.0;validate(f);}),
+            "solid undercarriage cannot have a support slab thicker than its entire rise");
     std::cout << "ok: rejects degenerate and non-finite geometry\n";
 }
 }
@@ -138,6 +183,7 @@ void test_invalid() {
 int main() {
     try {
         test_underpass();
+        test_full_flight_undercarriage();
         test_step_geometry();
         test_long_switchback();
         test_obj();
