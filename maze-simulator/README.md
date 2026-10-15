@@ -73,9 +73,9 @@ A set bit means an opening, not a wall. Cells and floors use zero-based coordina
 
 ## Physical stair geometry prototype
 
-The optional geometry prototype can produce an actual set of sixteen stair
-steps, a thin sloping underside, an upper landing, and optional enclosing
-walls. It analytically checks whether a person can walk under the *high end*
+The geometry prototype produces sixteen real stair treads with either a
+continuous hollow underside or a fully solid undercarriage, an upper landing,
+and optional enclosing walls. It analytically checks whether a person can walk under the *high end*
 and separately whether the same stairs are climbable. A 23-story switchback
 test verifies successive flights meet at shared landings. Export OBJ test
 rooms with:
@@ -156,17 +156,18 @@ been generated, explored, drawn, or performance-tested as a real game.
 
 Each complete 32 x 32 chunk's passage grid is only **1 KiB**, excluding cache
 metadata and transient generation buffers. A 128-chunk cache retains about
-128 KiB of passage grid data (plus overhead). The rendering geometry should
-also be streamed by proximity, but that renderer does not exist yet.
+128 KiB of passage grid data (plus overhead). The full procedural world will need nearby-chunk mesh streaming; that
+world-scale renderer does not exist yet. The separate handcrafted 3D room
+renderer is playable.
 
 ## Important limitations
 
-- This generates **graph topology**, not 3D geometry. An `Up`/`Down` bit denotes
-  a vertical connection at a matching XY coordinate on adjacent floors. The
-  renderer/gameplay layer must create a physical single-story staircase at each
-  such link. `StairNetwork` separately adds continuous multi-floor stairwell
-  topology with selective entrances. Physical treads, required footprints and
-  clearance/collision have not yet been implemented.
+- The **generated giant labyrinth** is still a topology graph, not a
+  collision-tested 3D building. Up/Down bits are abstract links that will
+  require reserved physical stair geometry. The separate playable test room
+  *already* demonstrates proper treads, underside fills, walls and collision,
+  but does not yet place them into generated labyrinth corridors. The
+  continuous multistory stair network remains abstract until that integration.
 - Hierarchical division introduces **large-scale chokepoints**. Extra loops
   create alternative routes. Later algorithms can offer different maze styles.
 - Changing the **dimensions** changes the hierarchy and thus may change the
