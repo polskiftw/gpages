@@ -53,7 +53,18 @@ bool Room::standable(Pose p) const {
     // within the body's horizontal radius.
     const bool overlaps_flight=p.x+r>0.0 && p.x-r<4.0 &&
                                p.y+r>0.0 && p.y-r<1.0;
-    if (overlaps_flight && !standing_on_treads && !on_upper) {
+    // The first riser is lower than the player's permitted step-up. When
+    // approaching the flight from its LOW end, the body radius reaches the
+    // stair nose slightly before its center enters the first tread. Let the
+    // next center sample perform the actual step rather than treating this
+    // small lip as an impassable wall.
+    const bool approaching_low_nose=within_stairs==false &&
+        p.y>=flight_.origin.y+r && p.y<=flight_.origin.y+flight_.width-r &&
+        ((!flight_.reversed && p.x < flight_.origin.x && p.x+r > flight_.origin.x) ||
+         (flight_.reversed && p.x > flight_.origin.x+flight_.run &&
+          p.x-r < flight_.origin.x+flight_.run));
+    if (overlaps_flight && !standing_on_treads && !on_upper &&
+        !approaching_low_nose) {
         if (flight_.solid_under) return false;
         const double worst_x=flight_.reversed ? p.x+r : p.x-r;
         const double underside=geometry::underside_height(flight_,worst_x);
