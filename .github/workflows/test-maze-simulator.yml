@@ -46,3 +46,52 @@ jobs:
           grep -Fxq 'g floor_reaching_enclosure_walls' /tmp/solid-walled-stairs.obj
           ! grep -Fxq 'g continuous_solid_infill' /tmp/open-stairs.obj
           ! grep -Fxq 'g continuous_solid_infill' /tmp/walled-stairs.obj
+
+  playable-linux:
+    # Build SDL3 from its upstream release source on CI. The user's native
+    # Gentoo build instead uses the already-installed system SDL3 package.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned SDL3 3.4.16 sources
+        uses: actions/checkout@v4
+        with:
+          repository: libsdl-org/SDL
+          ref: fa2c02bb6e21974a89ea9824bc53c9932abe5f9c
+          path: vendor-sdl
+          persist-credentials: false
+      - name: Install OpenGL software renderer and headless X server
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev libx11-dev xvfb xauth
+      - name: Compile and install CI-local SDL3 (no system modifications)
+        run: |
+          cmake -S vendor-sdl -B /tmp/maze-sdl-build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/tmp/maze-sdl-prefix \
+            -DSDL_SHARED=OFF -DSDL_STATIC=ON \
+            -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF \
+            -DSDL_WAYLAND=OFF -DSDL_X11=ON
+          cmake --build /tmp/maze-sdl-build --parallel 3
+          cmake --install /tmp/maze-sdl-build
+      - name: Build playable executable and geometry test with warnings as errors
+        run: |
+          cmake -S maze-simulator -B /tmp/maze-native-build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_PREFIX_PATH=/tmp/maze-sdl-prefix \
+            -DMAZE_BUILD_PLAYABLE=ON -DMAZE_REQUIRE_PLAYABLE=ON \
+            -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic -Werror"
+          cmake --build /tmp/maze-native-build --parallel 3 --target maze-playable playable-room-tests
+          ctest --test-dir /tmp/maze-native-build -R playable-room-collision --output-on-failure
+      - name: Render a genuine OpenGL 3.3 screenshot in a virtual display
+        run: |
+          xvfb-run -a -s "-screen 0 1280x720x24" \
+            env SDL_VIDEODRIVER=x11 LIBGL_ALWAYS_SOFTWARE=1 \
+            /tmp/maze-native-build/maze-playable --smoke /tmp/stair-lab.ppm
+          test -s /tmp/stair-lab.ppm
+      - name: Keep the visual smoke-test screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: playable-stairs-screenshot
+          path: /tmp/stair-lab.ppm
+          retention-days: 7
