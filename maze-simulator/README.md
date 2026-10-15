@@ -1,6 +1,6 @@
 # Maze Simulator - procedural 3D maze engine (prototype)
 
-**Status:** a real, tested, on-demand **maze topology generator** for the planned
+**Status:** a real, tested, on-demand **maze topology and staircase-routing generator** for the planned
 Windows 95 3D Maze-inspired first-person game. It is **not a playable 3D game yet**.
 The source is in this independent `gpages/maze-simulator/` folder; it does not
 modify the GitHub Pages landing page, other utilities, or site navigation.
@@ -20,12 +20,13 @@ g++ -std=c++20 -O2 -Wall -Wextra src/maze.cpp src/main.cpp -o maze-cli
 ./maze-cli bench 100000 100000 100 42 600 50 1000
 ./maze-cli probe 100000 100000 100 42 600 50 99999 99999 99
 ./run-tests.sh
+./build/maze-stairs 64 64 50 6549 49 1 10000 3000 4000 # after CMake build
 ```
 
 Or use CMake: `cmake -S . -B build && cmake --build build && ctest --test-dir build --output-on-failure`.
 `run-tests.sh` creates temporary test binaries in `/tmp`; it does not install anything.
 
-All CLI commands take `width height floors seed loop_bps stair_bps` in that order,
+The original `maze-cli` commands take `width height floors seed loop_bps stair_bps` in that order,
 followed by command-specific values. Defaults are `256 256 3 6549 600 50`.
 Basis points are percentages with two decimal places: `600` = 6% additional
 horizontal openings and `50` = 0.5% additional vertical shafts per cell/floor pair.
@@ -36,6 +37,13 @@ horizontal openings and `50` = 0.5% additional vertical shafts per cell/floor pa
 | `check ...` | Whole-world reachability and perfect-tree check, capped at 250,000 cells |
 | `probe ... x y z` | Get a cell's passage bits without generating the rest of the world |
 | `bench ... [samples]` | Random-access timing across an immense finite world |
+
+The standalone **`maze-stairs`** executable is a bounded inspector for the new
+variable-height staircase network. Argument order: `width height floors seed
+[max_rise [min_rise [density_bps [landing_bps [enclosed_bps]]]]]`. This can
+show enclosed 23-story routes, staircases with selective floor entrances, and
+long runs crossing procedural floor-band boundaries. See
+[docs/STAIRCASES.md](docs/STAIRCASES.md).
 
 The passage bitmask is **N=1, E=2, S=4, W=8, Up=16, Down=32**.
 A set bit means an opening, not a wall. Cells and floors use zero-based coordinates.
@@ -58,11 +66,18 @@ A set bit means an opening, not a wall. Cells and floors use zero-based coordina
 7. Cache only recently requested chunks with a configurable **LRU memory cap**.
    No complete world map, global visited set, giant DFS stack, or precomputed
    world graph is needed during generation.
+8. Add **first-class long stairwells** using a separate navigation space.
+   Stairs can rise by 1, 23, or many more floors, with entrances only on the
+   endpoints or selectively on intervening floors. They do not change any of
+   the original corridor connections. Stairwells are deterministic and queried
+   on demand with O(1) metadata lookup. No ladders are part of the design.
 
 **Connectivity is guaranteed by construction** for any valid finite world. With
-`loop_bps=0` and `stair_bps=0`, the entire cell graph is a spanning tree: exactly
+`loop_bps=0` and `stair_bps=0`, the original **corridor graph** is a spanning tree: exactly
 one route between any pair of cells, including cells on different floors.
-For a precise argument and important tradeoffs, see [docs/ALGORITHM.md](docs/ALGORITHM.md).
+Additional long stairwells create intentional alternative routes when enabled.
+For a precise argument and important tradeoffs, see [docs/ALGORITHM.md](docs/ALGORITHM.md)
+and [docs/STAIRCASES.md](docs/STAIRCASES.md).
 
 ## Scales and practical limits
 
@@ -81,8 +96,10 @@ also be streamed by proximity, but that renderer does not exist yet.
 
 - This generates **graph topology**, not 3D geometry. An `Up`/`Down` bit denotes
   a vertical connection at a matching XY coordinate on adjacent floors. The
-  renderer/gameplay layer must eventually decide whether it is a staircase,
-  ladder, elevator, or explicit floor-transfer interaction and ensure clearance.
+  renderer/gameplay layer must create a physical single-story staircase at each
+  such link. `StairNetwork` separately adds continuous multi-floor stairwell
+  topology with selective entrances. Physical treads, required footprints and
+  clearance/collision have not yet been implemented.
 - Hierarchical division introduces **large-scale chokepoints**. Extra loops
   create alternative routes. Later algorithms can offer different maze styles.
 - Changing the **dimensions** changes the hierarchy and thus may change the

@@ -5,9 +5,12 @@
 2. **3D geometry:** make procedural meshes for visible chunk walls/floor/ceiling,
    merge repeated wall faces, and render only chunks near the player. Use SDL3 +
    OpenGL and keep the renderer separate from the topology library.
-3. **Physical multi-floor transitions:** initially use a clearly signposted
-   vertical shaft at each Up/Down cell; handle both stair directions and
-   ceiling cutouts. Later add true stair meshes with a deterministic footprint.
+3. **Geometry-aware stairs:** `StairNetwork` now generates continuous,
+   variable-rise multi-floor stairwells with selective entrances. **Next:**
+   allocate collision-safe physical footprints/vestibules, switchback or spiral
+   meshes, ceiling cutouts, and suitable single-floor steps at original Up/Down
+   edges. Test that the staircase and corridor geometry never overlap and that
+   intermediate floors without doors cannot be entered. Stairs only: no ladders.
 4. **Player controller:** mouse look, WASD, collision, speed settings, coordinate
    HUD, optional 90-degree turning, and fast one-click launch.
 5. **Navigation / objectives:** spawn selection, seeded exit locations, optional
@@ -32,9 +35,13 @@
 - Profile tens of thousands of random chunk loads and check LRU bounds.
 - Add randomized fuzz tests of dimension edge cases and chunk boundaries.
 - Add save/reload reproducibility test after serialization exists.
-- Add floor/shaft collision validation when the 3D geometry layer exists.
+- Validate **stair footprints, ceilings, landings, step collision, and doorway
+  accessibility** when actual 3D geometry exists.
 
 Current `tests/test_maze.cpp` covers the first four regression areas and tests
 single-cell, linear, partial chunks, multiple floors, deterministic seeds,
 order-independence, and optional-loop configurations. AddressSanitizer and
 UndefinedBehaviorSanitizer runs also passed in the initial development session.
+`tests/test_stairs.cpp` now tests 23-story enclosed staircases, open landings,
+band-crossing runs, multi-space navigation reciprocity/connectedness, and
+trillion-coordinate queries.
