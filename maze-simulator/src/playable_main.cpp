@@ -333,10 +333,26 @@ bool screenshot_ppm(const char* filename,int w,int h) {
 }
 
 int run(int argc,char** argv) {
-    const bool smoke=argc==3 && std::string(argv[1])=="--smoke";
+    const bool smoke=(argc>=3 && argc<=5 && std::string(argv[1])=="--smoke");
     if(argc!=1 && !smoke) {
-        std::cerr<<"Usage: maze-playable [--smoke screenshot.ppm]\n";
+        std::cerr<<"Usage: maze-playable [--smoke screenshot.ppm [1|2|3|4 [stairs|under]]]\n";
         return 2;
+    }
+    int smoke_mode=0;
+    bool smoke_under=false;
+    if(smoke) {
+        if(argc>=4) {
+            const std::string mode=argv[3];
+            if(mode.size()!=1 || mode[0]<'1' || mode[0]>'4')
+                throw std::invalid_argument("screenshot mode must be a digit 1..4");
+            smoke_mode=mode[0]-'1';
+        }
+        if(argc==5) {
+            const std::string view=argv[4];
+            if(view!="stairs" && view!="under")
+                throw std::invalid_argument("screenshot view must be stairs or under");
+            smoke_under=(view=="under");
+        }
     }
     if(!SDL_Init(SDL_INIT_VIDEO))
         throw std::runtime_error(std::string("SDL_Init: ")+SDL_GetError());
@@ -363,9 +379,14 @@ int run(int argc,char** argv) {
             std::cerr<<"VSync unavailable: "<<SDL_GetError()<<'\n';
         renderer=std::make_unique<Renderer>();
         Room room;
+        if(smoke_mode)room.configure(smoke_mode>=2,(smoke_mode&1)!=0);
         Pose player=room.spawn();
-        renderer->upload(labyrinth::demo::make_test_room_mesh(room.flight()));
         float yaw=0.0f,pitch=0.0f;
+        if(smoke_under) {
+            player={3.6,-1.6,0.0};
+            yaw=Pi/2.0f;
+        }
+        renderer->upload(labyrinth::demo::make_test_room_mesh(room.flight()));
         int w=1280,h=720;
         if(!SDL_GetWindowSizeInPixels(window,&w,&h))
             throw std::runtime_error(std::string("SDL_GetWindowSizeInPixels: ")+SDL_GetError());
@@ -377,7 +398,7 @@ int run(int argc,char** argv) {
             result=0;
         } else {
             std::cout<<"3D MAZE - PHYSICAL STAIR TEST ROOM\n"
-                        "WASD move | mouse look | Shift run | R reset\n"
+                        "WASD move | mouse look | Shift run | R stairs | U underpass start\n"
                         "1 hollow/open | 2 hollow/walled | 3 solid/open | 4 solid/walled\n"
                         "Esc free/capture mouse | Left-click capture | Q quit\n"
                         "Walk straight up the steps or approach the HIGH end from its SIDE\n"
@@ -404,7 +425,14 @@ int run(int argc,char** argv) {
                         if(!SDL_SetWindowRelativeMouseMode(window,captured))
                             std::cerr<<"Mouse mode: "<<SDL_GetError()<<'\n';
                     }
-                    if(event.key.scancode==SDL_SCANCODE_R)player=room.spawn();
+                    if(event.key.scancode==SDL_SCANCODE_R) {
+                        player=room.spawn();
+                        yaw=0.0f;pitch=0.0f;
+                    }
+                    if(event.key.scancode==SDL_SCANCODE_U) {
+                        player={3.6,-1.6,0.0};
+                        yaw=Pi/2.0f;pitch=0.0f;
+                    }
                     if(event.key.scancode>=SDL_SCANCODE_1 &&
                        event.key.scancode<=SDL_SCANCODE_4) {
                         const int mode=static_cast<int>(
@@ -437,7 +465,7 @@ int run(int argc,char** argv) {
                 if(now-title_tick>180000000ULL) {
                     char title[240];
                     std::snprintf(title,sizeof(title),
-                                  "3D Maze Stair Lab | %s / %s | x %.2f y %.2f floor %.2f | WASD, 1-4, R, Esc, Q",
+                                  "3D Maze Stair Lab | %s / %s | x %.2f y %.2f floor %.2f | WASD, 1-4, R/U, Esc, Q",
                                   room.flight().solid_under?"SOLID":"HOLLOW",
                                   room.flight().sides==labyrinth::geometry::Sides::Walled?"WALLED":"OPEN",
                                   player.x,player.y,player.feet);
