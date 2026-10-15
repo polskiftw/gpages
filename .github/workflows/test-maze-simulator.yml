@@ -91,15 +91,27 @@ jobs:
             -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic -Werror"
           cmake --build /tmp/maze-native-build --parallel 3 --target maze-playable playable-room-tests
           ctest --test-dir /tmp/maze-native-build -R playable-room-collision --output-on-failure
-      - name: Render a genuine OpenGL 3.3 screenshot in a virtual display
+      - name: Render and compare stair and underpass perspectives under real OpenGL
         run: |
           xvfb-run -a -s "-screen 0 1280x720x24" \
             env SDL_VIDEODRIVER=x11 LIBGL_ALWAYS_SOFTWARE=1 \
             /tmp/maze-native-build/maze-playable --smoke /tmp/stair-lab.ppm
+          xvfb-run -a -s "-screen 0 1280x720x24" \
+            env SDL_VIDEODRIVER=x11 LIBGL_ALWAYS_SOFTWARE=1 \
+            /tmp/maze-native-build/maze-playable --smoke /tmp/under-hollow.ppm 1 under
+          xvfb-run -a -s "-screen 0 1280x720x24" \
+            env SDL_VIDEODRIVER=x11 LIBGL_ALWAYS_SOFTWARE=1 \
+            /tmp/maze-native-build/maze-playable --smoke /tmp/under-solid.ppm 3 under
           test -s /tmp/stair-lab.ppm
-      - name: Keep the visual smoke-test screenshot
+          test -s /tmp/under-hollow.ppm
+          test -s /tmp/under-solid.ppm
+          ! cmp -s /tmp/under-hollow.ppm /tmp/under-solid.ppm
+      - name: Keep the visual smoke-test screenshots
         uses: actions/upload-artifact@v4
         with:
           name: playable-stairs-screenshot
-          path: /tmp/stair-lab.ppm
+          path: |
+            /tmp/stair-lab.ppm
+            /tmp/under-hollow.ppm
+            /tmp/under-solid.ppm
           retention-days: 7
