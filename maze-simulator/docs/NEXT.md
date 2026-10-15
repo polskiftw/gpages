@@ -58,3 +58,25 @@ needed by each stair *before* corridor carving; integrate the guaranteed
 macro graph while routing around reserved space and allowing valid underpasses.
 Do not mark physical maze connectivity as solved until traversability is
 checked end-to-end with actual collision geometry.
+
+## First playable proof-of-concept (complete, but not integrated)
+
+The new native SDL3/OpenGL 3.3 Core stair laboratory opens a real
+first-person room with brick walls, roof cutouts, a 16-tread flight,
+upper landing, solid or hollow undercarriage, and optional enclosure.
+WASD and mouse-look work without Steam, Proton, servers, or daemons;
+the laboratory is separate from the on-demand huge-maze topology.
+A pure C++ player physics test walks up/down in all four structural
+modes and verifies that only hollow, unwalled stairs permit the
+high-end underpass. Headless OpenGL screenshots are tested by CI.
+
+See [PLAYABLE.md](PLAYABLE.md) for launch controls and limitations.
+The earlier statement that 3D player control doesn't exist is now
+superseded for the handcrafted laboratory ONLY. The 3D renderer does
+NOT yet visualize the generated multichunk labyrinth.
+
+**Next major engine milestone:** deterministic geometry-aware corridor
+and stairwell reservation. Allow underpass passages only where swept
+headroom clears the real underside; preserve the mandatory connected
+maze graph, provide arbitrary-height stair structures with selectively
+open landings, and validate physical room-to-room reachability.
