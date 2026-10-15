@@ -1,7 +1,8 @@
 # Maze Simulator - procedural 3D maze engine (prototype)
 
-**Status:** a real, tested, on-demand **maze topology and staircase-routing generator** for the planned
-Windows 95 3D Maze-inspired first-person game. It is **not a playable 3D game yet**.
+**Status:** the mathematically tested on-demand **maze/staircase generator** now has an
+independent **playable native 3D staircase laboratory** (SDL3 + OpenGL 3.3).
+The laboratory is a small handcrafted room, **not yet the generated giant maze**.
 The source is in this independent `gpages/maze-simulator/` folder; it does not
 modify the GitHub Pages landing page, other utilities, or site navigation.
 
@@ -9,9 +10,31 @@ The goal is to make mazes far larger than RAM, with arbitrary finite dimensions,
 multiple floors, connected corridors, reproducible worlds, and no requirement to
 generate or save the entire maze up front.
 
+## Play the first 3D test room
+
+The separate stair laboratory is a real Linux first-person executable with
+brick walls and ceilings, 16 physical steps, a raised landing and a usable
+ground-level underpass. Switch between all four combinations of hollow/solid
+undercarriage and open/enclosed sides in real time. It tests the agreed geometry,
+not procedural maze placement yet.
+
+If SDL3 and OpenGL development support are already installed, run from this folder:
+
+    sh run-playable.sh
+
+WASD moves, mouse looks, Shift runs, R starts at the foot of the stairs,
+U starts beside the underpass, 1/2/3/4 switch structural types, Esc frees
+the mouse, and Q quits. The launcher compiles locally using your own
+installed libraries; it neither installs software nor starts daemons.
+
+Full details, including headless screenshot checks:
+[docs/PLAYABLE.md](docs/PLAYABLE.md).
+
 ## Build on Gentoo / Linux
 
-Only a C++20 compiler is needed. No SDL, OpenGL, third-party code, servers, or daemons.
+For the original topology CLI/tests, only a C++20 compiler is needed.
+The separate native 3D laboratory additionally needs your existing SDL3/OpenGL development libraries.
+Neither mode needs a server or daemon.
 
 ```sh
 g++ -std=c++20 -O2 -Wall -Wextra src/maze.cpp src/main.cpp -o maze-cli
@@ -50,9 +73,9 @@ A set bit means an opening, not a wall. Cells and floors use zero-based coordina
 
 ## Physical stair geometry prototype
 
-The optional geometry prototype can produce an actual set of sixteen stair
-steps, a thin sloping underside, an upper landing, and optional enclosing
-walls. It analytically checks whether a person can walk under the *high end*
+The geometry prototype produces sixteen real stair treads with either a
+continuous hollow underside or a fully solid undercarriage, an upper landing,
+and optional enclosing walls. It analytically checks whether a person can walk under the *high end*
 and separately whether the same stairs are climbable. A 23-story switchback
 test verifies successive flights meet at shared landings. Export OBJ test
 rooms with:
@@ -133,17 +156,18 @@ been generated, explored, drawn, or performance-tested as a real game.
 
 Each complete 32 x 32 chunk's passage grid is only **1 KiB**, excluding cache
 metadata and transient generation buffers. A 128-chunk cache retains about
-128 KiB of passage grid data (plus overhead). The rendering geometry should
-also be streamed by proximity, but that renderer does not exist yet.
+128 KiB of passage grid data (plus overhead). The full procedural world will need nearby-chunk mesh streaming; that
+world-scale renderer does not exist yet. The separate handcrafted 3D room
+renderer is playable.
 
 ## Important limitations
 
-- This generates **graph topology**, not 3D geometry. An `Up`/`Down` bit denotes
-  a vertical connection at a matching XY coordinate on adjacent floors. The
-  renderer/gameplay layer must create a physical single-story staircase at each
-  such link. `StairNetwork` separately adds continuous multi-floor stairwell
-  topology with selective entrances. Physical treads, required footprints and
-  clearance/collision have not yet been implemented.
+- The **generated giant labyrinth** is still a topology graph, not a
+  collision-tested 3D building. Up/Down bits are abstract links that will
+  require reserved physical stair geometry. The separate playable test room
+  *already* demonstrates proper treads, underside fills, walls and collision,
+  but does not yet place them into generated labyrinth corridors. The
+  continuous multistory stair network remains abstract until that integration.
 - Hierarchical division introduces **large-scale chokepoints**. Extra loops
   create alternative routes. Later algorithms can offer different maze styles.
 - Changing the **dimensions** changes the hierarchy and thus may change the
