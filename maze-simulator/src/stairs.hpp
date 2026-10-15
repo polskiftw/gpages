@@ -38,6 +38,11 @@ struct StairSettings {
     std::uint16_t landing_bps = 3000;
     // Chance a tower has ONLY endpoint access, ignoring landing_bps.
     std::uint16_t enclosed_bps = 4000;
+    // Per-whole-flight underside construction. Every flight within a
+    // contiguous group of N stories gets the SAME solid or hollow style.
+    // Deterministic per staircase ID; NEVER randomized per tread or tile.
+    std::uint16_t solid_under_bps = 5000; // 50% of groups have a solid fill.
+    std::uint64_t construction_section_floors = 4; // Whole-story grouping.
 };
 
 struct Stairwell {
@@ -61,6 +66,9 @@ public:
     std::optional<Stairwell> for_chunk(std::uint64_t chunk_x, std::uint64_t chunk_y, std::uint64_t band) const;
     std::optional<Stairwell> at(Cell cell) const;
     bool has_landing(const Stairwell& tower, std::uint64_t floor) const;
+    // For the flight from floor to floor+1, not the landing itself.
+    // Can change at story boundaries, optionally grouped into longer runs.
+    bool solid_under(const Stairwell& tower, std::uint64_t floor) const;
     NavNeighbors neighbors(NavNode node); // all reachable movement edges; reciprocal; no allocation.
 
 private:

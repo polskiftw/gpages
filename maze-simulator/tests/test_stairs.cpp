@@ -182,6 +182,49 @@ void test_random_access_huge() {
     std::cout << "ok: gigantic world random-access staircase queries\n";
 }
 
+
+void test_underside_construction_sections() {
+    // A 63-story stairwell contains complete per-story flights.
+    // The underside design can change ONLY at a floor boundary, and by
+    // default changes are grouped into runs of four whole stories.
+    Maze m({32,32,64,2401,0,0});
+    StairSettings settings{63,63,10000,3000,0,5000,4};
+    StairNetwork a(m,settings),b(m,settings);
+    const auto t=a.for_chunk(0,0,0);
+    require(t && t->bottom == 0 && t->top == 63,"missing long stair for style test");
+    for (std::uint64_t z=0;z<63;++z) {
+        const auto value=a.solid_under(*t,z);
+        require(value==b.solid_under(*t,z),"stair understructure must be deterministic");
+        if ((z%settings.construction_section_floors)!=0)
+            require(value==a.solid_under(*t,z-1),
+                    "underside style changed mid-section instead of at a floor-group boundary");
+    }
+    std::size_t observed_changes=0;
+    for (std::uint64_t seed=1;seed<=32;++seed) {
+        Maze world({32,32,64,seed,0,0});
+        StairNetwork net(world,settings);
+        auto tower=net.for_chunk(0,0,0);
+        require(tower.has_value(),"missing forced stair in seeded structural test");
+        for (std::uint64_t z=settings.construction_section_floors;z<tower->top;
+             z+=settings.construction_section_floors) {
+            if (net.solid_under(*tower,z)!=net.solid_under(*tower,z-1))
+                ++observed_changes;
+        }
+    }
+    require(observed_changes>0,"the same large staircase must be allowed to change between floors");
+    StairNetwork always_solid(m,{63,63,10000,0,10000,10000,1});
+    StairNetwork always_hollow(m,{63,63,10000,0,10000,0,1});
+    for (std::uint64_t z=0;z<t->top;++z) {
+        require(always_solid.solid_under(*t,z),"solid-only mode generated hollow flight");
+        require(!always_hollow.solid_under(*t,z),"hollow-only mode generated solid flight");
+    }
+    bool rejected=false;
+    try { (void)a.solid_under(*t,t->top); }
+    catch(const std::out_of_range&) {rejected=true;}
+    require(rejected,"stair top landing erroneously considered a flight");
+    std::cout << "ok: deterministic whole-flight underside sections; changes only between floors\n";
+}
+
 void test_last_floor_arithmetic() {
     constexpr std::uint64_t maximum = std::numeric_limits<std::uint64_t>::max();
     Maze m({1,2,maximum,301,0,0},1);
@@ -214,6 +257,14 @@ void test_invalid_config() {
     try { StairNetwork s(m,{std::numeric_limits<std::uint64_t>::max(),1,10000,10000,10000}); }
     catch (const std::invalid_argument&) { bad = true; }
     require(bad,"accepted overflowing max_rise");
+    bad = false;
+    try { StairNetwork s(m,{12,1,10000,0,0,10001,4}); }
+    catch (const std::invalid_argument&) { bad = true; }
+    require(bad,"accepted out-of-range solid understructure percentage");
+    bad = false;
+    try { StairNetwork s(m,{12,1,10000,0,0,5000,0}); }
+    catch (const std::invalid_argument&) { bad = true; }
+    require(bad,"accepted zero-story construction section");
     std::cout << "ok: configuration validation\n";
 }
 }
@@ -230,6 +281,7 @@ int main() {
         test_augmented_connectivity({50,40,25,3,100,10}, {24,4,7500,5000,5000});
         test_augmented_connectivity({63,68,13,4,400,100}, {12,1,2500,7000,3000});
         test_random_access_huge();
+        test_underside_construction_sections();
         test_last_floor_arithmetic();
         test_invalid_config();
         std::cout << "ALL STAIR TESTS PASSED\n";

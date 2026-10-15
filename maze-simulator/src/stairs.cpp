@@ -14,14 +14,18 @@ constexpr std::uint64_t TagBegin = 0x5354414952531005ULL;
 constexpr std::uint64_t TagEnclosed = 0x5354414952531006ULL;
 constexpr std::uint64_t TagShape = 0x5354414952531007ULL;
 constexpr std::uint64_t TagLanding = 0x5354414952531008ULL;
+constexpr std::uint64_t TagSolidUnder = 0x5354414952531009ULL;
 }
 
 StairNetwork::StairNetwork(Maze& maze, StairSettings options) : maze_(maze), options_(options) {
     if (!options.min_rise || options.min_rise > options.max_rise ||
         options.max_rise == std::numeric_limits<std::uint64_t>::max())
         throw std::invalid_argument("stair min_rise must be 1..max_rise and max_rise must be below UINT64_MAX");
-    if (options.density_bps > 10000 || options.landing_bps > 10000 || options.enclosed_bps > 10000)
+    if (options.density_bps > 10000 || options.landing_bps > 10000 ||
+        options.enclosed_bps > 10000 || options.solid_under_bps > 10000)
         throw std::invalid_argument("stair probabilities must be 0..10000 basis points");
+    if (!options.construction_section_floors)
+        throw std::invalid_argument("underside construction sections must span at least one whole floor");
 }
 
 std::uint64_t StairNetwork::mix(std::uint64_t x) {
@@ -94,6 +98,18 @@ bool StairNetwork::has_landing(const Stairwell& t, std::uint64_t floor) const {
     if (floor == t.bottom || floor == t.top) return true;
     return !t.enclosed && options_.landing_bps &&
         hash(TagLanding, {t.chunk_x,t.chunk_y,t.band,floor}) % 10000 < options_.landing_bps;
+}
+
+// Physical underside style is stable throughout each group of complete
+// floor-to-floor flights. Switching is possible ONLY at a shared landing,
+// not partway up any individual flight or randomly within its mesh chunks.
+// This is an O(1) lookup even in towers spanning millions of floors.
+bool StairNetwork::solid_under(const Stairwell& t, std::uint64_t floor) const {
+    if (floor < t.bottom || floor >= t.top)
+        throw std::out_of_range("no flight originates at the given staircase floor");
+    const std::uint64_t section = (floor - t.bottom) / options_.construction_section_floors;
+    return options_.solid_under_bps != 0 &&
+           hash(TagSolidUnder, {t.chunk_x,t.chunk_y,t.band,section}) % 10000 < options_.solid_under_bps;
 }
 
 NavNeighbors StairNetwork::neighbors(NavNode n) {

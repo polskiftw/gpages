@@ -34,9 +34,47 @@ whole swept body footprint, including player radius, is above their head.
 The test calculates that minimum analytically for a straight crossing.
 It is NOT yet a fully general capsule collision solver.
 
-The physical OBJ exporter writes actual flat stair treads, a thin sloped
-supporting underside, the lower floor, an upper landing, and (if enabled)
-floor-reaching walls. It does not fill the underside with a solid ramp.
+The physical OBJ exporter writes flat stair treads, a continuous hollow slab
+or a single solid underside infill, the lower floor, an upper landing, and
+optional floor-reaching enclosure walls. The caller chooses the full-flight
+undercarriage style; it never mixes solid and hollow under one flight.
+
+## Undercarriage and enclosing walls are independent
+
+A staircase flight has TWO independent architectural choices:
+
+| Undercarriage | Side walls | Appearance and ground-level crossing |
+| --- | --- | --- |
+| Hollow | None | One uninterrupted sloped underside; can pass under the high end if there is headroom and a corridor |
+| Hollow | Enclosed | Underside is continuous and hollow, but floor-reaching side walls block a transverse ground-level corridor |
+| Solid | None | Entire space below the inclined stair slab is one continuous masonry wedge; no underpass, even without side walls |
+| Solid | Enclosed | Same solid infill plus the separate side walls |
+
+A solid undercarriage is **all-or-nothing for a complete floor-to-floor
+flight**. It must not contain arbitrarily placed hollow tiles or gaps.
+The OBJ model creates a **single triangular infill prism** under the entire
+flight, with two uninterrupted side surfaces that can visually match
+ordinary corridor walls. The open/hollow model instead has ONE continuous
+smooth inclined underside from bottom to top. No patchy supports or
+random per-step undercarriage decisions.
+
+One enormous staircase may switch its construction **between stories**:
+floors 1-5 solid, floors 5-9 hollow, floors 9-17 solid, etc. The story
+landing is a natural architectural boundary where the type can change.
+This must not create a gap or discontinuity in the walking surface above.
+
+The long-stair generator uses a seeded stable style hash keyed to the
+stairwell ID and the index of a contiguous section of whole story flights.
+Defaults: 50% chance of solid infill per section; sections span four full
+flights. Set construction_section_floors=1 for a new decision on every
+story, or a larger value to create longer consistent runs. Consecutive
+sections may independently pick the same style and visually join into
+one longer uninterrupted section.
+
+Undercarriage solidity and outer side walls are **not** the same as
+Stairwell.enclosed, which controls only which intermediate floors
+have corridor entrances. Geometry does not automatically cut openings
+in an otherwise closed maze wall.
 
 ## Many floors without teleporting
 
@@ -64,6 +102,8 @@ Inside maze-simulator:
     ctest --test-dir build --output-on-failure
     ./build/maze-geometry open ./open-stairs.obj
     ./build/maze-geometry walled ./walled-stairs.obj
+    ./build/maze-geometry solid ./solid-stairs.obj
+    ./build/maze-geometry solid-walled ./solid-walled-stairs.obj
 
 Both OBJ files are standard triangle meshes that can be viewed in a 3D
 mesh application. The program also reports whether the two example

@@ -28,12 +28,21 @@ jobs:
           cmake --build /tmp/maze-build --parallel 2
       - name: Run all navigation and geometry regressions
         run: ctest --test-dir /tmp/maze-build --output-on-failure
-      - name: Export open and enclosed OBJ prototype rooms
+      - name: Export hollow/solid and open/walled geometry combinations
         shell: bash
         run: |
           /tmp/maze-build/maze-geometry open /tmp/open-stairs.obj
           /tmp/maze-build/maze-geometry walled /tmp/walled-stairs.obj
+          /tmp/maze-build/maze-geometry solid /tmp/solid-stairs.obj
+          /tmp/maze-build/maze-geometry solid-walled /tmp/solid-walled-stairs.obj
           test -s /tmp/open-stairs.obj
           test -s /tmp/walled-stairs.obj
-          grep -q '^g stairs_with_open_underneath$' /tmp/open-stairs.obj
-          grep -q '^g floor_reaching_enclosure_walls$' /tmp/walled-stairs.obj
+          test -s /tmp/solid-stairs.obj
+          test -s /tmp/solid-walled-stairs.obj
+          grep -Fxq 'g stairs_with_open_underneath' /tmp/open-stairs.obj
+          grep -Fxq 'g floor_reaching_enclosure_walls' /tmp/walled-stairs.obj
+          grep -Fxq 'g continuous_solid_infill' /tmp/solid-stairs.obj
+          grep -Fxq 'g continuous_solid_infill' /tmp/solid-walled-stairs.obj
+          grep -Fxq 'g floor_reaching_enclosure_walls' /tmp/solid-walled-stairs.obj
+          ! grep -Fxq 'g continuous_solid_infill' /tmp/open-stairs.obj
+          ! grep -Fxq 'g continuous_solid_infill' /tmp/walled-stairs.obj

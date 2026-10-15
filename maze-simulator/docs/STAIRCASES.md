@@ -83,6 +83,41 @@ Intermediate floors are passed, not entered, regardless of `landing_bps`.
 Alternatively choose `enclosed_bps=0,landing_bps=10000` to get an entrance on
 every floor along the same uninterrupted vertical route.
 
+## Continuous solid and hollow undercarriages
+
+The structural underside is decided per complete floor-to-floor flight,
+rather than per stair tread, triangle, cell, or chunk. An entire long
+stairwell may change style **at floor landings** without ever producing
+random masonry chunks when viewed from below. A hollow flight renders
+one continuous sloping underside, and a solid flight fills the entire
+space beneath the slope with a continuous wall-like prism.
+
+The choices are deterministic and independent of the presence of
+landing entrances or enclosure walls:
+
+| Setting | Default | Meaning |
+| --- | ---: | --- |
+| solid_under_bps | 5000 | Chance that an underside group is solid (50%) |
+| construction_section_floors | 4 | Number of complete floor-to-floor flights sharing one underside style |
+
+The section index for any flight that starts at level z is
+floor((z - tower.bottom) / construction_section_floors).
+The staircase ID and section index determine its solid/hollow style,
+allowing constant-time random-access reconstruction anywhere in a
+very tall tower. The generator never allocates or iterates the entire
+tower to make this choice.
+
+Set solid_under_bps=0 for all hollow, 10000 for all solid, or an
+intermediate value for mixed multistory structures. Set
+construction_section_floors=1 to permit changes at every landing;
+larger sections reduce visual noise. Adjacent sections that choose
+the same construction style blend into one longer span.
+
+Important: the long-stair route generator records only the selection;
+the new stair geometry prototype knows how to model each variant.
+Integrating physical occupied volumes and safe junctions into the
+whole maze remains future work. See [GEOMETRY.md](GEOMETRY.md).
+
 ## Build and inspect
 
 From `maze-simulator/` on Gentoo/Linux:

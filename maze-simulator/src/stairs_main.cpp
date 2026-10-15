@@ -26,8 +26,8 @@ std::uint16_t as_bps(const char* s) {
 
 int main(int argc, char** argv) {
     try {
-        if (argc != 1 && argc != 5 && argc != 6 && argc != 7 && argc != 8 && argc != 9 && argc != 10)
-            throw std::invalid_argument("usage: maze-stairs [width height floors seed [max_rise [min_rise [density_bps [landing_bps [enclosed_bps]]]]]]");
+        if (argc != 1 && (argc < 5 || argc > 12))
+            throw std::invalid_argument("usage: maze-stairs [width height floors seed [max_rise [min_rise [density_bps [landing_bps [enclosed_bps [solid_under_bps [section_floors]]]]]]]]");
         Settings world{128,128,96,6549,0,0};
         StairSettings settings;
         if (argc >= 5) {
@@ -39,6 +39,8 @@ int main(int argc, char** argv) {
         if (argc >= 8) settings.density_bps=as_bps(argv[7]);
         if (argc >= 9) settings.landing_bps=as_bps(argv[8]);
         if (argc >= 10) settings.enclosed_bps=as_bps(argv[9]);
+        if (argc >= 11) settings.solid_under_bps=as_bps(argv[10]);
+        if (argc >= 12) settings.construction_section_floors=as_u64(argv[11]);
         Maze maze(world);
         StairNetwork network(maze,settings);
         std::cout << "Seed " << world.seed << " | finite maze " << world.width << 'x'
@@ -69,9 +71,22 @@ int main(int argc, char** argv) {
                     }
                     if (t->top-t->bottom-1 > limit) std::cout << ", ...";
                     std::cout << ", " << t->top+1 << "\n";
+                    // Bounded, human-readable S/H display, NEVER iterating an
+                    // entire million-story tower just to print its metadata.
+                    const std::uint64_t flights=t->top-t->bottom;
+                    const std::uint64_t shown=std::min<std::uint64_t>(flights,48);
+                    std::cout << "   Underside per full flight (S=solid, H=hollow): ";
+                    for (std::uint64_t step=0;step<shown;++step) {
+                        if (step && step%settings.construction_section_floors==0)
+                            std::cout << ' ';
+                        std::cout << (network.solid_under(*t,t->bottom+step)?'S':'H');
+                    }
+                    if (shown<flights) std::cout << " ...";
+                    std::cout << "\n";
                 }
         if (!found) std::cout << "No long staircases in this sample. Increase density_bps or inspect another seed.\n";
-        std::cout << "\nThis lists abstract navigation topology. Physical steps, ramps, clearance and collision meshes are not yet implemented.\n";
+        std::cout << "\nLong-stair metadata is generated, including per-flight underside style,\n"
+                     "but the physical stair geometry is not yet installed into the full maze.\n";
     } catch (const std::exception& error) {
         std::cerr << "Error: " << error.what() << '\n';
         return 1;
