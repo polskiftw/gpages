@@ -1,7 +1,8 @@
 # Maze Simulator - procedural 3D maze engine (prototype)
 
-**Status:** a real, tested, on-demand **maze topology and staircase-routing generator** for the planned
-Windows 95 3D Maze-inspired first-person game. It is **not a playable 3D game yet**.
+**Status:** the mathematically tested on-demand **maze/staircase generator** now has an
+independent **playable native 3D staircase laboratory** (SDL3 + OpenGL 3.3).
+The laboratory is a small handcrafted room, **not yet the generated giant maze**.
 The source is in this independent `gpages/maze-simulator/` folder; it does not
 modify the GitHub Pages landing page, other utilities, or site navigation.
 
@@ -9,9 +10,31 @@ The goal is to make mazes far larger than RAM, with arbitrary finite dimensions,
 multiple floors, connected corridors, reproducible worlds, and no requirement to
 generate or save the entire maze up front.
 
+## Play the first 3D test room
+
+The separate stair laboratory is a real Linux first-person executable with
+brick walls and ceilings, 16 physical steps, a raised landing and a usable
+ground-level underpass. Switch between all four combinations of hollow/solid
+undercarriage and open/enclosed sides in real time. It tests the agreed geometry,
+not procedural maze placement yet.
+
+If SDL3 and OpenGL development support are already installed, run from this folder:
+
+    sh run-playable.sh
+
+WASD moves, mouse looks, Shift runs, R starts at the foot of the stairs,
+U starts beside the underpass, 1/2/3/4 switch structural types, Esc frees
+the mouse, and Q quits. The launcher compiles locally using your own
+installed libraries; it neither installs software nor starts daemons.
+
+Full details, including headless screenshot checks:
+[docs/PLAYABLE.md](docs/PLAYABLE.md).
+
 ## Build on Gentoo / Linux
 
-Only a C++20 compiler is needed. No SDL, OpenGL, third-party code, servers, or daemons.
+For the original topology CLI/tests, only a C++20 compiler is needed.
+The separate native 3D laboratory additionally needs your existing SDL3/OpenGL development libraries.
+Neither mode needs a server or daemon.
 
 ```sh
 g++ -std=c++20 -O2 -Wall -Wextra src/maze.cpp src/main.cpp -o maze-cli
