@@ -63,7 +63,7 @@ jobs:
       - name: Install OpenGL software renderer and headless X server
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgl1-mesa-dev libx11-dev xvfb xauth
+          sudo apt-get install -y libgl1-mesa-dev libx11-dev libxext-dev libxcursor-dev libxi-dev libxrandr-dev libxfixes-dev libxss-dev libxinerama-dev libxkbcommon-dev xvfb xauth
       - name: Compile and install CI-local SDL3 (no system modifications)
         run: |
           cmake -S vendor-sdl -B /tmp/maze-sdl-build \
