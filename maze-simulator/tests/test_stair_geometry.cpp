@@ -157,7 +157,9 @@ void test_obj() {
         return c;
     };
     require(count("v ") > 8*16, "mesh has too few 3D vertices");
-    require(count("f ") >= 12*16, "mesh missing solid tread triangles");
+    // The smooth open underside is ONE plane instead of sixteen separate
+    // per-step quads, reducing triangle count while preserving all treads.
+    require(count("f ") >= 10*16, "mesh missing stair treads or side surfaces");
     require(count("g ") == 3, "open model should have three named groups");
     f.sides=Sides::Walled;
     std::ostringstream walled;
