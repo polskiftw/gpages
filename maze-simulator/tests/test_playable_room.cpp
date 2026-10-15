@@ -62,7 +62,8 @@ void test_collisions() {
     Room room;
     Pose p=room.spawn();
     check(!room.standable({-3,0,0}),"outer brick wall not solid");
-    check(!room.standable({3.6,0.5,0}),"feet cannot stand inside low-floor slab");
+    check(!room.standable({1.2,0.5,0}),"ground floor at the LOW stair end has no headroom");
+    check(room.standable({3.6,0.5,0}),"ground floor under the HIGH stair end must remain usable");
     check(room.standable({3.6,0.5,0.9375}),"stair step top should be standable");
     check(!room.standable({3.6,0.5,0.75}),"floating between underside and tread");
     check(!room.move(p,1000,0),"unbounded movement should be rejected");
