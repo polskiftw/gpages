@@ -71,7 +71,7 @@ jobs:
             -DCMAKE_INSTALL_PREFIX=/tmp/maze-sdl-prefix \
             -DSDL_SHARED=OFF -DSDL_STATIC=ON \
             -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF \
-            -DSDL_WAYLAND=OFF -DSDL_X11=ON
+            -DSDL_WAYLAND=OFF -DSDL_X11=ON -DSDL_X11_XTEST=OFF
           cmake --build /tmp/maze-sdl-build --parallel 3
           cmake --install /tmp/maze-sdl-build
       - name: Build playable executable and geometry test with warnings as errors
