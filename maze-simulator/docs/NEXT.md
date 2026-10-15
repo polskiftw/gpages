@@ -45,3 +45,16 @@ UndefinedBehaviorSanitizer runs also passed in the initial development session.
 `tests/test_stairs.cpp` now tests 23-story enclosed staircases, open landings,
 band-crossing runs, multi-space navigation reciprocity/connectedness, and
 trillion-coordinate queries.
+
+## Phase 3: physical stair proof (prototype)
+
+The separate dimensionless stair geometry module now makes flat treads with
+thin supporting undersides (so real underpasses exist), tests the full player
+width/height against clearance, distinguishes open and walled stairs, and
+verifies switchback landings across 23 story segments. It exports simple OBJ
+rooms; see [GEOMETRY.md](GEOMETRY.md). All of this is independent of the
+large-scale topology generator. NEXT PRIORITY: reserve the full 3D volume
+needed by each stair *before* corridor carving; integrate the guaranteed
+macro graph while routing around reserved space and allowing valid underpasses.
+Do not mark physical maze connectivity as solved until traversability is
+checked end-to-end with actual collision geometry.
