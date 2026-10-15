@@ -65,6 +65,33 @@ needs deterministic multi-tile space reservations and a new reachability proof
 before generated stairs can replace abstract Up/Down edges. See
 [docs/GEOMETRY.md](docs/GEOMETRY.md) for limitations and exact test rules.
 
+## Solid versus hollow staircase construction
+
+Stair flights can have an entirely **solid** supporting mass beneath
+them, blending with an ordinary brick maze wall, or a uniformly
+**hollow** underside with one continuous sloping slab. A solid flight
+blocks any underpass regardless of whether it has enclosing walls;
+a hollow flight with no enclosing walls may allow an underpass where
+the player fits. **Never** create per-tread or random partial underfills.
+
+A long staircase can switch its construction at story landings.
+The default stair network groups four adjacent floor-to-floor flights
+with one underside style; section decisions are reproducible from the
+world seed and stair ID. These are independent of whether an intermediate
+floor has an entrance. Physical geometry and navigation are still
+separate prototypes, not a collision-proof generated world.
+
+Inspect all four combinations as standard OBJ meshes after the CMake
+build:
+
+    ./build/maze-geometry open hollow-open.obj
+    ./build/maze-geometry walled hollow-walled.obj
+    ./build/maze-geometry solid solid-open.obj
+    ./build/maze-geometry solid-walled solid-walled.obj
+
+See [docs/GEOMETRY.md](docs/GEOMETRY.md) and
+[docs/STAIRCASES.md](docs/STAIRCASES.md).
+
 ## What we implemented
 
 1. Divide the world into **32 x 32-cell chunks per floor**. Edge chunks are smaller.
