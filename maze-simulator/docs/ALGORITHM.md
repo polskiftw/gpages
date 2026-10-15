@@ -102,6 +102,23 @@ Wilson's algorithm would be suitable as an *alternative local chunk generator*,
 but is not required for streaming correctness. A purely global Wilson run would
 not allow independent random-access chunk generation at astronomical sizes.
 
+## Long staircases: separate interior navigation nodes
+
+The `stairs.hpp`/`stairs.cpp` extension does not change the base graph. Its
+optional deterministic staircase objects add a second `StairInterior` space at
+some XY positions across multiple Z levels. An interior stair node connects
+vertically to the next interior node, but connects to a floor `Corridor` node
+only on an explicit landing. Both endpoints are always open, while intermediate
+landings depend on per-floor hashes or an enclosed/endpoints-only flag. This
+prevents a stairwell that passes through a floor from magically giving the
+player access to that floor.
+
+The additional stairwell edges create alternate routes and do not remove the
+mandatory single-story connections; all original cells and stair interiors stay
+reachable. Candidate generation and finding the tower at a given cell take
+O(1) time even for very tall worlds. See [STAIRCASES.md](STAIRCASES.md) for
+band-crossing, anchor selection, and physical-footprint limitations.
+
 ## The vertical geometry contract
 
 Each up/down bit means `same (x,y), adjacent z`, not that a staircase mesh is
@@ -109,5 +126,5 @@ already created. The renderer should treat these positions as reserved stair
 shafts and generate adequate portals. Physical stairs that require horizontal
 run length or a 2x2 footprint need a later deterministic placement rule that
 preserves topology and collision accessibility. The first prototype can use a
-functional ladder/elevator or centered stair tile; the visuals can remain
+functional stair-only path with appropriate clearance; the visuals can remain
 faithful to the Windows 95 screensaver style.

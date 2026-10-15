@@ -11,3 +11,16 @@ The enormous-coordinate regression uses a *trillion-by-trillion* cell plane,
 three million floors, and evaluates a handful of sampled cells plus 6-way seam
 reciprocity. This demonstrates random-access feasibility; it **does not** prove
 traversal performance or renderability of that astronomical world.
+
+## Staircase topology v2
+
+Stair route creation is deterministic and uses constant-work queries for one
+XY chunk column / floor band, without a global tower index. The separate
+`StairInterior` navigation space allows intermediate closed floors to be
+passed vertically but not entered from the staircase.
+
+`test_stairs.cpp` verifies exactly 23-floor enclosed stairs, unrestricted
+intermediate landings, long runs crossing floor-band boundaries, alternative
+heights, seeded reproducibility and gigantic coordinates. Full BFS checks the
+augmented corridor+stair network for connectivity and reciprocal edges.
+No renderer, geometry, physics or stair-footprint validation exists yet.
