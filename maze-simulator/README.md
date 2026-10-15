@@ -48,6 +48,23 @@ long runs crossing procedural floor-band boundaries. See
 The passage bitmask is **N=1, E=2, S=4, W=8, Up=16, Down=32**.
 A set bit means an opening, not a wall. Cells and floors use zero-based coordinates.
 
+## Physical stair geometry prototype
+
+The optional geometry prototype can produce an actual set of sixteen stair
+steps, a thin sloping underside, an upper landing, and optional enclosing
+walls. It analytically checks whether a person can walk under the *high end*
+and separately whether the same stairs are climbable. A 23-story switchback
+test verifies successive flights meet at shared landings. Export OBJ test
+rooms with:
+
+    ./build/maze-geometry open ./open-stairs.obj
+    ./build/maze-geometry walled ./walled-stairs.obj
+
+This is **not yet** integrated with the giant-maze corridors. The geometry
+needs deterministic multi-tile space reservations and a new reachability proof
+before generated stairs can replace abstract Up/Down edges. See
+[docs/GEOMETRY.md](docs/GEOMETRY.md) for limitations and exact test rules.
+
 ## What we implemented
 
 1. Divide the world into **32 x 32-cell chunks per floor**. Edge chunks are smaller.
