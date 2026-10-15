@@ -9,13 +9,19 @@ using namespace labyrinth::geometry;
 
 int main(int argc, char** argv) {
     try {
-        if (argc != 3 || (std::string(argv[1]) != "open" && std::string(argv[1]) != "walled")) {
-            std::cout << "Usage: maze-geometry <open|walled> <output.obj>\n"
-                         "Writes a dimensionless 3D test room (1 story = 1 unit).\n";
+        const std::string mode = argc > 1 ? argv[1] : "";
+        if (argc != 3 || (mode != "open" && mode != "walled" &&
+                          mode != "solid" && mode != "solid-walled")) {
+            std::cout << "Usage: maze-geometry <open|walled|solid|solid-walled> <output.obj>\n"
+                         "open = hollow underside, no walls; walled = hollow with walls;\n"
+                         "solid = continuous masonry infill, no walls; solid-walled = both.\n"
+                         "Each exported flight may use a different style in a taller stairwell.\n";
             return argc == 1 ? 0 : 2;
         }
         Flight f{};
-        f.sides = std::string(argv[1]) == "walled" ? Sides::Walled : Sides::Open;
+        f.solid_under = (mode == "solid" || mode == "solid-walled");
+        f.sides = (mode == "walled" || mode == "solid-walled")
+                  ? Sides::Walled : Sides::Open;
         const Player p{};
         const bool high = crosses_under(f,{3.6,-0.6},{3.6,1.6},p);
         const bool low = crosses_under(f,{1.2,-0.6},{1.2,1.6},p);
@@ -28,7 +34,8 @@ int main(int argc, char** argv) {
                   << (climbable(f,p) ? "CLIMBABLE" : "BLOCKED") << '\n'
                   << "Ground route across Y at X=3.6: " << (high?"OPEN UNDERPASS":"BLOCKED") << '\n'
                   << "Ground route across Y at X=1.2: " << (low?"OPEN UNDERPASS":"BLOCKED") << '\n'
-                  << "Mode: " << (f.sides==Sides::Open?"no enclosure":"floor-reaching side walls") << '\n'
+                  << "Walls: " << (f.sides==Sides::Open?"none":"floor-reaching enclosure") << '\n'
+                  << "Undercarriage: " << (f.solid_under?"fully solid infill":"uniform hollow slab") << '\n'
                   << "Mesh: " << argv[2] << '\n'
                   << "OBJ export is a test room, NOT connected to the full maze geometry yet.\n";
     } catch (const std::exception& e) {
