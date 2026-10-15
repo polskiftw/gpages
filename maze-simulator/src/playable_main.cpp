@@ -26,7 +26,6 @@ constexpr float Pi=3.14159265358979323846f;
 struct V3 {
     float x,y,z;
 };
-V3 sub(V3 a,V3 b) { return {a.x-b.x,a.y-b.y,a.z-b.z}; }
 float dot(V3 a,V3 b) { return a.x*b.x+a.y*b.y+a.z*b.z; }
 V3 cross(V3 a,V3 b) {
     return {a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x};
