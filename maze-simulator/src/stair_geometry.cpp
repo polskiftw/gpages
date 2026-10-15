@@ -35,6 +35,13 @@ public:
             << "f " << n << ' ' << n+2 << ' ' << n+3 << '\n';
         next_vertex += 4;
     }
+    void tri(Point3 a, Point3 b, Point3 c) {
+        const std::uint64_t n = next_vertex;
+        for (auto p : {a,b,c})
+            out << "v " << p.x << ' ' << p.y << ' ' << p.z << '\n';
+        out << "f " << n << ' ' << n+1 << ' ' << n+2 << '\n';
+        next_vertex += 3;
+    }
     void box(Point3 low, Point3 high) {
         quad({low.x,low.y,high.z},{high.x,low.y,high.z},{high.x,high.y,high.z},{low.x,high.y,high.z});
         quad({low.x,high.y,low.z},{high.x,high.y,low.z},{high.x,low.y,low.z},{low.x,low.y,low.z});
@@ -56,6 +63,8 @@ void validate(const Flight& f) {
     positive(f.width, "flight width must be positive");
     positive(f.rise, "flight rise must be positive");
     positive(f.slab, "stair slab thickness must be positive");
+    if (f.solid_under && f.slab >= f.rise)
+        throw std::invalid_argument("solid undercarriage needs slab thinner than flight rise");
     if (f.steps == 0 || f.steps > 1000000)
         throw std::invalid_argument("flight steps must be 1..1000000");
     if (!finite(f.origin.x + f.run) || !finite(f.origin.y + f.width) ||
@@ -88,9 +97,9 @@ double tread_height(const Flight& f, double x) {
 double underside_height(const Flight& f, double x) {
     validate(f);
     if (!finite(x)) throw std::invalid_argument("x must be finite");
-    // A thin continuous sloped supporting slab instead of a solid triangular
-    // pile of stairs; the void underneath is actual empty navigable volume.
-    return f.base_z + progress(f,x) * f.rise - f.slab;
+    // With a solid infill the first blocking surface is at floor level.
+    // Hollow stairs have one continuous exposed sloping support slab.
+    return f.solid_under ? f.base_z : f.base_z + progress(f,x) * f.rise - f.slab;
 }
 
 bool climbable(const Flight& f, const Player& p) {
@@ -110,7 +119,7 @@ bool crosses_under(const Flight& f, Point2 start, Point2 finish, const Player& p
     const double upper_y = f.origin.y + f.width + p.radius;
     if (!((start.y < lower_y && finish.y > upper_y) ||
           (finish.y < lower_y && start.y > upper_y))) return false;
-    if (f.sides == Sides::Walled) return false;
+    if (f.sides == Sides::Walled || f.solid_under) return false;
 
     // Solve exactly where the line crosses the broadened stair strip.
     // At both strip boundaries the body's X-radius must remain inside the run.
@@ -146,7 +155,19 @@ void write_demo_room_obj(std::ostream& out, const Flight& f) {
     const double x2=f.reversed ? f.origin.x : f.origin.x+f.run+1.0;
     obj.box({x1,f.origin.y,f.base_z+f.rise-0.04},
             {x2,f.origin.y+f.width,f.base_z+f.rise});
-    obj.group("stairs_with_open_underneath");
+    obj.group(f.solid_under ? "stairs_with_solid_undercarriage"
+                            : "stairs_with_open_underneath");
+    // The hollow underside is a SINGLE unbroken sloping slab per flight.
+    // Never generate random missing pieces under individual steps or chunks.
+    if (!f.solid_under) {
+        const double start_x=f.reversed?f.origin.x+f.run:f.origin.x;
+        const double end_x=f.reversed?f.origin.x:f.origin.x+f.run;
+        const double y0=f.origin.y,y1=f.origin.y+f.width;
+        obj.quad({start_x,y1,f.base_z-f.slab},
+                 {end_x,y1,f.base_z+f.rise-f.slab},
+                 {end_x,y0,f.base_z+f.rise-f.slab},
+                 {start_x,y0,f.base_z-f.slab});
+    }
     const double len = f.run / f.steps;
     for (std::uint32_t i=0;i<f.steps;++i) {
         const double ta=static_cast<double>(i)/f.steps;
@@ -159,11 +180,27 @@ void write_demo_room_obj(std::ostream& out, const Flight& f) {
         const double under_b=f.base_z+tb*f.rise-f.slab;
         (void)len;
         obj.quad({xa,y0,top},{xb,y0,top},{xb,y1,top},{xa,y1,top});
-        obj.quad({xa,y1,under_a},{xb,y1,under_b},{xb,y0,under_b},{xa,y0,under_a});
         obj.quad({xa,y0,under_a},{xb,y0,under_b},{xb,y0,top},{xa,y0,top});
         obj.quad({xa,y1,top},{xb,y1,top},{xb,y1,under_b},{xa,y1,under_a});
         obj.quad({xa,y0,under_a},{xa,y0,top},{xa,y1,top},{xa,y1,under_a});
         obj.quad({xb,y0,top},{xb,y0,under_b},{xb,y1,under_b},{xb,y1,top});
+    }
+    if (f.solid_under) {
+        // One continuous triangular infill prism for the ENTIRE flight.
+        // Side faces are plain, so they can share the maze wall material.
+        // Its bottom starts where the inclined slab first clears the floor.
+        // Changing the construction between stories is handled at landings.
+        obj.group("continuous_solid_infill");
+        const double low_x=f.reversed?f.origin.x+f.run:f.origin.x;
+        const double high_x=f.reversed?f.origin.x:f.origin.x+f.run;
+        const double toe_x=low_x+(high_x-low_x)*f.slab/f.rise;
+        const double y0=f.origin.y,y1=f.origin.y+f.width;
+        const double z0=f.base_z,z1=f.base_z+f.rise-f.slab;
+        obj.tri({toe_x,y0,z0},{high_x,y0,z0},{high_x,y0,z1});
+        obj.tri({high_x,y1,z0},{toe_x,y1,z0},{high_x,y1,z1});
+        obj.quad({toe_x,y0,z0},{toe_x,y1,z0},{high_x,y1,z1},{high_x,y0,z1});
+        obj.quad({toe_x,y0,z0},{high_x,y0,z0},{high_x,y1,z0},{toe_x,y1,z0});
+        obj.quad({high_x,y0,z0},{high_x,y1,z0},{high_x,y1,z1},{high_x,y0,z1});
     }
     if (f.sides == Sides::Walled) {
         obj.group("floor_reaching_enclosure_walls");
