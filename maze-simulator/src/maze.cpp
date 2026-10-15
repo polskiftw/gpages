@@ -258,7 +258,6 @@ std::uint8_t Maze::passages(Cell c) {
         throw std::out_of_range("cell outside the maze");
     const Chunk& chunk = cached_chunk({ c.x / ChunkSide, c.y / ChunkSide, c.z });
     return chunk.at(static_cast<std::uint32_t>(c.x % ChunkSide), static_cast<std::uint32_t>(c.y % ChunkSide));
-
 }
 
 } // namespace labyrinth
