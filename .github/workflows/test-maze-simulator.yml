@@ -47,6 +47,14 @@ jobs:
           ! grep -Fxq 'g continuous_solid_infill' /tmp/open-stairs.obj
           ! grep -Fxq 'g continuous_solid_infill' /tmp/walled-stairs.obj
 
+
+      - name: Offer a source ZIP that needs no local Git
+        uses: actions/upload-artifact@v4
+        with:
+          name: maze-simulator-source
+          path: maze-simulator/
+          retention-days: 30
+
   playable-linux:
     # Build SDL3 from its upstream release source on CI. The user's native
     # Gentoo build instead uses the already-installed system SDL3 package.
