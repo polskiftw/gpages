@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import {ConnectedDetours3D} from "../elevation/combined.mjs";
 import {N,E,S,W,SOLID} from "../maze-core.mjs";
+import {PITCH,STORY} from "../elevation/stairs.mjs";
+import {movePlayer} from "../walk/navigation.mjs";
 const BITS=[N,E,S,W],DX=[0,1,0,-1],DY=[-1,0,1,0];
 function degree(b){return Number(!!(b&N))+Number(!!(b&E))+Number(!!(b&S))+Number(!!(b&W));}
 function next(w,h,i,d){
@@ -24,7 +26,7 @@ function legacyDistance(cells,w,h,start,goal){
 }
 function examineGapBridges(old,newer,w,h){
   const marked=new Uint8Array(old.length),isNew=i=>(old[i]&SOLID)&&!(newer[i]&SOLID);
-  let opened=0,bridgeCount=0;
+  let opened=0,bridgeCount=0,example=null;
   for(let i=0;i<old.length;i++){
     if(!isNew(i))continue;
     opened++;
@@ -44,13 +46,14 @@ function examineGapBridges(old,newer,w,h){
     assert.ok(q.length>=1&&q.length<=4,"connector carves one to four former masonry cells");
     assert.equal(ends.size,2,"each connector has two real original-corridor entrances, not a dangling spur");
     const [a,b]=[...ends];
+    if(!example)example={a,b,length:q.length};
     assert.ok(degree(old[a])===2&&degree(old[b])===2,"both ends attached at old linear corridors");
     assert.ok(degree(newer[a])===3&&degree(newer[b])===3,"both ends become genuine decision junctions");
     const distance=legacyDistance(old,w,h,a,b);
     assert.ok(distance>=14,"connector offers a meaningful existing detour rather than a trivial little loop: "+distance);
     bridgeCount++;
   }
-  return {bridgeCount,opened};
+  return {bridgeCount,opened,example};
 }
 const seeds=["LOST-6549","A-LOT-OF-CORRIDORS","TANGLED-WAY","LONG-HALLWAY"];
 let checked=0,totalBridge=0,totalCarved=0;
@@ -72,7 +75,7 @@ for(const seed of seeds){
   assert.ok(upgraded.carvedCells>=upgraded.bridges,"each bridge opens at least one solid cell");
   assert.ok(upgraded.stairs/upgraded.edges<.05,"stairs remain sparse");
   assert.equal(upgraded.levelCounts.length,upgraded.levels);
-  let bridges=0,opened=0;
+  let bridges=0,opened=0,walkedBridge=false;
   for(let z=0;z<o.levels;z++){
     const original=legacy.flatMasks[z],rich=upgraded.flatMasks[z];
     for(let i=0;i<original.length;i++)if(!(original[i]&SOLID)){
@@ -81,6 +84,20 @@ for(const seed of seeds){
     }
     const result=examineGapBridges(original,rich,o.width,o.height);
     bridges+=result.bridgeCount;opened+=result.opened;
+    if(!walkedBridge&&result.example){
+      const {a,b,length}=result.example,ax=a%o.width,ay=Math.floor(a/o.width),
+        bx=b%o.width,by=Math.floor(b/o.width);
+      const dx=Math.sign(bx-ax),dy=Math.sign(by-ay);
+      assert.equal(Math.abs(bx-ax)+Math.abs(by-ay),length+1,
+        "every new corridor spans its entire former solid gap straight through");
+      let player={x:ax*PITCH,z:ay*PITCH,feet:z*STORY,yaw:0,pitch:0};
+      for(let edge=0;edge<length+1;edge++)for(let s=0;s<70;s++)
+        player=movePlayer(upgraded,player,dx*PITCH/70,dy*PITCH/70);
+      assert.ok(Math.hypot(player.x-bx*PITCH,player.z-by*PITCH)<.3,
+        "actual first-person collision must permit traversing both entrances of a carved connector");
+      assert.ok(Math.abs(player.feet-z*STORY)<.001,"flat connector never teleports between floors");
+      walkedBridge=true;
+    }
     assert.equal(result.bridgeCount,upgraded.choiceDiagnostics[z].bridges);
     assert.equal(result.opened,upgraded.choiceDiagnostics[z].carved);
     assert.equal(upgraded.floorMetrics[z].short,old.floorMetrics[z].short,
@@ -91,6 +108,7 @@ for(const seed of seeds){
       "90th-percentile walks without junctions must not get longer");
     checked++;
   }
+  assert.ok(walkedBridge,"each full seed must contain a physically walkable cross-gap route");
   assert.equal(bridges,upgraded.bridges);
   assert.equal(opened,upgraded.carvedCells);
   totalBridge+=bridges;totalCarved+=opened;
