@@ -129,3 +129,58 @@ were **0.72% at setting 1, 1.41% at setting 2, and 3.15% at setting 8**
 of all undirected navigable edges. This retains occasional multistory climbs
 without making staircases the dominant means of travel. Extra alternative
 route connections are deliberately planar rather than generating more ramps.
+
+## Connected Detours 3D — integrated mathematical preview
+
+**[Open the new unified browser viewer](./unified/)** ·
+https://polskiftw.github.io/gpages/maze-simulator/unified/
+
+The formerly separate corridor and stair experiments now have one tested,
+seeded 3D navigation graph, **ConnectedDetours3D**. The older pages remain
+available for comparisons rather than being deleted.
+
+The integrator runs the approved **Connected Detours v4** on each *entire*
+horizontal floor. It preserves every horizontal passage bit, every retained
+wall, the deeper cul-de-sac distribution and the braiding algorithm exactly.
+There are no chunk-sized submazes.
+
+It then makes each floor reachable from the next via very sparse,
+collision-checked, reciprocal **real X/Y/Z slope edges**. Additional stair
+routes join existing floor corridors, which already contain the useful
+long-range detours. Some stair runs start at a level corridor, pass through
+previously solid *intermediate floor cells* without branching, and end at a
+different floor's corridor: a genuine uninterrupted multi-story climb with
+no compulsory landing or predefined L/U staircase template. Only the
+randomly generated sequence of edges determines its shape.
+
+- Setting 1-8 imposes an actual maximum per floor-pair; default 2.
+- Randomized endpoints are in different floors and at least 85% of the
+  maximum cross-floor *shortest-path graph distance* apart.
+- Uninterrupted ramp interiors are protected from branches being attached
+  later; ordinary floor junctions remain free to branch and turn.
+- Physical XYZ positions are scaled as 7 m per horizontal step and 3.5 m
+  per story, with 1.5 m corridor width, 2.1 m standing clearance and
+  0.25 m slab allowance. Co-projected route edges cannot intersect at
+  incompatible heights; full final mesh/collision rendering is NOT done yet.
+- The viewer offers full-floor and cropped/pannable SVG, actual stair runs,
+  seeded link sharing, and an exact navigable-edge JSON export.
+
+Run with Node.js 22+:
+
+    node --test tests/combined.test.mjs
+    node unified/examples.mjs /tmp/combined-maze
+
+CI independently checks 16 worlds across four seeds, small and large
+dimensions, exact horizontal-bit preservation, all-level connectivity,
+reciprocity, absence of non-Euclidean teleports, stair rarity, protected
+uninterrupted multistory climbs, clearance and reproducible generation.
+
+**Measured on LOST-6549, 28x28x6, frequency 2:** 35 stair edges out of
+3,585 connected 3D edges (**0.98%**). Original Connected Detours median
+dead-end depth by floor: 9/8/9/9/9/8 cells. At least one automatically
+generated uninterrupted stair run climbs three levels. Those are real
+topology statistics, not artistic mockups.
+
+This is now the strongest base for a subsequent 3D renderer. We have **not**
+replaced the existing original maze version or claimed that wall/ceiling
+collision meshes have been completed.
