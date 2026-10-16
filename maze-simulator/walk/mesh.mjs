@@ -43,12 +43,13 @@ export function buildMesh(maze,{center=maze.start,radius=13,floorRadius=2}={}){
     const steps=a.z===b.z?1:16,kind=a.z===b.z?SURFACE.STONE:SURFACE.STAIRS;
     // Include grade breakpoints exactly, so landings meet the slope without
     // holes or unexpected slopes inside their square landing floor.
-    const cuts=[0,1];
-    if(steps>1){
-      for(let s=1;s<steps;s++)cuts.push(s/steps);
-      if(hasPad(maze,i))cuts.push(padFraction(maze,i));
-      if(hasPad(maze,j))cuts.push(1-padFraction(maze,j));
-    }
+    // The square landing occupies the last WIDTH/2 of every incoming edge.
+    // NEVER put corridor sidewalls inside that square: doing so would make
+    // legal N-to-E turns look blocked by internal floating wall panels.
+    // Straight through-flight nodes have no landing and remain continuous.
+    const start=padFraction(maze,i),end=1-padFraction(maze,j);
+    const cuts=[start,end];
+    if(steps>1)for(let s=1;s<steps;s++)cuts.push(start+(end-start)*s/steps);
     cuts.sort((x,y)=>x-y);
     const point=(t,side,offset=0)=>{
       const elevation=edgeHeight(maze,i,j,t)+offset;
