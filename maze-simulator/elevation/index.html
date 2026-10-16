@@ -20,7 +20,7 @@
 <div class="field"><label for="width">Width</label><input id="width" type="number" value="28" min="6" max="64" required></div>
 <div class="field"><label for="height">Height</label><input id="height" type="number" value="28" min="6" max="64" required></div>
 <div class="field"><label for="levels">Elevation levels</label><input id="levels" type="number" value="6" min="2" max="12" required></div>
-<div class="field"><label for="stairWeight">Stair frequency</label><input id="stairWeight" type="number" value="17" min="2" max="60" required></div>
+<div class="field"><label for="stairWeight">Stair frequency</label><input id="stairWeight" type="number" value="3" min="2" max="60" required></div>
 <div class="field seed"><label for="seed">Seed</label><input id="seed" type="text" value="LOST-6549" maxlength="100" required></div>
 <button type="submit" class="primary">Generate</button><button id="reroll" type="button">Random seed</button>
 </form>
@@ -48,7 +48,7 @@
 <button id="share" type="button">Copy seed link</button>
 </section>
 <section class="technical"><h2>Actual physical scale</h2>
-<p>Every horizontal step advances <strong>6 m</strong>. A climbing step gains or loses <strong>3 m</strong>, so every rising segment has the same realistic 26.6° incline. The walkable ribbon is <strong>1.5 m wide</strong>, with <strong>2.1 m headroom</strong> and a 0.25 m floor allowance. A physical-space reservation test prevents intersecting overlapping passage ribbons. Cells on different levels may occupy the same X/Y footprint if they have vertical clearance.</p>
+<p>Every horizontal step advances <strong>7 m</strong>. A climbing step gains or loses <strong>3.5 m</strong>, so every rising segment has the same realistic 26.6° incline. The walkable ribbon is <strong>1.5 m wide</strong>, with <strong>2.1 m headroom</strong> and a 0.25 m floor allowance. A physical-space reservation test prevents intersecting overlapping passage ribbons. Cells on different levels may occupy the same X/Y footprint if they have vertical clearance.</p>
 <p>This is a new <strong>elevation-aware topology prototype</strong>. The approved Connected Detours generator stays available on the main page while we test the new movement mathematics. Here, every stair link is horizontally displaced, unlike the older abstract same-coordinate U/D links. A complete 3D renderer and staircase/ceiling meshes have not yet been built.</p></section>
 <footer>Each SVG and JSON edge comes directly from <code>stairs.mjs</code>. No server or game engine. Generation is global and deterministic; there are no generation chunks or stair design templates.</footer>
 </main></body></html>
