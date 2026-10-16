@@ -97,6 +97,6 @@ for(const stairWeight of [1,4,8]){
       "stairs",m.stairs,"edges",m.edges,"percent",m.stairShare);
   }
 }
-assert.equal(COMBINED_VERSION,"detours-elevation-v1");
+assert.equal(COMBINED_VERSION,"detours-elevation-v2");
 assert.throws(()=>new ConnectedDetours3D({width:2,height:16,levels:3}),/width/);
 console.log("ALL INTEGRATED TOPOLOGY CHECKS PASSED",worlds,"worlds;",longCount,"naturally continuous flights");
