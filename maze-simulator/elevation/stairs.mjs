@@ -63,7 +63,16 @@ export class ElevationMaze{
     }
     return true;
   }
+  // Each cardinal heading has at most one exit: the corridor floor either
+  // stays level, climbs, or descends. A staircase is NEVER an optional
+  // piece of furniture beside a same-direction flat corridor.
+  headingOccupied(i,code){
+    const d=direction(code);
+    return !!(this.bits[i]&((1<<d)|(1<<(d+4))|(1<<(d+8))));
+  }
   join(i,j,code){
+    if(this.headingOccupied(i,code)||this.headingOccupied(j,opposite(code)))
+      throw new Error("Only one enclosed passage is permitted per heading");
     if(!this.clear(i,j))throw new Error("Reserved passage-volume collision");
     if((this.bits[i]&(1<<code))||this.bits[j]&(1<<opposite(code)))throw new Error("Repeated edge");
     this.bits[i]|=1<<code;this.bits[j]|=1<<opposite(code);
@@ -77,6 +86,30 @@ export class ElevationMaze{
       this.stairs++;
     }
   }
+  // Find real stacked passages sharing the *same projected horizontal
+  // corridor footprint*. There is no junction between them. The lower
+  // passage has a continuous enclosed headroom below the upper route slab.
+  // A staircase may thus pass above an ordinary corridor invisibly.
+  overpasses(){
+    const result=[],asPoint=p=>({x:p%this.width,y:Math.floor(p/this.width)});
+    for(const [key,segments] of this.reservations){
+      if(segments.length<2)continue;
+      const a=asPoint(Math.floor(key/this.area)),b=asPoint(key%this.area);
+      for(let i=0;i<segments.length;i++)for(let j=i+1;j<segments.length;j++){
+        const first=segments[i],second=segments[j];
+        if((first.z0===first.z1)===(second.z0===second.z1))continue;
+        const d0=(first.z0-second.z0)*STORY,d1=(first.z1-second.z1)*STORY;
+        if(d0*d1<=0)throw new Error("Overlapping projected passages cross vertically");
+        const minimumHeadroomMeters=Math.min(Math.abs(d0),Math.abs(d1))-SLAB;
+        if(minimumHeadroomMeters<HEADROOM)throw new Error("Not enough headroom beneath overhead passage");
+        const lower=d0<0?first:second,upper=d0<0?second:first;
+        const info=s=>({kind:s.z0===s.z1?"flat":"stairs",startLevel:s.z0,endLevel:s.z1});
+        result.push({from:a,to:b,lower:info(lower),upper:info(upper),
+          minimumHeadroomMeters,requiredHeadroomMeters:HEADROOM,connected:false});
+      }
+    }
+    return result;
+  }
   // True directed 3D route edges, using floor-level positions in real meters.
   geometry(){
     const out=[];
@@ -84,7 +117,8 @@ export class ElevationMaze{
       const a=this.loc(i),b=this.loc(to);
       out.push({from:a,to:b,kind:vertical(code)===0?"flat":"stairs",
         a:[a.x*PITCH,a.y*PITCH,a.z*STORY],b:[b.x*PITCH,b.y*PITCH,b.z*STORY],
-        pitchMeters:PITCH,riseMeters:(b.z-a.z)*STORY,widthMeters:WIDTH,headroomMeters:HEADROOM});
+        pitchMeters:PITCH,riseMeters:(b.z-a.z)*STORY,widthMeters:WIDTH,
+        headroomMeters:HEADROOM,slabMeters:SLAB,enclosure:"walls-floor-ceiling"});
     }
     return out;
   }
