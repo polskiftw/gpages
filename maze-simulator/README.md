@@ -1,54 +1,73 @@
-# Maze Lab v2 - topology before graphics
+# Maze Lab v3 - ONE globally carved multi-floor labyrinth
 
-**Live viewer:** https://polskiftw.github.io/gpages/maze-simulator/
+[Open the interactive viewer](https://polskiftw.github.io/gpages/maze-simulator/)
 
-This is a phone-friendly, **math-only** maze workshop. Every visible wall is
-drawn directly from the maze's real cell passage bitmask. There is no 3D engine,
-web service, dependency, build step, or downloaded asset.
+## What changed
 
-## Mathematical guarantees
+**The old chunks-as-submazes approach is gone.** There are no local mazes,
+macro chunk trees, chunk boundary portals or artificial chokepoints.
 
-- A finite width x height x levels world with one start and one exit.
-- Every cell on every level is connected to every other cell.
-- The **macro chunk graph** recursively divides a 3D box, selecting exactly
-  one shared neighboring-chunk portal across each split: a spanning tree.
-  Macro edges can be queried directly without storing the full world.
-- Each 16 x 16 chunk contains its own seeded spanning tree. Combining local
-  trees and macro portals guarantees connectivity of the full cell graph.
-- Neighboring chunks calculate identical reciprocal wall openings and
-  vertical transitions, regardless of visitation or cache eviction order.
-- Optional braid openings, extra cross-chunk links, and extra vertical edges
-  only add routes. They cannot disconnect the maze.
-- Local chunk generation is deterministic from the seed, dimensions, chunk
-  coordinates and passage style, with a bounded 96-chunk default LRU.
-- Styles: straight-biased depth-first, mixed growing-tree, or random Prim.
+The topology engine carves a **single global spanning tree** of a finite
+3D cell graph, using a seeded growing-tree traversal over ALL cells and floors.
+A sparse deterministic set of candidate vertical links connects each adjacent
+pair of floors. Each pair has a guaranteed anchor site, so the underlying graph
+is connected before carving. Optional cycle openings only add edges.
 
-**Important physical limitation:** Vertical arrows are valid *abstract*
-floor-connection edges. Full-size staircase footprints, collision, headroom
-and underpasses have NOT yet been proven or placed. This tool validates
-topology, not an architectural 3D building.
+- Every cell on every floor is reachable.
+- Every passage has a reciprocal opening and every outer boundary is walled.
+- A seeded starting position and an exit on a different floor (when possible).
+  The exit is chosen from positions at least 85% as far along shortest paths
+  as the furthest reachable position on other floors.
+- Three personalities (long corridors, balanced, many branches) are settings
+  of the same global growing-tree algorithm.
+- The seed, dimensions, style, and generator version fully determine output.
+- Exactly **one byte per cell** stores the finished passage graph. The graph
+  is generated once, not when a rendering chunk becomes visible.
+- The 2D SVG floor viewer renders only the requested window and produces
+  true walls and floor-connection markers from this same passage graph.
+  Geometry streaming/chunk dimensions are solely a renderer concern.
 
-## Viewer
+## Capacity (this first simple global-memory implementation)
 
-Enter dimensions, floor count, passage character and seed. Pan on a phone,
-change floors, jump to the start or exit, save SVG and copy a reproducible URL.
-The three small samples use the same generation engine as the main map,
-rather than fabricated concept images.
+At most **4,194,304 cells** per maze. Examples: 256 x 256 x 16,
+512 x 512 x 16, or 1024 x 1024 x 4. One-byte final passage arrays occupy
+4 MiB at that limit; temporary generation buffers are larger.
+Building the world runs synchronously in the current browser and large
+dimensions may take noticeable time, especially on phones.
 
-Large worlds need not be fully generated to inspect a window. The generator
-version is part of reproduction: changing the algorithm in a future release
-would require a new version to preserve exact old seed results.
+Larger-than-RAM worlds would require an *additional* storage and generation
+strategy. We intentionally do not claim that v3 generates a billion-cell maze
+on demand, or that its global graph uses bounded generation memory.
 
-## Tests
+## Staircase limitation
 
-Node.js 22+, no packages:
+Up/down markers are **actual reciprocal graph transitions**, not yet
+collision-verified physical flights of stairs. No engine-renderable staircase
+footprints, headroom or underpass geometry have been solved yet. We will
+evaluate and reserve actual physical stair footprints before promising a 3D
+game; that must not introduce a chunk-like layout bias.
+
+## How to use
+
+Choose dimensions, floors, style, and seed. Pan the actual top-down map,
+switch floors, jump to start/exit, export an SVG floor plan or copy a seeded URL.
+An SVG is a faithful rendering of the global passage bits, not a design sketch.
+
+The three on-screen **smaller style demonstrations** are independent seeded
+worlds at at most 48 x 48 x 3, generated by precisely the same global core.
+They are not slices of a larger world's graph.
+
+## Verification
+
+Node.js 22 or newer, no installation of packages:
 
     node --test tests/maze.test.mjs
+    node examples.mjs /tmp/maze-samples
 
-The suite verifies whole-world reachability in several multi-floor worlds,
-every reciprocal cell opening, outer boundaries, unique endpoints, macro-tree
-size and connectivity, chunk-order independence, and SVG determinism.
-GitHub Actions runs the same test suite.
+Tests check every traversable 3D cell, reciprocal connections, different seed
+results, reproducibility, independence from renderer chunk size (7, 16, 24, 32
+and 64), absence of forced 16-cell seam chokepoints, deterministic SVG output,
+and a global 524,288-cell world. GitHub Actions exports five original SVG
+plans and passage buffers from the production maze engine.
 
-The old native C++/OpenGL prototype, heavy CI and geometry studies have been
-removed from the active project. They remain recoverable in Git history.
+The old C++ staircase experiments are recoverable in Git history.
