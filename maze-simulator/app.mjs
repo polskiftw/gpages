@@ -28,6 +28,8 @@ function render(){
   $("floor-label").textContent=(level+1)+" / "+maze.levels;
   $("floor-back").disabled=level<=0;$("floor-next").disabled=level>=maze.levels-1;
   $("span-value").textContent=String(view);
+  $("fit").disabled=Math.max(maze.width,maze.height)>96;
+  $("fit").title=$("fit").disabled?"For huge mazes, use the view-width slider to stream sections.":"Show the entire floor.";
   const s=data.stats;
   $("stats").textContent="Visible "+data.width+" × "+data.height+" cells · "+s.dead+" dead ends · "
     +s.turns+" turns · "+s.straight+" straight passages · "+s.junctions+" junctions · "+s.vertical+" stair connections";
