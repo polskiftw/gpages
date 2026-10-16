@@ -3,12 +3,13 @@ import {PITCH,STORY,WIDTH,HEADROOM,SLAB} from "../elevation/stairs.mjs";
 import {floorPlanSvg,runProfileSvg} from "../elevation/view.mjs";
 const $=id=>document.getElementById(id),clamp=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
 let maze=null,floor=0,zoom=32,x0=0,y0=0,runs=[],selected=0,lastSvg="",pointer=null;
-function options(){return {width:Number($("width").value),height:Number($("height").value),levels:Number($("levels").value),seed:$("seed").value.trim(),stairWeight:Number($("stairWeight").value)};}
+function options(){return {width:Number($("width").value),height:Number($("height").value),levels:Number($("levels").value),seed:$("seed").value.trim(),stairWeight:Number($("stairWeight").value),choices:Number($("choices").value)};}
 function updateUrl(){
   if(!maze)return;
   const p=new URLSearchParams({v:COMBINED_VERSION,w:maze.width,h:maze.height,l:maze.levels,
-    s:maze.seed,stairs:maze.stairWeight,floor});
+    s:maze.seed,stairs:maze.stairWeight,choices:maze.choices,floor});
   history.replaceState(null,"",location.pathname+"?"+p);
+  $("walkLink").href="../walk/?"+p;
 }
 function bounds(){
   x0=clamp(x0,0,Math.max(0,maze.width-Math.min(zoom,maze.width)));
@@ -29,8 +30,9 @@ function render(){
   $("zoomValue").textContent=String(zoom);
   const s=data.stats,f=maze.floorMetrics[floor];
   $("counts").textContent="Visible: "+s.flats+" flat corridor edges · "+s.up+" uphill entrances · "+s.down+
-    " downhill entrances. This floor's original Connected Detours median dead-end depth: "+
-    f.median+" cells. The full 3D graph: "+maze.stairShare+"% stair edges, "+maze.stairs+" stair segments, "+
+    " downhill entrances. This floor: "+maze.choiceDiagnostics[floor].after.junctions+
+    " planar junctions (original: "+maze.choiceDiagnostics[floor].before.junctions+"), "+f.median+
+    "-cell median dead-end branch. Full 3D graph: "+maze.stairShare+"% stair edges, "+maze.stairs+" stair segments, "+
     maze.overpassCount+" hidden passages passing over/under stairs, "+maze.routeLength+" minimum steps to the exit.";
   $("map").setAttribute("aria-label","Floor "+floor+": "+s.flats+" level connections, "+s.up+
     " ascending and "+s.down+" descending stairs; drag to pan.");
@@ -62,7 +64,7 @@ function generate(){
     }
     selected=0;$("runs").value="0";showRun();
     $("summary").textContent=maze.usedCount.toLocaleString()+" walkable positions · "+
-      maze.stairShare+"% stairs";
+      maze.junctions+" branching junctions · "+maze.stairShare+"% stairs";
     $("runDetail").textContent+=" Across the world: "+runs.filter(r=>r.steps>=3).length+
       " uninterrupted climbs of at least three floors; original median dead-end depth per floor "+
       maze.floorMetrics.map(x=>x.median).join(" / ")+".";
@@ -129,7 +131,8 @@ map.addEventListener("keydown",e=>{
   e.preventDefault();x0+=offsets[e.key][0];y0+=offsets[e.key][1];render();
 });
 const p=new URLSearchParams(location.search);
-for(const [key,id] of [["w","width"],["h","height"],["l","levels"],["s","seed"],["stairs","stairWeight"]])
+for(const [key,id] of [["w","width"],["h","height"],["l","levels"],["s","seed"],["stairs","stairWeight"],["choices","choices"]])
   if(p.has(key))$(id).value=id==="stairWeight"?String(clamp(Number(p.get(key))||2,1,8)):p.get(key);
+if((p.has("s")||p.get("v")==="detours-elevation-v1")&&!p.has("choices"))$("choices").value="0";
 generate();
 if(maze&&p.has("floor")){floor=clamp(Number(p.get("floor"))||0,0,maze.levels-1);render();}
