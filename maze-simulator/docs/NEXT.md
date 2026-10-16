@@ -1,5 +1,29 @@
 # Integration roadmap
 
+## Priority update: math-first, 3D as a viewer
+
+The procedural maze mathematics now takes precedence over further
+first-person rendering work. Our 3D test room remains a useful
+visual/collision fixture, but it must not determine the actual generated
+maze's walls, rooms, staircase footprints, underpasses or connections.
+
+**Immediate milestone:** Use `maze-preview` to inspect exact SVG floor
+plans and compare zero loops, default loops, high loops, different seeds,
+and layered worlds. Decide how winding or straight the maze should be,
+and what bounded room sizes/frequencies to support.
+
+**Subsequent generator milestones:** Add room/corridor-shape controls
+without erasing guaranteed links; allocate actual multi-cell physical
+staircase geometry before corridor carving; model underpasses as
+different vertical spaces; validate the entire resulting physically
+traversable graph, with chunk-boundary/determinism regression tests.
+
+**Only after those steps:** Hook the authoritative 3D geometry stream
+up to the existing SDL3/OpenGL renderer and implement chunk streaming.
+The renderer must not invent passageways or change their meaning.
+The detailed authoritative contract is [MATH_FIRST.md](MATH_FIRST.md).
+
+
 1. **Freeze generator v1:** keep seed and world settings alongside a generator
    version in saves; do not change hashing or chunk construction invisibly.
 2. **3D geometry:** make procedural meshes for visible chunk walls/floor/ceiling,
