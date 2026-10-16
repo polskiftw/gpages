@@ -5,7 +5,7 @@ import {ElevationMaze,PITCH,STORY,WIDTH,HEADROOM,SLAB,VERSION} from "./stairs.mj
 import {floorPlanSvg,runProfileSvg} from "./view.mjs";
 const output=process.argv[2]||"/tmp/stair-preview";
 mkdirSync(output,{recursive:true});
-const world=new ElevationMaze({width:28,height:28,levels:6,seed:"LOST-6549",stairWeight:17});
+const world=new ElevationMaze({width:28,height:28,levels:6,seed:"LOST-6549",stairWeight:3});
 const runs=world.runs(),biggest=runs[0]||null;
 for(let z=0;z<world.levels;z++){
   const data=floorPlanSvg(world,z,{highlight:biggest});
