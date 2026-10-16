@@ -32,6 +32,11 @@ jobs:
           node --test maze-simulator/tests/combined.test.mjs
           node --test maze-simulator/tests/stair-landings.test.mjs
           node --test maze-simulator/tests/enclosed-overpasses.test.mjs
+          node --check maze-simulator/walk/navigation.mjs
+          node --check maze-simulator/walk/mesh.mjs
+          node --check maze-simulator/walk/webgl.mjs
+          node --check maze-simulator/walk/app.mjs
+          node --test maze-simulator/tests/walk.test.mjs
           node --check maze-simulator/unified/app.mjs
           node --check maze-simulator/unified/examples.mjs
           node maze-simulator/elevation/bench.mjs
