@@ -152,17 +152,24 @@ export function bridgeSolidGaps(m,{maxGap=4}={}){
     before:original,after:choiceStats(m,cells)};
 }
 
-export function enrichChoices(m,intensity=1){
+export function enrichChoices(m,intensity=1,protectedCells=null){
   if(!Number.isInteger(intensity)||intensity<0||intensity>3)
     throw new RangeError("Choices must be 0 (original), 1 (more), or 2 (many)");
   if(intensity===3){
-    const first=enrichChoices(m,2);
+    // Find the *missing* connections through existing solid gaps BEFORE
+    // adding adjacent corridor braids. This gives long isolated passages a
+    // chance to meet, instead of v2's nearby junctions hiding candidates.
+    const original=choiceStats(m,m.cells);
+    const originalSolid=new Uint8Array(m.cells.length);
+    for(let i=0;i<m.cells.length;i++)if(m.cells[i]&SOLID)originalSolid[i]=1;
     const fill=bridgeSolidGaps(m);
+    // New bridge interiors stay continuous tunnels, not arbitrary junctions.
+    const first=enrichChoices(m,2,originalSolid);
     m.metrics.navigable+=fill.carved;
     return {mode:3,added:first.added+fill.bridges,goal:first.goal+fill.aim,
       bridges:fill.bridges,carved:fill.carved,connectors:first.added,
       candidates:first.candidates+fill.candidates,minLoop:first.minLoop,
-      before:first.before,after:fill.after};
+      before:original,after:first.after};
   }
   const cells=m.cells,w=m.width,h=m.height,n=cells.length,before=choiceStats(m,cells);
   if(!intensity)return {mode:0,added:0,goal:0,minLoop:0,before,after:before};
@@ -182,9 +189,9 @@ export function enrichChoices(m,intensity=1){
   const random=randomNumber(m.salt^(intensity*0x7feb352d)^0xbaf76212);
   const candidates=[];
   for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-    const i=y*w+x;if(deg[i]!==2||(toDeadEnd[i]>=0&&toDeadEnd[i]<leafGuard)||toChoice[i]<junctionGuard)continue;
+    const i=y*w+x;if(deg[i]!==2||protectedCells?.[i]||(toDeadEnd[i]>=0&&toDeadEnd[i]<leafGuard)||toChoice[i]<junctionGuard)continue;
     for(const [j,d] of [[x+1<w?i+1:-1,1],[y+1<h?i+w:-1,2]]){
-      if(j<0||deg[j]!==2||(cells[i]&BITS[d])||(toDeadEnd[j]>=0&&toDeadEnd[j]<leafGuard)||toChoice[j]<junctionGuard)continue;
+      if(j<0||deg[j]!==2||protectedCells?.[j]||(cells[i]&BITS[d])||(toDeadEnd[j]>=0&&toDeadEnd[j]<leafGuard)||toChoice[j]<junctionGuard)continue;
       // Prioritize locations where players currently go furthest without
       // encountering any junction. Tie-break by a deterministic seed.
       const score=Math.min(toChoice[i],toChoice[j])*1024+
