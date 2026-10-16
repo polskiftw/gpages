@@ -16,6 +16,7 @@ function opts(){return {seed:$("seed").value.trim(),width:Number($("width").valu
 function query(){
   const p=new URLSearchParams({s:maze.seed,w:maze.width,h:maze.height,l:maze.levels,stairs:maze.stairWeight,choices:maze.choices});
   history.replaceState(null,"",location.pathname+"?"+p);
+  $("mapLink").href="../unified/?"+p;
 }
 function status(text,error=false){
   $("error").hidden=!error;
