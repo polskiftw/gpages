@@ -21,3 +21,11 @@ jobs:
           node-version: '22'
       - name: Verify all floors, portals, seeds and rendered walls
         run: node --test maze-simulator/tests/maze.test.mjs
+
+      - name: Export five exact mathematical floor plans
+        run: node maze-simulator/examples.mjs /tmp/maze-samples
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maze-math-sample-svg
+          path: /tmp/maze-samples/*.svg
+          retention-days: 30
