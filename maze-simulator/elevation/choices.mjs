@@ -73,8 +73,20 @@ export function bridgeSolidGaps(m,{maxGap=4}={}){
   const original=choiceStats(m,cells),deg=new Uint8Array(n);
   for(let i=0;i<n;i++)deg[i]=degree(cells[i]);
   const choices=distanceFrom(m,cells,i=>deg[i]>=3);
-  const leaves=distanceFrom(m,cells,i=>deg[i]===1);
-  const leafSafety=7; // Avoid converting medium/long dead-end stems into short nubs.
+  // Protect the actual *terminal stem* of each dead end, not every nearby
+  // corridor in its wider network. A 5-cell leaf cannot become a 1-cell stub,
+  // but routes beside it are still eligible for meaningful cross-connections.
+  const protect=new Uint8Array(n);
+  for(let leaf=0;leaf<n;leaf++)if(deg[leaf]===1){
+    let prev=-1,i=leaf;
+    for(let depth=0;depth<5&&deg[i]<=2;depth++){
+      protect[i]=1;
+      let next=-1;
+      neighbors(w,h,i,(j,d)=>{if(j!==prev&&(cells[i]&BITS[d]))next=j;});
+      if(next<0)break;
+      prev=i;i=next;
+    }
+  }
   const rand=randomNumber(m.salt^0xc3e9a75f);
   const candidates=[];
   // A plausible connector walks through *solid* cells only, in a cardinal
@@ -82,7 +94,7 @@ export function bridgeSolidGaps(m,{maxGap=4}={}){
   // diagonal shortcuts, or invented staircase/room templates.
   const step=[-w,1,w,-1];
   for(let i=0;i<n;i++){
-    if(deg[i]!==2||choices[i]<2||leaves[i]>=0&&leaves[i]<leafSafety)continue;
+    if(deg[i]!==2||choices[i]<2||protect[i])continue;
     const x=i%w,y=Math.floor(i/w);
     for(const d of [1,2]){
       const remain=d===1?w-x-1:h-y-1;
@@ -90,7 +102,7 @@ export function bridgeSolidGaps(m,{maxGap=4}={}){
       for(let gap=1;gap<=Math.min(maxGap,remain-1);gap++){
         const end=i+step[d]*(gap+1);
         if(deg[end]===0)continue;
-        if(deg[end]!==2||choices[end]<2||leaves[end]>=0&&leaves[end]<leafSafety)break;
+        if(deg[end]!==2||choices[end]<2||protect[end])break;
         let clear=true;
         for(let t=1;t<=gap;t++)if(cells[i+step[d]*t]!==SOLID){clear=false;break;}
         if(!clear)break;
