@@ -5,6 +5,7 @@ Small static browser tools hosted with GitHub Pages.
 ## Structure
 
 - `/index.html` — landing page
+- `/maze-simulator/` — mobile-friendly reproducible multi-floor mathematical maze previews
 - `/terraria-shopping/` — Terraria Shopping acquisition planner
 - `/boolean-search/` — Boolean Search Builder
 - `/boink-local/` — manually-run local Reddit media archiver with SQLite/content dedupe
