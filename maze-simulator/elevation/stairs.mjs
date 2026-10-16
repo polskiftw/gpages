@@ -93,6 +93,24 @@ export class ElevationMaze{
     const a=edges[0],b=edges[1],da=DIRECTIONS[direction(a.code)],db=DIRECTIONS[direction(b.code)];
     return vertical(a.code)!==0&&vertical(b.code)!==0&&da.dx+db.dx===0&&da.dy+db.dy===0&&vertical(a.code)+vertical(b.code)===0;
   }
+  // Renderer-facing surface classification. A straight two-link rising flight
+  // crosses intermediate story heights WITHOUT a landing or level-floor pad.
+  // Only a turn, branch, slope reversal, or transition onto level ground can
+  // require a landing; this is derived entirely from actual graph edges.
+  stairNodeKind(i){
+    if(!this.used[i])return "solid";
+    if(!this.links(i).some(link=>vertical(link.code)!==0))return "level";
+    return this.through(i)?"continuous-flight":"landing";
+  }
+  stairSurfaces(){
+    const landings=[],continuous=[];
+    for(let i=0;i<this.volume;i++){
+      const kind=this.stairNodeKind(i);
+      if(kind==="landing")landings.push(this.loc(i));
+      else if(kind==="continuous-flight")continuous.push(this.loc(i));
+    }
+    return {landings,continuous};
+  }
   runs(){
     const results=[],done=new Set();
     for(let i=0;i<this.volume;i++)if(this.used[i]&&!this.through(i)){
