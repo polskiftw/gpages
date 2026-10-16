@@ -349,3 +349,53 @@ determinism, and genuine improvement in choice proximity. It also exports
 true math SVGs of the original, moderate and many-choice layouts, and
 uses Chromium to walk through the high-choice version and switch back
 to the original without browser errors.
+
+## Solid-gap connectors — shorter walks between meaningful junctions (v11)
+
+The v10 Many choices layout remained too linear because it only opened
+links between *already adjacent walkable cells*. It could not join two
+corridors separated by unused solid masonry.
+
+**Bridge corridor gaps (3, new default)** finds two existing degree-2
+corridors separated by 1-4 completely solid floor cells, then generates
+a genuine straight enclosed connector between them. Both ends become
+three-way junctions and the intermediary tunnel positions have exactly
+two opposite directions. It is not a detached branch, a prebuilt room,
+a staircase prefab, or a render-chunk seam.
+
+Constraints enforced by the generator and CI:
+
+- The old route between the two prospective exits must already require
+  at least 14 graph steps; do not create a tiny trivial loop.
+- The first five positions of actual terminal dead-end stems are
+  protected, so extra connectors don't chop down long cul-de-sacs.
+- Every original horizontal opening stays open and reciprocal.
+- The other floor's corridor and stairs remain enclosed and can still
+  overlap vertically only with the required physical clearance.
+- Once a gap is bridged, additional Many choices braids may join existing
+  passages but cannot turn the new connector interior into a new branch.
+- World seeds and 3D movement are tested with the same physics used in game.
+
+After bridging, the old seeded many-choice step adds remaining nearby
+long alternatives. Both operations derive from the one global floor
+graph, so no 16-cell checkerboard submazes can reappear.
+
+The Original (0), More choices (1) and Many choices (2) modes still
+generate their exact prior layouts for any old seed. Shared URLs
+without a branching mode still select Original. New worlds use
+choices=3 by default, with the selection included in their share URL.
+
+On LOST-6549, 28x28x6, stair frequency 2:
+
+| Metric | Old Many choices (2) | Bridge corridor gaps (3) |
+|---|---:|---:|
+| Junctions | 386 | 486 |
+| Mean graph distance to next junction | 3.20 cells | 2.54 cells |
+| New useful solid-gap connectors | 0 | 78 |
+| Formerly solid cells now navigable | 0 | 134 |
+
+The CI suite validates each connector against the prior planar
+network, checks every newly carved cell's degree and the two new
+junctions, verifies old terminal dead ends are preserved, and walks
+through a sample connector using the real first-person collision solver.
+New floor SVGs are exported for all four branching modes.
