@@ -117,7 +117,7 @@ produced around **26% sloped passage connections** (the old default was near
 plus sparse deterministic gates for the *beginning* of a stair run. A flight
 already climbing may continue up successive stories without a forced landing.
 
-The stair rarity setting is **1–8**, default **2**. It is a maximum budget of
+The stair frequency setting is **1–8**, default **2**. It is a maximum budget of
 roughly `setting% × (width × height)` staircase edges per adjacent floor
 pair, not a percentage of every outgoing move. The actual percentage is
 shown on the page, along with the number of staircase edges. The graph also
