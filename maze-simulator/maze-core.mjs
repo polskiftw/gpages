@@ -29,7 +29,7 @@ export class Maze {
     const hx=this.hash(tag,1)%Math.min(this.width,near),hy=this.hash(tag,2)%Math.min(this.height,near);
     const x=((corner&1)!==(far?1:0))?this.width-1-hx:hx;
     const y=((corner&2)!==(far?2:0))?this.height-1-hy:hy;
-    const z=this.levels===1?0:(far?this.levels-1-this.hash(TAG.END,3)%Math.ceil(this.levels/2):this.hash(TAG.START,3)%Math.ceil(this.levels/2));
+    const z=this.levels===1?0:(far?this.levels-1-this.hash(TAG.END,3)%Math.floor(this.levels/2):this.hash(TAG.START,3)%Math.floor(this.levels/2));
     return {x,y,z:this.levels>1&&(this.hash(TAG.START,4)&1)?this.levels-1-z:z};
   }
   split(b){
