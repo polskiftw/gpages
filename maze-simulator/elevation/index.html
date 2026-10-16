@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#172230">
+<meta name="description" content="Explore real seed-generated, continuously climbing staircase networks with no predefined staircase shapes.">
+<title>Natural Staircases · Maze Lab</title>
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="./stairs.css">
+<script type="module" src="./app.mjs"></script>
+</head>
+<body><main>
+<header><a class="back" href="../">← Back to Connected Detours / Maze Lab</a>
+<div class="eyebrow">MATH EXPERIMENT / REAL 3D STAIR ROUTES</div>
+<h1>Stairs are passages.</h1>
+<p>The generator chooses flat or rising/falling connections one step at a time. Multiple climbs can continue straight through floor elevations without stopping. Turns, junctions, and new flights can emerge when the math makes a landing. No L-, U-, or spiral-stair prefab templates.</p>
+</header>
+<form id="setup">
+<div class="field"><label for="width">Width</label><input id="width" type="number" value="28" min="6" max="64" required></div>
+<div class="field"><label for="height">Height</label><input id="height" type="number" value="28" min="6" max="64" required></div>
+<div class="field"><label for="levels">Elevation levels</label><input id="levels" type="number" value="6" min="2" max="12" required></div>
+<div class="field"><label for="stairWeight">Stair frequency</label><input id="stairWeight" type="number" value="17" min="2" max="60" required></div>
+<div class="field seed"><label for="seed">Seed</label><input id="seed" type="text" value="LOST-6549" maxlength="100" required></div>
+<button type="submit" class="primary">Generate</button><button id="reroll" type="button">Random seed</button>
+</form>
+<p id="error" class="error" role="alert" hidden></p>
+<section class="panel">
+<div class="panel-head"><div><div class="eyebrow">TRUE NAVIGABLE GRAPH</div><h2>Overhead floor plan</h2></div><span id="summary"></span></div>
+<div class="controls">
+<button id="previous" type="button">◀ Lower</button><strong id="floor" aria-live="polite">Level 0</strong><button id="next" type="button">Higher ▶</button>
+<button id="atStart" type="button">Start</button><button id="atExit" type="button">Exit</button>
+</div>
+<div id="map" class="stair-map" role="img" aria-label="Mathematically generated corridors and stair connections"></div>
+<div class="legend"><span>White = walkable</span><span>Gray = solid</span><span>U = goes up</span><span>D = goes down</span><span>● = junction</span><span>Ring = selected run</span></div>
+<p class="hint">Each U/D marker is a real stair edge to an adjacent horizontal position on the next/previous level. The next section can climb again; no automatic landing is inserted. The white passages and gray solids are generated geometry.</p>
+<div id="counts"></div>
+</section>
+<section class="panel stair-runs">
+<div class="panel-head"><div><div class="eyebrow">DERIVED FROM THE SAME PASSAGE DATA</div><h2>Continuous staircase runs</h2></div></div>
+<div class="controls"><label for="runs">Inspect a generated run</label><select id="runs"></select><button id="focus" type="button">Find on map</button></div>
+<div id="profile" class="profile" role="img" aria-label="Exact side elevation profile of a generated continuous staircase"></div>
+<p id="runDetail" class="hint"></p>
+</section>
+<section class="export-row">
+<button id="save" type="button">Save floor-plan SVG</button>
+<button id="geometry" type="button">Export navigation geometry JSON</button>
+<button id="share" type="button">Copy seed link</button>
+</section>
+<section class="technical"><h2>Actual physical scale</h2>
+<p>Every horizontal step advances <strong>6 m</strong>. A climbing step gains or loses <strong>3 m</strong>, so every rising segment has the same realistic 26.6° incline. The walkable ribbon is <strong>1.5 m wide</strong>, with <strong>2.1 m headroom</strong> and a 0.25 m floor allowance. A physical-space reservation test prevents intersecting overlapping passage ribbons. Cells on different levels may occupy the same X/Y footprint if they have vertical clearance.</p>
+<p>This is a new <strong>elevation-aware topology prototype</strong>. The approved Connected Detours generator stays available on the main page while we test the new movement mathematics. Here, every stair link is horizontally displaced, unlike the older abstract same-coordinate U/D links. A complete 3D renderer and staircase/ceiling meshes have not yet been built.</p></section>
+<footer>Each SVG and JSON edge comes directly from <code>stairs.mjs</code>. No server or game engine. Generation is global and deterministic; there are no generation chunks or stair design templates.</footer>
+</main></body></html>
