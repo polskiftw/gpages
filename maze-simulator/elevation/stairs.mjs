@@ -1,7 +1,7 @@
 // Experimental elevation-aware maze math. No prefab stairs, no chunk topology.
 // A path step changes (x,y,z) by (+/-1,0,0), (0,+/-1,0), or
 // (+/-1,0,+/-1) / (0,+/-1,+/-1). Every step moves horizontally.
-export const PITCH=6, STORY=3, WIDTH=1.5, HEADROOM=2.1, SLAB=0.25;
+export const PITCH=7, STORY=3.5, WIDTH=1.5, HEADROOM=2.1, SLAB=0.25;
 export const DIRECTIONS=[{dx:0,dy:-1,name:"N"},{dx:1,dy:0,name:"E"},{dx:0,dy:1,name:"S"},{dx:-1,dy:0,name:"W"}];
 export const VERSION="elevation-lattice-1";
 export const opposite=code=>{const d=(code+2)%4;return code<4?d:code<8?d+8:d+4;};
@@ -13,7 +13,7 @@ function seedValue(seed){let h=2166136261;for(const ch of seed)h=Math.imul(h^ch.
 function makeRandom(seed){let x=seed>>>0;return max=>{x=(x+0x6d2b79f5)>>>0;let t=Math.imul(x^(x>>>15),1|x);t^=t+Math.imul(t^(t>>>7),61|t);return ((t^(t>>>14))>>>0)%max;};}
 
 export class ElevationMaze{
-  constructor({width=28,height=28,levels=6,seed="LOST-6549",stairWeight=17}={}){
+  constructor({width=28,height=28,levels=6,seed="LOST-6549",stairWeight=3}={}){
     for(const [name,value,min,max] of [["width",width,6,64],["height",height,6,64],["levels",levels,2,12],["stairWeight",stairWeight,2,60]])
       if(!Number.isSafeInteger(value)||value<min||value>max)throw new RangeError(name+" must be "+min+".."+max);
     this.width=width;this.height=height;this.levels=levels;this.area=width*height;this.volume=this.area*levels;
