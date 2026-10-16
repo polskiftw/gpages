@@ -10,6 +10,41 @@ The goal is to make mazes far larger than RAM, with arbitrary finite dimensions,
 multiple floors, connected corridors, reproducible worlds, and no requirement to
 generate or save the entire maze up front.
 
+## Math first: view exact top-down mazes (current priority)
+
+**The procedural generator is the authoritative model.** The SDL3/OpenGL
+test room is a secondary visualization prototype. Before integrating
+3D into large worlds, we are comparing the actual mathematical layouts
+and settling physical staircase footprints, stair/underpass layering,
+rooms, corridor lengths and whole-world collision-safe connectivity.
+
+The standalone `maze-preview` tool reads the original
+`Maze::passages` bitmask and exports vector-accurate **SVG** floor maps.
+It also generates a self-contained **offline HTML comparison gallery**
+with multiple seeds and loop settings, plus switchable floors.
+
+On Gentoo, from this directory:
+
+    sh run-preview.sh
+
+This builds the math-only C++ tools (no SDL3/OpenGL), creates
+`previews/standalone.html` (one portable offline file), and opens it in Firefox if installed. It never
+starts a server, service, or daemon. Run only the generator if desired:
+
+    cmake -S . -B build -DMAZE_BUILD_PLAYABLE=OFF
+    cmake --build build --target maze-preview
+    ./build/maze-preview gallery ./previews
+    ./build/maze-preview svg ./custom.svg 48 32 3 6549 600 50 1
+
+The custom example uses a 48 x 32 x 3 world and renders floor index 1
+(zero-based). Gallery files can also be downloaded from GitHub CI and
+opened directly in a browser. **These are real existing one-tile-wide
+corridors.** There are no intentional rooms yet. U/D/B in previews
+show only abstract vertical graph edges, not physically placed stairs.
+
+Read [docs/MATH_FIRST.md](docs/MATH_FIRST.md) for the engine
+architecture, unsolved geometry constraints and math-focused roadmap.
+
 ## Play the first 3D test room
 
 The separate stair laboratory is a real Linux first-person executable with

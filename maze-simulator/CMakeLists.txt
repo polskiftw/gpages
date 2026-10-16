@@ -11,6 +11,18 @@ target_link_libraries(maze-cli PRIVATE maze_core)
 add_executable(maze-tests tests/test_maze.cpp)
 target_link_libraries(maze-tests PRIVATE maze_core)
 
+# Mathematical top-down SVG preview of EXACT Maze::passages output.
+# No renderer, SDL, OpenGL, or alternate maze algorithm is involved.
+add_library(maze_preview_core src/maze_preview.cpp)
+target_link_libraries(maze_preview_core PUBLIC maze_core)
+target_compile_features(maze_preview_core PUBLIC cxx_std_20)
+
+add_executable(maze-preview src/maze_preview_main.cpp)
+target_link_libraries(maze-preview PRIVATE maze_preview_core)
+
+add_executable(maze-preview-tests tests/test_maze_preview.cpp)
+target_link_libraries(maze-preview-tests PRIVATE maze_preview_core)
+
 add_library(stairs_core src/stairs.cpp)
 target_link_libraries(stairs_core PUBLIC maze_core)
 target_compile_features(stairs_core PUBLIC cxx_std_20)
@@ -62,6 +74,7 @@ endif()
 
 enable_testing()
 add_test(NAME maze-connectivity COMMAND maze-tests)
+add_test(NAME maze-topdown-accuracy COMMAND maze-preview-tests)
 add_test(NAME stairs-connectivity COMMAND stair-tests)
 add_test(NAME stair-physical-geometry COMMAND stair-geometry-tests)
 add_test(NAME playable-room-collision COMMAND playable-room-tests)

@@ -28,6 +28,26 @@ jobs:
           cmake --build /tmp/maze-build --parallel 2
       - name: Run all navigation and geometry regressions
         run: ctest --test-dir /tmp/maze-build --output-on-failure
+      - name: Generate authoritative 2D mathematical maze gallery
+        shell: bash
+        run: |
+          /tmp/maze-build/maze-preview gallery /tmp/maze-topdown-gallery
+          /tmp/maze-build/maze-preview svg /tmp/maze-single-floor.svg 32 32 1 6549 600 0 0
+          test -s /tmp/maze-topdown-gallery/index.html
+          test -s /tmp/maze-topdown-gallery/standalone.html
+          test -s /tmp/maze-topdown-gallery/default_floor1.svg
+          test -s /tmp/maze-topdown-gallery/loopy_floor1.svg
+          test -s /tmp/maze-topdown-gallery/floors_floor3.svg
+          test -s /tmp/maze-single-floor.svg
+          grep -Fq 'data-wall-segments=' /tmp/maze-topdown-gallery/default_floor1.svg
+          grep -Fq 'const catalogue=' /tmp/maze-topdown-gallery/index.html
+          grep -Fq 'data:image/svg+xml;base64,' /tmp/maze-topdown-gallery/standalone.html
+      - name: Upload standalone mathematical floor-plan gallery
+        uses: actions/upload-artifact@v4
+        with:
+          name: maze-math-topdown-gallery
+          path: /tmp/maze-topdown-gallery/
+          retention-days: 30
       - name: Export hollow/solid and open/walled geometry combinations
         shell: bash
         run: |
