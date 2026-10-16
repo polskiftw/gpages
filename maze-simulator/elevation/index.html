@@ -33,8 +33,8 @@
 <label class="stair-toggle"><input id="labels" type="checkbox"> Show exact U/D letters</label>
 </div>
 <div id="map" class="stair-map" role="img" aria-label="Mathematically generated corridors and stair connections"></div>
-<div class="legend"><span>White = walkable</span><span>Gray = solid</span><span>▲ = goes up</span><span>▼ = goes down</span><span>● = junction</span><span>Ring = selected run</span></div>
-<p class="hint">Each ▲/▼ marker is a real stair edge to an adjacent horizontal position on the next/previous level. The rarity control is a strict density budget, not a 1–8% chance that every passage becomes stairs. The next section can climb again; no automatic landing is inserted. The white passages and gray solids are generated geometry.</p>
+<div class="legend"><span>White = walkable</span><span>Gray = solid</span><span>▲ = goes up</span><span>▼ = goes down</span><span>● = junction</span><span>□ = actual stair landing</span><span>Ring = selected run</span></div>
+<p class="hint">Each ▲/▼ marker is a real stair edge to an adjacent horizontal position on the next/previous level. The rarity control is a strict density budget, not a 1–8% chance that every passage becomes stairs. A straight uninterrupted climb does not receive a landing; turns, level-floor transitions and optional junctions do. The white passages and gray solids are generated geometry.</p>
 <div id="counts"></div>
 </section>
 <section class="panel stair-runs">
