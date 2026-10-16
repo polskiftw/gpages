@@ -43,7 +43,7 @@ export function floorPlanSvg(m,z,{x0=0,y0=0,width=m.width,height=m.height,highli
   }
   const sw=w*CELL+PAD*2,sh=h*CELL+PAD*2;
   const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+sw+' '+sh+'" role="img" aria-label="Exact navigable network at elevation '+z+'">'
-    +'<style>.back{fill:#d3dbe2}.flat{fill:none;stroke:#fff;stroke-width:7;stroke-linecap:square}.ramp{fill:none;stroke:#fff;stroke-width:7;stroke-linecap:round}.rise{fill:#10263b;font:bold 8.5px monospace;text-anchor:middle;dominant-baseline:central;paint-order:stroke;stroke:white;stroke-width:2px}.endpoint{font:bold 8px sans-serif;text-anchor:middle;dominant-baseline:central;fill:#0d263b}.selected{fill:none;stroke:#99502a;stroke-width:2.4}</style>'
+    +'<style>.back{fill:#d3dbe2}.flat{fill:none;stroke:#fff;stroke-width:7;stroke-linecap:square}.ramp{fill:none;stroke:#fff;stroke-width:7;stroke-linecap:round}.rise{fill:#071d31;font:900 10px monospace;text-anchor:middle;dominant-baseline:central}.endpoint{font:bold 8px sans-serif;text-anchor:middle;dominant-baseline:central;fill:#0d263b}.selected{fill:none;stroke:#99502a;stroke-width:2.4}</style>'
     +'<rect class="back" width="'+sw+'" height="'+sh+'"/>'+path.join('')+pads.join('')+signs.join('')+markers.join('')+'</svg>';
   return {svg,stats:{flats,up,down,landings,through}};
 }
