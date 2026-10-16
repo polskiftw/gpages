@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {ElevationMaze,PITCH,STORY,WIDTH,HEADROOM,SLAB,VERSION,popcount,vertical,direction,opposite} from "../elevation/stairs.mjs";
+assert.ok(STORY-(STORY/PITCH)*WIDTH>HEADROOM+SLAB,"Stacked perpendicular stair ribbons need corner clearance");
 const fixtures=[{width:24,height:24,levels:6,seed:"LOST-6549"},{width:30,height:24,levels:5,seed:"CONTINUOUS-RISE"},{width:18,height:27,levels:7,seed:"NO-PREFABS"}];
 let longestSeen=0,ascending=0,descending=0;
 for(const opts of fixtures){
