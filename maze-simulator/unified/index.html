@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#172230">
+<meta name="description" content="One connected, seed-reproducible 3D labyrinth: Connected Detours corridors plus rare actual multistory slopes.">
+<title>Connected Detours 3D · Maze Lab</title>
+<link rel="stylesheet" href="../style.css"><link rel="stylesheet" href="../elevation/stairs.css">
+<link rel="stylesheet" href="./unified.css"><script type="module" src="./app.mjs"></script>
+</head>
+<body><main>
+<header>
+<a class="back" href="../">← Main Maze Lab</a>
+<div class="eyebrow">CONNECTED DETOURS × NATURAL STAIRCASES / UNIFIED MATHEMATICS</div>
+<h1>The whole labyrinth, now in 3D.</h1>
+<p>Actual Connected Detours corridors on each floor, linked by <strong>rare, physical stair passages</strong>. Same deep branches, no visible maze chunks, no impossible same-coordinate elevators. An occasional stair flight can pass several stories without a landing.</p>
+</header>
+<form id="setup">
+<div class="field"><label for="width">Width (cells)</label><input id="width" type="number" value="28" min="6" max="64" required></div>
+<div class="field"><label for="height">Height (cells)</label><input id="height" type="number" value="28" min="6" max="64" required></div>
+<div class="field"><label for="levels">Floors</label><input id="levels" type="number" value="6" min="2" max="12" required></div>
+<div class="field"><label for="stairWeight">Stair frequency (1–8)</label><input id="stairWeight" type="number" value="2" min="1" max="8" required></div>
+<div class="field seed"><label for="seed">Reproducible seed</label><input id="seed" type="text" value="LOST-6549" maxlength="100" required></div>
+<button class="primary" type="submit">Generate full labyrinth</button><button id="reroll" type="button">Random seed</button>
+</form>
+<p id="error" class="error" role="alert" hidden></p>
+<section class="panel">
+<div class="panel-head"><div><div class="eyebrow">ONE GLOBAL NAVIGATION GRAPH</div><h2>Mathematical floor plan</h2></div><span id="summary"></span></div>
+<div class="controls">
+<button id="previous" type="button">◀ Lower</button><strong id="floor">Level 0</strong><button id="next" type="button">Higher ▶</button>
+<button id="atStart" type="button">Start</button><button id="atExit" type="button">Exit</button>
+</div>
+<div class="controls">
+<label class="zoom">View width <input id="zoom" type="range" value="32" min="16" max="64" step="8"><output id="zoomValue">32</output></label>
+<button id="fit" type="button">Full floor</button>
+<label class="stair-toggle"><input id="labels" type="checkbox"> U/D letters</label>
+</div>
+<div id="map" class="stair-map" tabindex="0" role="img" aria-label="Exact navigable corridors on current floor. Drag to pan, arrow keys to move."></div>
+<div class="legend"><span>White = walkable</span><span>Gray = solid</span><span>▲ = climbs</span><span>▼ = descends</span><span>● = junction</span><span>Ring = selected staircase</span></div>
+<p class="hint">Drag to pan or use arrow keys. The only vertical passages are real horizontally displaced slopes. Each floor's horizontal graph is the original Connected Detours algorithm, untouched. Gray tiles can include the middle of a staircase on another level.</p>
+<div id="counts"></div>
+</section>
+<section class="panel stair-runs">
+<div class="panel-head"><div><div class="eyebrow">ACTUAL DETOURS AND CLIMBS</div><h2>Explore a generated staircase</h2></div></div>
+<div class="controls"><label for="runs">Continuous stair flights</label><select id="runs"></select><button id="focus" type="button">Locate on floor</button></div>
+<div id="profile" class="profile" role="img" aria-label="Side elevation of an actual generated staircase"></div>
+<p id="runDetail" class="hint"></p>
+</section>
+<section class="export-row">
+<button id="save" type="button">Save actual SVG</button>
+<button id="geometry" type="button">Export 3D graph JSON</button>
+<button id="share" type="button">Copy seed link</button>
+</section>
+<section class="technical">
+<h2>What this milestone proves</h2>
+<p>The generator reuses Connected Detours for every flat floor and adds only a small number of reciprocal Euclidean ramps between them. Some stairs continue through an otherwise solid intermediate floor tile, so a climb can pass multiple floors <em>without</em> becoming a landing. No fixed staircase patterns, and no generation chunks.</p>
+<p>Everything derives from one connected navigation graph. We test exact preservation of the original horizontal walls, reachability, vertical clearance on overlapping passage segments, stair rarity and seed reproduction. <strong>This remains a math preview, not the final 3D wall, ceiling or collision-mesh renderer.</strong></p>
+<p><a href="../elevation/">Earlier standalone stair experiment</a> · <a href="../">Original 2D Connected Detours comparison</a></p>
+</section>
+<footer>Real seeded maze topology · <code>unified/</code> + <code>elevation/combined.mjs</code> · no assets or third-party libraries</footer>
+</main></body></html>
