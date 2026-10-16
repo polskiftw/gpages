@@ -76,3 +76,26 @@ jobs:
           name: connected-detours-3d-math
           path: /tmp/combined-maze/
           retention-days: 30
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install CI-only browser driver
+        run: |
+          npm install --prefix /tmp/maze-browser --no-save --no-audit --no-fund playwright-core@1.56.1
+          command -v google-chrome
+      - name: Actually open and walk in 3D (headless Chrome + WebGL)
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/maze-local-http.log 2>&1 &
+          sleep 2
+          MAZE_PLAYWRIGHT=/tmp/maze-browser/node_modules/playwright-core/index.mjs MAZE_CHROME="$(command -v google-chrome)" node maze-simulator/tests/walk-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: actual-first-person-3d-screenshot
+          path: /tmp/maze-3d-browser.png
+          retention-days: 14
