@@ -3,7 +3,7 @@
 import {PITCH,STORY,vertical,direction,DIRECTIONS,popcount} from "./stairs.mjs";
 const CELL=19,PAD=18,ROUND=n=>Number(n.toFixed(2));
 const escapeXml=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-export function floorPlanSvg(m,z,{x0=0,y0=0,width=m.width,height=m.height,highlight=null}={}){
+export function floorPlanSvg(m,z,{x0=0,y0=0,width=m.width,height=m.height,highlight=null,showLabels=false}={}){
   if(!Number.isInteger(z)||z<0||z>=m.levels)throw new RangeError("Invalid floor");
   const w=Math.min(width,m.width-x0),h=Math.min(height,m.height-y0);
   if(w<1||h<1)throw new RangeError("Map window is outside labyrinth");
@@ -29,7 +29,10 @@ export function floorPlanSvg(m,z,{x0=0,y0=0,width=m.width,height=m.height,highli
         path.push('<path d="M'+cx+' '+cy+'L'+x2+' '+y2+'" class="ramp"/>');
         if(v>0)up++;else down++;
         // Text, not color alone, distinguishes up from down.
-        signs.push('<text x="'+(cx+d.dx*CELL*.43)+'" y="'+(cy+d.dy*CELL*.43)+'" class="rise">'+(v>0?'U':'D')+'</text>');
+        const mx=cx+d.dx*CELL*.43,my=cy+d.dy*CELL*.43;
+        if(showLabels)signs.push('<text x="'+mx+'" y="'+my+'" class="rise">'+(v>0?'U':'D')+'</text>');
+        else if(v>0)signs.push('<path d="M'+mx+' '+(my-3.3)+' l-3.4 6 h6.8 Z" class="rise-marker"/>');
+        else signs.push('<path d="M'+(mx-3.4)+' '+(my-3)+' h6.8 l-3.4 6 Z" class="rise-marker"/>');
       }
     }
     if(x===m.start.x&&y===m.start.y&&z===m.start.z)
@@ -43,7 +46,7 @@ export function floorPlanSvg(m,z,{x0=0,y0=0,width=m.width,height=m.height,highli
   }
   const sw=w*CELL+PAD*2,sh=h*CELL+PAD*2;
   const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+sw+' '+sh+'" role="img" aria-label="Exact navigable network at elevation '+z+'">'
-    +'<style>.back{fill:#d3dbe2}.flat{fill:none;stroke:#fff;stroke-width:7;stroke-linecap:square}.ramp{fill:none;stroke:#fff;stroke-width:7;stroke-linecap:round}.rise{fill:#071d31;font:900 10px monospace;text-anchor:middle;dominant-baseline:central}.endpoint{font:bold 8px sans-serif;text-anchor:middle;dominant-baseline:central;fill:#0d263b}.selected{fill:none;stroke:#99502a;stroke-width:2.4}</style>'
+    +'<style>.back{fill:#d3dbe2}.flat{fill:none;stroke:#fff;stroke-width:7;stroke-linecap:square}.ramp{fill:none;stroke:#fff;stroke-width:7;stroke-linecap:round}.rise{fill:#071d31;font:900 10px monospace;text-anchor:middle;dominant-baseline:central}.rise-marker{fill:#172e42;stroke:white;stroke-width:.6}.endpoint{font:bold 8px sans-serif;text-anchor:middle;dominant-baseline:central;fill:#0d263b}.selected{fill:none;stroke:#99502a;stroke-width:2.4}</style>'
     +'<rect class="back" width="'+sw+'" height="'+sh+'"/>'+path.join('')+pads.join('')+signs.join('')+markers.join('')+'</svg>';
   return {svg,stats:{flats,up,down,landings,through}};
 }
