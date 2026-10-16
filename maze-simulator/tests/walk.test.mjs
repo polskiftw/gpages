@@ -3,7 +3,7 @@ import {ConnectedDetours3D} from "../elevation/combined.mjs";
 import {PITCH,STORY,WIDTH,HEADROOM,vertical} from "../elevation/stairs.mjs";
 import {WALK_RADIUS,halfWidth,hasPad,edgeHeight,initialPose,movePlayer,floorAt,
   distanceToExit,ribbonSample} from "../walk/navigation.mjs";
-import {buildMesh,SURFACE} from "../walk/mesh.mjs";
+import {buildMesh,SURFACE,corridorSpan} from "../walk/mesh.mjs";
 const approx=(a,b,eps=0.1)=>assert.ok(Math.abs(a-b)<=eps,a+" should be near "+b);
 let explored=0;
 for(const [seed,width,height,levels] of [
@@ -32,6 +32,20 @@ for(const [seed,width,height,levels] of [
   for(let i=0;i<m.volume;i++)if(hasPad(m,i))
     for(let d=0;d<4;d++)if(!m.headingOccupied(i,d))expectedCaps++;
   assert.equal(full.stats.caps,expectedCaps,"every missing exit closes with an actual opaque wall");
+  // At a real junction, walls on connecting tubes MUST stop at the
+  // landing square's boundary; otherwise a legal right-angle turn could
+  // appear blocked by an internal floating sidewall.
+  let corners=0,throughFlights=0;
+  for(let i=0;i<m.volume;i++)if(m.used[i])
+    for(const {to} of m.links(i))if(i<to){
+      const {start,end}=corridorSpan(m,i,to);
+      assert.ok(start>=0&&end<=1&&end>start,"edge retains a positive geometric span");
+      approx(start,hasPad(m,i)?WIDTH/(2*PITCH):0,1e-7);
+      approx(end,hasPad(m,to)?1-WIDTH/(2*PITCH):1,1e-7);
+      if(hasPad(m,i)&&m.links(i).length>=2)corners++;
+      if(!hasPad(m,i)&&!hasPad(m,to))throughFlights++;
+    }
+  assert.ok(corners>0&&m.stairs>0,"render open turns as actual unobstructed landing squares");
   const sample=buildMesh(m,{center:m.start,radius:7,floorRadius:1});
   assert.ok(sample.stats.triangles<full.stats.triangles,
     "render only nearby mesh; no global geometry load for each view");
