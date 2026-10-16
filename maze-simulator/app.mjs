@@ -78,7 +78,7 @@ $("span").addEventListener("change",()=>{
   x0=Math.floor(cx-view/2);y0=Math.floor(cy-view/2);render();
 });
 $("fit").addEventListener("click",()=>{
-  view=clamp(Math.max(maze.width,maze.height),16,96);
+  view=clamp(8*Math.ceil(Math.max(maze.width,maze.height)/8),16,96);
   $("span").value=String(view);
   x0=0;y0=0;render();
 });
