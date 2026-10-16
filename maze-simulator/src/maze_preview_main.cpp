@@ -8,6 +8,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 using labyrinth::Maze;
@@ -23,6 +24,22 @@ std::uint64_t number(const char* str) {
     std::size_t used=0;
     const auto result=std::stoull(s,&used,0);
     if(used!=s.size())throw std::invalid_argument("invalid number: "+s);
+    return result;
+}
+std::string base64(const std::string& bytes) {
+    constexpr char alphabet[]="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string result;
+    result.reserve((bytes.size()+2)/3*4);
+    for(std::size_t i=0;i<bytes.size();i+=3) {
+        const auto a=static_cast<unsigned char>(bytes[i]);
+        const bool has_b=i+1<bytes.size(),has_c=i+2<bytes.size();
+        const unsigned b=has_b?static_cast<unsigned char>(bytes[i+1]):0;
+        const unsigned c=has_c?static_cast<unsigned char>(bytes[i+2]):0;
+        result+=alphabet[a>>2];
+        result+=alphabet[((a&3U)<<4)|(b>>4)];
+        result+=has_b?alphabet[((b&15U)<<2)|(c>>6)]:'=';
+        result+=has_c?alphabet[c&63U]:'=';
+    }
     return result;
 }
 void write_file(const std::filesystem::path& dest,const std::string& text) {
@@ -71,6 +88,7 @@ constexpr std::array<Example,5> examples{{
 
 void gallery(const std::filesystem::path& dir) {
     std::filesystem::create_directories(dir);
+    std::vector<std::pair<std::string,std::string>> svg_assets;
     std::ostringstream dataset;
     dataset<<"[\n";
     for(std::size_t index=0;index<examples.size();++index) {
@@ -86,6 +104,7 @@ void gallery(const std::filesystem::path& dir) {
             auto out=render_floor(maze,z,20);
             const auto name=std::string(example.id)+"_floor"+std::to_string(z+1)+".svg";
             write_file(dir/name,out.svg);
+            svg_assets.emplace_back(name,std::move(out.svg));
             if(z)dataset<<',';
             dataset<<"{file:\""<<name<<"\",info:\""<<stats_label(out.stats)<<"\"}";
             std::cout<<"Wrote "<<(dir/name).string()<<" - "<<stats_label(out.stats)<<'\n';
@@ -172,7 +191,22 @@ init('a',1);init('b',2);
 </script></body></html>
 )HTML";
     write_file(dir/"index.html",html.str());
-    std::cout<<"Open "<<(dir/"index.html").string()<<" locally in Firefox (no server required).\n";
+    // Make the full gallery portable as ONE HTML file, even if the user
+    // opens it directly from a download or moves it away from the SVG folder.
+    // SVG bytes are the same authoritative, already-computed C++ output.
+    std::string standalone=html.str();
+    for(const auto& asset:svg_assets) {
+        const std::string needle="file:\""+asset.first+"\"";
+        const std::string replacement="file:\"data:image/svg+xml;base64,"+
+                                      base64(asset.second)+"\"";
+        const auto location=standalone.find(needle);
+        if(location==std::string::npos)
+            throw std::runtime_error("standalone gallery missing SVG reference");
+        standalone.replace(location,needle.size(),replacement);
+    }
+    write_file(dir/"standalone.html",standalone);
+    std::cout<<"Open "<<(dir/"standalone.html").string()
+             <<" in Firefox (one self-contained file; no server required).\n";
 }
 void usage() {
     std::cout<<"Usage:\n"
