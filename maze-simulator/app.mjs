@@ -121,6 +121,9 @@ const params=new URLSearchParams(location.search);
 for(const [key,id] of [["w","width"],["h","height"],["floors","levels"],["seed","seed"],["style","style"]]){
   if(params.has(key))$(id).value=params.get(key);
 }
+// Old shared v3 links can still open the new v4 styles without an invalid selection.
+const older={balanced:"deep",winding:"roaming",branching:"interconnected"};
+if(params.has("style")&&Object.hasOwn(older,params.get("style")))$("style").value=older[params.get("style")];
 generate();
 if(maze&&params.has("floor")){
   level=clamp(Number(params.get("floor"))-1||0,0,maze.levels-1);render();
