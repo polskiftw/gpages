@@ -82,6 +82,21 @@ for(const seed of ["LOST-6549","NO-PREFABS","CONNECTED-DETOURS","A-REAL-LOST-PLA
   }
 }
 assert.ok(longCount>0,"at least one randomly discovered three-story stair run must occur");
+// Varying the user-facing stair setting must never break floor connectivity,
+// exceed per-boundary limits or alter the original horizontal maze style.
+for(const stairWeight of [1,4,8]){
+  for(const [width,height,levels] of [[6,6,2],[16,18,4],[28,28,6]]){
+    const m=new ConnectedDetours3D({width,height,levels,seed:"DENSITY-EDGE-CASES",stairWeight});
+    assert.ok(m.stairCountByBoundary.every(x=>x>0&&x<=m.maxRampsPerBoundary));
+    assert.equal(m.levelCounts.length,levels);
+    assert.ok(m.stairShare<6,"stairs must remain less prevalent than level corridors");
+    assert.ok(m.floorMetrics.every(x=>x.median>0),"each floor retains meaningful level branches");
+    for(let z=0;z<levels;z++)for(let k=0;k<m.area;k++)
+      assert.equal(m.bits[z*m.area+k]&15,m.flatMasks[z][k]&15);
+    console.log("PASS STAIR DENSITY",stairWeight,width+"x"+height+"x"+levels,
+      "stairs",m.stairs,"edges",m.edges,"percent",m.stairShare);
+  }
+}
 assert.equal(COMBINED_VERSION,"detours-elevation-v1");
 assert.throws(()=>new ConnectedDetours3D({width:2,height:16,levels:3}),/width/);
 console.log("ALL INTEGRATED TOPOLOGY CHECKS PASSED",worlds,"worlds;",longCount,"naturally continuous flights");
