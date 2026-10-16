@@ -12,10 +12,11 @@ const keys=new Set(),hold=new Set();
 let maze=null,pose=null,renderer=null,won=false,distance=0,elapsed=0;
 let meshKey="",meshStats=null,frames=0,lastTime=0,debugTick=0,drag=null,loopStarted=false;
 function opts(){return {seed:$("seed").value.trim(),width:Number($("width").value),height:Number($("height").value),
-  levels:Number($("levels").value),stairWeight:Number($("stairWeight").value)};}
+  levels:Number($("levels").value),stairWeight:Number($("stairWeight").value),choices:Number($("choices").value)};}
 function query(){
-  const p=new URLSearchParams({s:maze.seed,w:maze.width,h:maze.height,l:maze.levels,stairs:maze.stairWeight});
+  const p=new URLSearchParams({s:maze.seed,w:maze.width,h:maze.height,l:maze.levels,stairs:maze.stairWeight,choices:maze.choices});
   history.replaceState(null,"",location.pathname+"?"+p);
+  $("mapLink").href="../unified/?"+p;
 }
 function status(text,error=false){
   $("error").hidden=!error;
@@ -36,6 +37,12 @@ function generate(){
     // Do not discard the currently playable world unless generation succeeds.
     if(!renderer)renderer=new MazeWebGL($("view"));
     maze=next;$("error").hidden=true;
+    const base=maze.choiceDiagnostics.reduce((sum,x)=>sum+x.before.junctions,0);
+    const current=maze.choiceDiagnostics.reduce((sum,x)=>sum+x.after.junctions,0);
+    const mode=maze.choices===0?"Original":maze.choices===1?"More":"Many";
+    $("layoutStats").textContent=mode+" branching · "+current+" junctions"+
+      (maze.choices?" (original: "+base+") · "+maze.extraChoices+" new long detours":" · original routes")+
+      " · "+maze.stairShare+"% stairs";
     reset();query();
     $("stats").textContent="Seed "+maze.seed+" · "+maze.levels+" floors";
     if(!loopStarted){loopStarted=true;requestAnimationFrame(frame);}
@@ -164,6 +171,9 @@ for(const button of document.querySelectorAll("[data-hold]")){
     button.addEventListener(event,()=>{hold.delete(name);button.classList.remove("is-held");});
 }
 const params=new URLSearchParams(location.search);
-for(const [q,id] of [["s","seed"],["w","width"],["h","height"],["l","levels"],["stairs","stairWeight"]])
+for(const [q,id] of [["s","seed"],["w","width"],["h","height"],["l","levels"],["stairs","stairWeight"],["choices","choices"]])
   if(params.has(q))$(id).value=params.get(q);
+// Existing old URLs without a choices parameter reproduce the old v1
+// labyrinth exactly. A fresh visit starts with the denser new default.
+if(params.has("s")&&!params.has("choices"))$("choices").value="0";
 generate();

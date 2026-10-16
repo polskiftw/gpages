@@ -20,6 +20,7 @@
 <div class="field"><label for="height">Height (cells)</label><input id="height" type="number" value="28" min="6" max="64" required></div>
 <div class="field"><label for="levels">Floors</label><input id="levels" type="number" value="6" min="2" max="12" required></div>
 <div class="field"><label for="stairWeight">Stairs (1 = rare, 8 = more)</label><input id="stairWeight" type="number" value="2" min="1" max="8" required></div>
+<div class="field"><label for="choices">Branching</label><select id="choices"><option value="0">Original routes</option><option value="1">More choices</option><option value="2" selected>Many choices</option></select></div>
 <div class="field seed"><label for="seed">Reproducible seed</label><input id="seed" type="text" value="LOST-6549" maxlength="100" required></div>
 <button class="primary" type="submit">Generate full labyrinth</button><button id="reroll" type="button">Random seed</button>
 </form>
@@ -37,7 +38,7 @@
 </div>
 <div id="map" class="stair-map" tabindex="0" role="img" aria-label="Exact navigable corridors on current floor. Drag to pan, arrow keys to move."></div>
 <div class="legend"><span>White = walkable</span><span>Gray = solid</span><span>▲ = climbs</span><span>▼ = descends</span><span>● = junction</span><span>□ = stair landing</span><span>Ring = selected staircase</span></div>
-<p class="hint">Drag to pan or use arrow keys. The only vertical passages are real horizontally displaced slopes. Each floor's horizontal graph is the original Connected Detours algorithm, untouched. Gray tiles can include the middle of a staircase on another level. A straight through-flight is never given a fake floor platform.</p>
+<p class="hint">Drag to pan or use arrow keys. The only vertical passages are real horizontally displaced slopes. Every original Connected Detours corridor remains; more-branching modes add long alternate routes between existing corridors without inserting new dead ends. Gray tiles can include the middle of a staircase on another level. A straight through-flight is never given a fake floor platform.</p>
 <div id="counts"></div>
 </section>
 <section class="panel stair-runs">
@@ -51,7 +52,7 @@
 <button id="geometry" type="button">Export 3D graph JSON</button>
 <button id="share" type="button">Copy seed link</button>
 </section>
-<section class="panel" style="margin-top:18px;padding:18px 20px"><div class="eyebrow">NEW FIRST-PERSON RENDERER</div><h2>Walk inside this exact labyrinth</h2><p>Your Connected Detours 3D graph now has enclosed brick walls, ceiling and floor meshes, naturally continuous stair ramps and graph-constrained collision. Explore without revealing the map.</p><p><a href="../walk/"><strong>Enter the 3D maze →</strong></a></p></section>
+<section class="panel" style="margin-top:18px;padding:18px 20px"><div class="eyebrow">NEW FIRST-PERSON RENDERER</div><h2>Walk inside this exact labyrinth</h2><p>Your Connected Detours 3D graph now has enclosed brick walls, ceiling and floor meshes, naturally continuous stair ramps and graph-constrained collision. Explore without revealing the map.</p><p><a id="walkLink" href="../walk/"><strong>Enter the same seed in 3D →</strong></a></p></section>
 <section class="technical">
 <h2>What this milestone proves</h2>
 <p>Every route is an <strong>enclosed passage</strong> with walls, floor and ceiling. A direction has exactly one possible floor profile: flat, uphill or downhill; stairs are never walk-around objects inside a hallway. The generator reuses Connected Detours for every flat floor and adds a small number of Euclidean ramps. Stairs can climb through intermediate elevations without a landing and can pass directly <em>above</em> independently traversable corridors when there is enough vertical clearance. A shared overhead footprint does not create a junction or a visual opening. No staircase templates or generation chunks.</p>

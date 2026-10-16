@@ -16,7 +16,7 @@ try{
   page.on("pageerror",err=>errs.push(err.stack||err.message));
   page.on("console",msg=>{if(msg.type()==="error")errs.push(msg.text());});
   const base="http://127.0.0.1:8765/maze-simulator/walk/";
-  await page.goto(base+"?s=LOST-6549&w=28&h=28&l=6&stairs=2",{waitUntil:"networkidle"});
+  await page.goto(base+"?s=LOST-6549&w=28&h=28&l=6&stairs=2&choices=2",{waitUntil:"networkidle"});
   await page.waitForFunction(()=>{
     const c=document.querySelector("#view");
     return !!c&&c.width>500&&c.height>250;
@@ -24,6 +24,10 @@ try{
   assert.equal(await page.locator("#error").isVisible(),false,"no error alert when generating seed");
   const initial=await page.locator("#stats").innerText();
   assert.ok(initial.includes("LOST-6549"),"seed-loaded 3D world is displayed");
+  assert.ok((await page.locator("#layoutStats").innerText()).includes("386 junctions"),
+    "the game must use choice-rich generated topology, not the old sparse network");
+  assert.ok((await page.locator("#mapLink").getAttribute("href")).includes("choices=2"),
+    "floor-plan link must preserve the actual maze mode");
   const gl=await page.evaluate(()=>{
     const c=document.getElementById("view"),gl=c.getContext("webgl");
     return {ok:!!gl,buffer:c.width*c.height,version:gl?.getParameter(gl.VERSION),
@@ -45,6 +49,13 @@ try{
   await page.waitForTimeout(450);
   const back=await page.locator("#stats").innerText();
   assert.notEqual(back,after,"restart goes back to original entrance");
+  await page.locator("#choices").selectOption("0");
+  await page.locator("#generate").click();
+  await page.waitForTimeout(400);
+  assert.ok((await page.locator("#layoutStats").innerText()).includes("238 junctions"),
+    "original mode must reproduce the previous maze topology");
+  assert.equal(await page.evaluate(()=>new URLSearchParams(location.search).get("choices")),
+    "0","choice mode persists in reproducible URL");
   assert.deepEqual(errs,[],"no runtime JS errors");
   console.log("BROWSER 3D PASS",JSON.stringify({viewport:"1280x860",gl,initial,before,after,restarted:back}));
 }finally{await browser.close();}

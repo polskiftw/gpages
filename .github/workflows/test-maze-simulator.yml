@@ -29,7 +29,11 @@ jobs:
           node --check maze-simulator/elevation/stairs.mjs
           node --test maze-simulator/tests/elevation.test.mjs
           node --check maze-simulator/elevation/combined.mjs
+          node --check maze-simulator/elevation/choices.mjs
+          node maze-simulator/elevation/choice-bench.mjs
           node --test maze-simulator/tests/combined.test.mjs
+          node --test maze-simulator/tests/choices.test.mjs
+          node --check maze-simulator/elevation/choice-examples.mjs
           node --test maze-simulator/tests/stair-landings.test.mjs
           node --test maze-simulator/tests/enclosed-overpasses.test.mjs
           node --check maze-simulator/walk/navigation.mjs
@@ -62,6 +66,17 @@ jobs:
         with:
           name: natural-stairs-math
           path: /tmp/natural-stairs/
+          retention-days: 30
+
+      - name: Export real baseline versus more branching layouts
+        run: |
+          node maze-simulator/elevation/choice-examples.mjs /tmp/maze-junction-previews
+          test -s /tmp/maze-junction-previews/comparisons.json
+          test -s /tmp/maze-junction-previews/choices-2-floor-0.svg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maze-junction-choice-comparisons
+          path: /tmp/maze-junction-previews/
           retention-days: 30
 
       - name: Export integrated Connected Detours 3D floor plans
