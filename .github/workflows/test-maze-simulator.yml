@@ -26,6 +26,12 @@ jobs:
           node --check maze-simulator/maze-grow.mjs
           node --check maze-simulator/examples.mjs
           node --test maze-simulator/tests/maze.test.mjs
+          node --check maze-simulator/elevation/stairs.mjs
+          node --test maze-simulator/tests/elevation.test.mjs
+          node maze-simulator/elevation/bench.mjs
+          node --check maze-simulator/elevation/app.mjs
+          node --check maze-simulator/elevation/view.mjs
+          node --check maze-simulator/elevation/examples.mjs
 
       - name: Export original v4 floor plans and depth metrics
         run: node maze-simulator/examples.mjs /tmp/maze-samples
@@ -33,4 +39,16 @@ jobs:
         with:
           name: maze-math-sample-svg
           path: /tmp/maze-samples/
+          retention-days: 30
+
+      - name: Export real 3D staircase math and floor-plan SVGs
+        run: |
+          node maze-simulator/elevation/examples.mjs /tmp/natural-stairs
+          test -s /tmp/natural-stairs/stats.json
+          test -s /tmp/natural-stairs/longest-continuous-run.svg
+          test -s /tmp/natural-stairs/floor-5.svg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: natural-stairs-math
+          path: /tmp/natural-stairs/
           retention-days: 30

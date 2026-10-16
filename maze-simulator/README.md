@@ -75,3 +75,36 @@ CI verifies reachability, reciprocal connections, deterministic reproduction,
 solid-block safety, short-dead-end reduction and independence from 7/16/24/32/64
 render windows, then publishes five SVG floor plans plus metrics.json.
 The previous v3 version remains available through Git history.
+
+## Elevation-aware staircase math experiment
+
+**[Open Natural Staircases](./elevation/)** or
+https://polskiftw.github.io/gpages/maze-simulator/elevation/
+
+This is a *separate*, working mathematical prototype that does not alter the
+approved **Connected Detours** 2D generation. It explores the graph/geometry
+needed to give that labyrinth ordinary physical, multistory stair passages.
+
+Every edge moves one X or Y grid step. It may also change Z by -1, 0 or +1;
+there are no same-X/Y vertical teleports. Consecutive edges can climb three,
+four, or more floors with **no automatically inserted landing**. A physical
+landing emerges from the graph wherever passages end, turn, or branch.
+Any apparent L- or U-turn is an incidental sequence of independently grown
+edges, **not a prefab staircase structure**.
+
+A 7m horizontal step and 3.5m vertical story have a 26.6-degree grade.
+Mathematical reservations keep each 1.5m-wide passage ribbon clear of
+other ribbons across the same projected segment, with 2.1m headroom and
+a 0.25m slab allowance. Additional conservative grid-pitch clearance
+allows orthogonal ribbons stacked at different elevations to pass safely.
+These are assumptions of this particular prototype, not user-mandated scale.
+
+The separate gallery displays each true floor's edge topology, highlights
+continuous no-landing stair runs, computes an actual side elevation profile,
+and exports the seeded **3D graph geometry JSON**. A single connected graph
+and symmetric reciprocal movements are verified in CI, along with the
+presence of RNG-generated climbs crossing at least three story boundaries.
+
+Physical 3D meshes, wall/ceiling collision geometry, and final integration
+with Connected Detours remain future steps; this preview does **not**
+misrepresent those as finished.
