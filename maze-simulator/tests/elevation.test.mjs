@@ -91,6 +91,25 @@ for(const opts of fixtures){
     "stairEdges",m.stairs,"landings",m.usedCount-runs.reduce((s,r)=>s+Math.max(0,r.steps-1),0),
     "longest continuous climb",runs[0]?.steps||0,"exit steps",m.routeLength);
 }
+// The original reported bug: even the "minimum" should be mostly level paths.
+for(const density of [1,2,4,8]){
+  for(const [w,h,levels,seed] of [[6,6,2,"TINY"],[10,8,5,"NARROW"],[28,28,6,"LOST-6549"],[32,29,7,"RANDOM-WORLD"]]){
+    const m=new ElevationMaze({width:w,height:h,levels,seed,stairWeight:density});
+    assert.ok(m.levelCounts.every(c=>c>0),"all story levels must be reached at every density");
+    assert.ok(m.stairCountByBoundary.every(c=>c>0&&c<=m.maxRampsPerBoundary),
+      "every neighboring floor pair must connect, never exceeding its hard cap");
+    const proportion=m.stairs/(m.edges-m.pruned);
+    if(density===1&&w>10)assert.ok(proportion<.02,
+      "minimum density must be under 2% actual stairs, not the old 26%");
+    if(density===2&&w>10)assert.ok(proportion<.035,
+      "default stair proportion must stay comfortably below 3.5%");
+    if(w>10)assert.ok(m.usedCount/m.volume>.75,
+      "rare-stair maze should not sacrifice most of its level corridors");
+    console.log("RARE",density,w+"x"+h+"x"+levels,seed,
+      "stair-edges",m.stairs,"proportion",proportion.toFixed(4),
+      "longest-flight",m.runs()[0]?.steps||0);
+  }
+}
 assert.ok(ascending>0&&descending>0,"up and down stairs are reciprocal");
 assert.ok(longestSeen>=3,"rare seeded ramps can still continue across three floors");
 // With genuinely rare stairs, an up/down split is possible but not mandatory for every sampled world.
