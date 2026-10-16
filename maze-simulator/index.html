@@ -20,7 +20,7 @@
 <div class="field"><label for="levels">Floors</label><input id="levels" type="number" min="1" max="64" value="3" required></div>
 <div class="field"><label for="style">Passage character</label><select id="style">
 <option value="deep">Deep branches</option>
-<option value="interconnected">Connected detours</option>
+<option value="interconnected" selected>Connected detours</option>
 <option value="roaming">Wandering branches</option>
 </select></div>
 <div class="field seed"><label for="seed">Reproducible seed</label><input id="seed" type="text" maxlength="160" value="LOST-6549" required></div>
@@ -53,6 +53,7 @@
 <p>These mini-worlds use the same core code and seed with three genuinely different route-growth/repair rules. Compare how far their dead-end branches run. Tap a style to generate it.</p>
 <div id="examples" class="example-grid"></div>
 </section>
+<section class="panel" style="margin-top:22px;padding:18px 20px"><div class="eyebrow">NEW MATH EXPERIMENT</div><h2>Natural multistory staircases</h2><p>Explore a seed-generated 3D passage graph where stairs take actual horizontal distance, can climb several levels without a landing, and turn or branch only when the generated connections allow it. No staircase templates.</p><p><a href="./elevation/"><strong>Open elevation-aware Stair Lab →</strong></a></p><p class="hint">Separate prototype for now. The Connected Detours layout generator above is unchanged.</p></section>
 <footer>Global seeded maze math, not stitched chunks. A solid gray tile is impassable masonry, not a disconnected room. No server, graphics engine or dependency.</footer>
 </main>
 </body></html>
