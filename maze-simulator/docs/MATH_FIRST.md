@@ -47,7 +47,7 @@ the drawn number of wall segments agrees with the real graph's edges.
 Preview width/height are capped for readability; actual world
 dimensions are unaffected by this visualization limit.
 
-The static index.html operates offline without a service, browser
+The static index.html and single-file standalone.html operate offline without a service, browser
 plugin, JavaScript maze reimplementation, build daemon or GPU. This
 means the gallery cannot create arbitrary new seeds without rerunning
 the C++ generator. The CLI supports arbitrary seeds and floors.
