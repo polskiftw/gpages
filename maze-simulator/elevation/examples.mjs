@@ -18,7 +18,7 @@ const info={version:VERSION,seed:world.seed,dimensions:[world.width,world.height
   start:world.start,exit:world.exit,routeLength:world.routeLength,
   navigableCells:world.usedCount,levelCounts:world.levelCounts,edges:world.edges,stairSegments:world.stairs,
   extraDetours:world.loops,removedDeadEndCells:world.pruned,
-  stairPercent:Number((100*world.stairs/world.edges).toFixed(2)),stairBudgetEachPair:world.maxRampsPerBoundary,
+  stairPercent:Number((100*world.stairs/(world.edges-world.pruned)).toFixed(2)),stairBudgetEachPair:world.maxRampsPerBoundary,
   uninterruptedRunsAtLeast3:runs.filter(r=>r.steps>=3).length,
   maxUninterruptedClimb:biggest?.steps||0,example:biggest};
 writeFileSync(output+"/stats.json",JSON.stringify(info,null,2)+"\n");
