@@ -31,7 +31,7 @@ function render(){
   $("counts").textContent="Visible: "+s.flats+" flat corridor edges · "+s.up+" uphill entrances · "+s.down+
     " downhill entrances. This floor's original Connected Detours median dead-end depth: "+
     f.median+" cells. The full 3D graph: "+maze.stairShare+"% stair edges, "+maze.stairs+" stair segments, "+
-    maze.routeLength+" minimum steps to the exit.";
+    maze.overpassCount+" hidden passages passing over/under stairs, "+maze.routeLength+" minimum steps to the exit.";
   $("map").setAttribute("aria-label","Floor "+floor+": "+s.flats+" level connections, "+s.up+
     " ascending and "+s.down+" descending stairs; drag to pan.");
   updateUrl();
@@ -104,7 +104,7 @@ $("geometry").addEventListener("click",()=>{
   const meta={version:COMBINED_VERSION,seed:maze.seed,size:[maze.width,maze.height,maze.levels],
     stairFrequency:maze.stairWeight,start:maze.start,exit:maze.exit,shortestPath:maze.routeLength,
     scale:{pitch:PITCH,story:STORY,width:WIDTH,headroom:HEADROOM,slab:SLAB},
-    originalFloorMetrics:maze.floorMetrics,stairEdgePercentage:maze.stairShare,edges:maze.geometry(),stairNodes:maze.stairSurfaces(),
+    originalFloorMetrics:maze.floorMetrics,stairEdgePercentage:maze.stairShare,edges:maze.geometry(),stairNodes:maze.stairSurfaces(),overpasses:maze.overpasses(),
     naturalMultistoryStairs:runs.filter(r=>r.steps>=3)};
   download(JSON.stringify(meta),"connected-detours-3d-"+maze.seed.replace(/[^a-z0-9_-]/gi,"_")+".json","application/json");
 });
