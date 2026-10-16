@@ -6,7 +6,7 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cmake -S "$here" -B "$here/build" -DMAZE_BUILD_PLAYABLE=OFF
 cmake --build "$here/build" --parallel "${MAZE_JOBS:-12}" --target maze-preview
 "$here/build/maze-preview" gallery "$here/previews"
-echo "Generated $here/previews/index.html"
+echo "Generated $here/previews/standalone.html"
 if command -v firefox >/dev/null 2>&1; then
-  exec firefox "file://$here/previews/index.html"
+  exec firefox "file://$here/previews/standalone.html"
 fi
