@@ -51,6 +51,7 @@
 <button id="geometry" type="button">Export 3D graph JSON</button>
 <button id="share" type="button">Copy seed link</button>
 </section>
+<section class="panel" style="margin-top:18px;padding:18px 20px"><div class="eyebrow">NEW FIRST-PERSON RENDERER</div><h2>Walk inside this exact labyrinth</h2><p>Your Connected Detours 3D graph now has enclosed brick walls, ceiling and floor meshes, naturally continuous stair ramps and graph-constrained collision. Explore without revealing the map.</p><p><a href="../walk/"><strong>Enter the 3D maze →</strong></a></p></section>
 <section class="technical">
 <h2>What this milestone proves</h2>
 <p>Every route is an <strong>enclosed passage</strong> with walls, floor and ceiling. A direction has exactly one possible floor profile: flat, uphill or downhill; stairs are never walk-around objects inside a hallway. The generator reuses Connected Detours for every flat floor and adds a small number of Euclidean ramps. Stairs can climb through intermediate elevations without a landing and can pass directly <em>above</em> independently traversable corridors when there is enough vertical clearance. A shared overhead footprint does not create a junction or a visual opening. No staircase templates or generation chunks.</p>
