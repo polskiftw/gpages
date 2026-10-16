@@ -30,7 +30,7 @@ function render(){
   $("zoomValue").textContent=String(zoom);
   const s=data.stats,f=maze.floorMetrics[floor];
   $("counts").textContent="Visible: "+s.flats+" flat corridor edges · "+s.up+" uphill entrances · "+s.down+
-    " downhill entrances. This floor: "+maze.choiceDiagnostics[floor].after.junctions+
+    " downhill entrances. "+(maze.choiceDiagnostics[floor].bridges||0)+" new gap bridges. This floor: "+maze.choiceDiagnostics[floor].after.junctions+
     " planar junctions (original: "+maze.choiceDiagnostics[floor].before.junctions+"), "+f.median+
     "-cell median dead-end branch. Full 3D graph: "+maze.stairShare+"% stair edges, "+maze.stairs+" stair segments, "+
     maze.overpassCount+" hidden passages passing over/under stairs, "+maze.routeLength+" minimum steps to the exit.";
@@ -64,7 +64,7 @@ function generate(){
     }
     selected=0;$("runs").value="0";showRun();
     $("summary").textContent=maze.usedCount.toLocaleString()+" walkable positions · "+
-      maze.junctions+" branching junctions · "+maze.stairShare+"% stairs";
+      maze.junctions+" branching junctions · "+maze.bridges+" gap bridges · "+maze.stairShare+"% stairs";
     $("runDetail").textContent+=" Across the world: "+runs.filter(r=>r.steps>=3).length+
       " uninterrupted climbs of at least three floors; original median dead-end depth per floor "+
       maze.floorMetrics.map(x=>x.median).join(" / ")+".";
