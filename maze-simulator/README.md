@@ -243,3 +243,64 @@ ascending edges cannot coexist in one direction from a single position.
 These are enforceable mathematical properties; the future renderer must
 derive sealed wall/floor/ceiling meshes from the same graph and not
 create unintended windows, bypasses or openings.
+
+## First-person walkable renderer - v9
+
+**[Enter the 3D labyrinth](./walk/)** or
+https://polskiftw.github.io/gpages/maze-simulator/walk/
+
+This is a functional WebGL browser prototype of the original Connected
+Detours 3D maze, with working physical navigation - not concept art.
+It consumes the *unchanged* ConnectedDetours3D math and has no external
+runtime libraries, imported meshes, images or downloaded textures.
+
+The mesh generator (walk/mesh.mjs) converts each original graph edge into a
+sealed 3D corridor tube: two opaque brick sidewalls, a floor, a ceiling
+and the underside of the ceiling/floor slab. The floor is ordinary stone
+on a level corridor; on a staircase it takes the exact continuous grade
+between mathematically connected nodes, with a repeating tread pattern.
+Stairs are therefore mandatory sections of passages, never an object that
+can be bypassed.
+
+At each non-through-flight node it generates an enclosed square landing
+with solid brick faces in every direction without a graph edge. Corridor
+tube sidewalls STOP at the landing boundary rather than extending through
+junctions and blocking a real turn. Consecutive slope edges classified as
+uninterrupted stair flights do not receive unnecessary landing pads.
+Independent stacked paths remain enclosed and visually isolated.
+
+The collision solver (walk/navigation.mjs) samples these very same
+corridor and landing envelopes. It checks the player's current height,
+so overlapping X/Y corridors on different floors cannot become
+accidental teleports. Wall directions cannot be passed; speed and frame
+length are broken into substeps to avoid tunneling through solids.
+Ascending physically changes the player's Y coordinate rather than
+jumping immediately to the next floor.
+
+Native WebGL1 (walk/webgl.mjs) renders the actual triangles with a
+first-person perspective and fog. Four deliberately simple repeating
+shader materials are used: brick, stone floor, stone ceiling and a
+stair tread/slope surface. No prefab stair models, rooms or architecture
+are inserted. A local render cache rebuilds when entering an 8x8-cell
+region (with extra fog margin); only the *rendered mesh* is chunked,
+never the maze topology or seed.
+
+Desktop: click to lock the mouse, WASD to walk, Shift to run, mouse to look,
+Escape to release. On a phone, drag the scene to look and hold touch
+buttons to move. A seeded entrance and distant exit, restart, URL sharing
+and optional debug coordinates are implemented.
+
+The initial browser implementation supports dimensions 6-64 by 6-64,
+2-12 floors. Walkable slopes are continuous ramps with visually repeating
+tread marks (not physically articulated stair steps); collision does
+not yet support a free-jumping character, shadows, decorative details,
+or complex 3D game physics. This is the first playable exploration
+milestone, with graph-faithful movement and solid enclosures.
+
+Run the regression and browser smoke tests:
+
+    node --test tests/walk.test.mjs
+
+GitHub Actions also launches real Chromium with WebGL on a local server,
+walks forward from the generated entrance, resets the run, checks JS
+and GPU errors, and uploads a screenshot from inside the maze.
