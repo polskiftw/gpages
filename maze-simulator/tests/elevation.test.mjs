@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {ElevationMaze,PITCH,STORY,WIDTH,HEADROOM,SLAB,VERSION,popcount,vertical,direction,opposite} from "../elevation/stairs.mjs";
+import {floorPlanSvg,runProfileSvg} from "../elevation/view.mjs";
 assert.ok(STORY-(STORY/PITCH)*WIDTH>HEADROOM+SLAB,"Stacked perpendicular stair ribbons need corner clearance");
 const fixtures=[{width:24,height:24,levels:6,seed:"LOST-6549"},{width:30,height:24,levels:5,seed:"CONTINUOUS-RISE"},{width:18,height:27,levels:7,seed:"NO-PREFABS"}];
 let longestSeen=0,ascending=0,descending=0,mixedLandings=0,flatAfterLongRun=0;
@@ -48,6 +49,13 @@ for(const opts of fixtures){
     assert.ok(d0*d1>0&&Math.min(Math.abs(d0),Math.abs(d1))>=HEADROOM+SLAB,"occupied ribbons collide");
   }
   const runs=m.runs();
+  const map=floorPlanSvg(m,1);
+  assert.ok(map.svg.includes('class="rise-marker"'),"compact stair glyphs should be drawn from real graph edges");
+  const labeled=floorPlanSvg(m,1,{showLabels:true});
+  assert.ok(labeled.svg.includes('class="rise"'),"accessible exact U/D labels should be available");
+  assert.notEqual(map.svg,labeled.svg);
+  if(runs.length)assert.ok(runProfileSvg(runs[0]).includes("m vertical change"),"real side profiles derive from stair runs");
+
   for(let i=0;i<m.volume;i++)if(m.used[i]){
     const links=m.links(i);
     if(links.length<3)continue;
