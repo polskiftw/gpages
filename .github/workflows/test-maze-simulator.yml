@@ -28,6 +28,8 @@ jobs:
           node --test maze-simulator/tests/maze.test.mjs
           node --check maze-simulator/elevation/stairs.mjs
           node --test maze-simulator/tests/elevation.test.mjs
+          node --check maze-simulator/elevation/combined.mjs
+          node --test maze-simulator/tests/combined.test.mjs
           node maze-simulator/elevation/bench.mjs
           node --check maze-simulator/elevation/app.mjs
           node --check maze-simulator/elevation/view.mjs
