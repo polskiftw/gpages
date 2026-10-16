@@ -53,8 +53,8 @@
 </section>
 <section class="technical">
 <h2>What this milestone proves</h2>
-<p>The generator reuses Connected Detours for every flat floor and adds only a small number of reciprocal Euclidean ramps between them. Some stairs continue through an otherwise solid intermediate floor tile, so a climb can pass multiple floors <em>without</em> becoming a landing. No fixed staircase patterns, and no generation chunks.</p>
-<p>Everything derives from one connected navigation graph. We test exact preservation of the original horizontal walls, reachability, vertical clearance on overlapping passage segments, stair rarity and seed reproduction. <strong>This remains a math preview, not the final 3D wall, ceiling or collision-mesh renderer.</strong></p>
+<p>Every route is an <strong>enclosed passage</strong> with walls, floor and ceiling. A direction has exactly one possible floor profile: flat, uphill or downhill; stairs are never walk-around objects inside a hallway. The generator reuses Connected Detours for every flat floor and adds a small number of Euclidean ramps. Stairs can climb through intermediate elevations without a landing and can pass directly <em>above</em> independently traversable corridors when there is enough vertical clearance. A shared overhead footprint does not create a junction or a visual opening. No staircase templates or generation chunks.</p>
+<p>Everything derives from one connected navigation graph. We test horizontal walls, reachability, single-exit-per-compass-heading, clearance for upper/lower passages, stair rarity and seed reproduction. The exported JSON identifies actual stacked hallways and stairs separately, including minimum vertical headroom. <strong>The enclosed swept-passage rules are mathematical; final 3D wall, ceiling and collision meshes have not yet been built.</strong></p>
 <p><a href="../elevation/">Earlier standalone stair experiment</a> · <a href="../">Original 2D Connected Detours comparison</a></p>
 </section>
 <footer>Real seeded maze topology · <code>unified/</code> + <code>elevation/combined.mjs</code> · no assets or third-party libraries</footer>
