@@ -7,6 +7,8 @@ let longestSeen=0,ascending=0,descending=0,mixedLandings=0,flatAfterLongRun=0;
 for(const opts of fixtures){
   const m=new ElevationMaze(opts),second=new ElevationMaze(opts);
   assert.equal(m.bits.length,m.volume);
+  assert.ok(m.stairs/m.edges<.035,"rare default must stay under 3.5% stair segments");
+  for(const used of m.stairCountByBoundary)assert.ok(used<=m.maxRampsPerBoundary,"floor-pair staircase budget must be respected");
   assert.deepEqual(m.bits,second.bits,"seed should reproduce every connection");
   assert.deepEqual(m.used,second.used);
   assert.deepEqual(m.start,second.start);
@@ -90,11 +92,11 @@ for(const opts of fixtures){
     "longest continuous climb",runs[0]?.steps||0,"exit steps",m.routeLength);
 }
 assert.ok(ascending>0&&descending>0,"up and down stairs are reciprocal");
-assert.ok(longestSeen>=3,"at least one automatically generated flight spans three whole floors");
-assert.ok(mixedLandings>0,"seeded landings with independently chosen up and down branches must occur");
-assert.ok(flatAfterLongRun>0,"at least one uninterrupted multistory flight should reach a real flat landing");
+assert.ok(longestSeen>=3,"rare seeded ramps can still continue across three floors");
+// With genuinely rare stairs, an up/down split is possible but not mandatory for every sampled world.
+assert.ok(flatAfterLongRun>0,"an uninterrupted multistory flight should reach a flat landing");
 console.log("Mixed-height branching landings:",mixedLandings,"long flights ending at level routes:",flatAfterLongRun);
-assert.equal(VERSION,"elevation-lattice-1");
+assert.equal(VERSION,"elevation-lattice-2");
 assert.throws(()=>new ElevationMaze({width:1,height:8,levels:3}),/width/);
 assert.throws(()=>new ElevationMaze({width:12,height:12,levels:0}),/levels/);
 console.log("Elevation math validated: no prefab turns, no mandatory floor landings, no impossible graph moves.");
