@@ -27,10 +27,10 @@ jobs:
           node --check maze-simulator/examples.mjs
           node --test maze-simulator/tests/maze.test.mjs
 
-      - name: Export five global mathematical floor plans
+      - name: Export original v4 floor plans and depth metrics
         run: node maze-simulator/examples.mjs /tmp/maze-samples
       - uses: actions/upload-artifact@v4
         with:
           name: maze-math-sample-svg
-          path: /tmp/maze-samples/*.svg
+          path: /tmp/maze-samples/
           retention-days: 30
