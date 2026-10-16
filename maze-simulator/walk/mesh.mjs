@@ -5,6 +5,8 @@ import {PITCH,STORY,WIDTH,HEADROOM,SLAB,DIRECTIONS} from "../elevation/stairs.mj
 import {edgeHeight,hasPad,halfWidth,padFraction} from "./navigation.mjs";
 export const SURFACE=Object.freeze({BRICK:0,STONE:1,CEILING:2,STAIRS:3,EXIT:4});
 const EPS=0.016;
+// Geometry is cut at landing faces; uninterrupted ramps have a full span.
+export const corridorSpan=(maze,i,j)=>({start:padFraction(maze,i),end:1-padFraction(maze,j)});
 const mix=(a,b,t)=>a+(b-a)*t;
 export function buildMesh(maze,{center=maze.start,radius=13,floorRadius=2}={}){
   const data=[],stats={pads:0,through:0,edges:0,stairs:0,caps:0,triangles:0};
@@ -47,7 +49,7 @@ export function buildMesh(maze,{center=maze.start,radius=13,floorRadius=2}={}){
     // NEVER put corridor sidewalls inside that square: doing so would make
     // legal N-to-E turns look blocked by internal floating wall panels.
     // Straight through-flight nodes have no landing and remain continuous.
-    const start=padFraction(maze,i),end=1-padFraction(maze,j);
+    const {start,end}=corridorSpan(maze,i,j);
     const cuts=[start,end];
     if(steps>1)for(let s=1;s<steps;s++)cuts.push(start+(end-start)*s/steps);
     cuts.sort((x,y)=>x-y);
