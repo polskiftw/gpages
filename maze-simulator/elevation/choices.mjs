@@ -145,6 +145,7 @@ export function enrichChoices(m,intensity=1){
   if(intensity===3){
     const first=enrichChoices(m,2);
     const fill=bridgeSolidGaps(m);
+    m.metrics.navigable+=fill.carved;
     return {mode:3,added:first.added+fill.bridges,goal:first.goal+fill.aim,
       bridges:fill.bridges,carved:fill.carved,connectors:first.added,
       candidates:first.candidates+fill.candidates,minLoop:first.minLoop,
