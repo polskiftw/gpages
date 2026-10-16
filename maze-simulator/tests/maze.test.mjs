@@ -33,6 +33,7 @@ function checkWorld(opts){
   assert.deepEqual([...m.generateChunk(0,0,0).cells],[...m.generateChunk(0,0,0).cells]);
   return m;
 }
+assert.throws(()=>new Maze({width:1,height:1,levels:1}),/at least two/);
 for(const style of Object.keys(STYLES)){
   for(const [width,height,levels] of [[7,9,1],[33,27,3],[49,34,4],[1,1,7],[17,17,2]]){
     // The 1x1 multi-floor world necessarily has start/exit at the same XY but different Z.
