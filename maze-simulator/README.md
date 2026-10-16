@@ -108,3 +108,24 @@ presence of RNG-generated climbs crossing at least three story boundaries.
 Physical 3D meshes, wall/ceiling collision geometry, and final integration
 with Connected Detours remain future steps; this preview does **not**
 misrepresent those as finished.
+
+## Stair rarity adjustment — elevation-lattice-2
+
+The v1 stair experiment was far too stair-heavy. Even its lowest setting
+produced around **26% sloped passage connections** (the old default was near
+30%). The generator now uses a **hard budget per neighboring floor pair**,
+plus sparse deterministic gates for the *beginning* of a stair run. A flight
+already climbing may continue up successive stories without a forced landing.
+
+The stair rarity setting is **1–8**, default **2**. It is a maximum budget of
+roughly `setting% × (width × height)` staircase edges per adjacent floor
+pair, not a percentage of every outgoing move. The actual percentage is
+shown on the page, along with the number of staircase edges. The graph also
+keeps floor-to-floor connections even on unusually small seeds through a
+bounded, clearance-tested recovery bridge.
+
+On the reproducible 28×28×6 benchmark at seed `LOST-6549`, measured stairs
+were **0.72% at setting 1, 1.41% at setting 2, and 3.15% at setting 8**
+of all undirected navigable edges. This retains occasional multistory climbs
+without making staircases the dominant means of travel. Extra alternative
+route connections are deliberately planar rather than generating more ramps.
