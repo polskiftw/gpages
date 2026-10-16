@@ -104,7 +104,7 @@ $("geometry").addEventListener("click",()=>{
   const meta={version:COMBINED_VERSION,seed:maze.seed,size:[maze.width,maze.height,maze.levels],
     stairFrequency:maze.stairWeight,start:maze.start,exit:maze.exit,shortestPath:maze.routeLength,
     scale:{pitch:PITCH,story:STORY,width:WIDTH,headroom:HEADROOM,slab:SLAB},
-    originalFloorMetrics:maze.floorMetrics,stairEdgePercentage:maze.stairShare,edges:maze.geometry(),
+    originalFloorMetrics:maze.floorMetrics,stairEdgePercentage:maze.stairShare,edges:maze.geometry(),stairNodes:maze.stairSurfaces(),
     naturalMultistoryStairs:runs.filter(r=>r.steps>=3)};
   download(JSON.stringify(meta),"connected-detours-3d-"+maze.seed.replace(/[^a-z0-9_-]/gi,"_")+".json","application/json");
 });
