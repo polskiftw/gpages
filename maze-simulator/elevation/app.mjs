@@ -89,6 +89,6 @@ $("share").addEventListener("click",async()=>{
 });
 const params=new URLSearchParams(location.search);
 for(const [field,id] of [["w","width"],["h","height"],["l","levels"],["s","seed"],["stairs","stairWeight"]])
-  if(params.has(field))$(id).value=params.get(field);
+  if(params.has(field))$(id).value=id==="stairWeight"?String(clamp(Math.round(Number(params.get(field))||2),1,8)):params.get(field);
 generate();
 if(maze&&params.has("floor")){level=clamp(Number(params.get("floor"))||0,0,maze.levels-1);draw();}
