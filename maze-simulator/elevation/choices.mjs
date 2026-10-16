@@ -75,14 +75,16 @@ export function enrichChoices(m,intensity=1){
   // Only existing degree-2 corridors are linked: every new edge creates
   // two T-junctions, NOT two new 1-cell dead ends.
   const goal=Math.max(1,Math.ceil(before.walkable/(intensity===1?25:15)));
-  const minLoop=Math.max(8,Math.min(14,Math.floor(Math.min(w,h)*.62)));
-  const leafGuard=Math.max(3,Math.min(7,Math.floor(Math.min(w,h)/3)));
+  const minLoop=Math.max(8,Math.min(intensity===1?14:12,Math.floor(Math.min(w,h)*.62)));
+  const leafGuard=Math.max(3,Math.min(intensity===1?7:5,Math.floor(Math.min(w,h)/3)));
+  const junctionGuard=intensity===1?2:1;
+  const spacing=intensity===1?3:2;
   const random=randomNumber(m.salt^(intensity*0x7feb352d)^0xbaf76212);
   const candidates=[];
   for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-    const i=y*w+x;if(deg[i]!==2||(toDeadEnd[i]>=0&&toDeadEnd[i]<leafGuard)||toChoice[i]<2)continue;
+    const i=y*w+x;if(deg[i]!==2||(toDeadEnd[i]>=0&&toDeadEnd[i]<leafGuard)||toChoice[i]<junctionGuard)continue;
     for(const [j,d] of [[x+1<w?i+1:-1,1],[y+1<h?i+w:-1,2]]){
-      if(j<0||deg[j]!==2||(cells[i]&BITS[d])||(toDeadEnd[j]>=0&&toDeadEnd[j]<leafGuard)||toChoice[j]<2)continue;
+      if(j<0||deg[j]!==2||(cells[i]&BITS[d])||(toDeadEnd[j]>=0&&toDeadEnd[j]<leafGuard)||toChoice[j]<junctionGuard)continue;
       // Prioritize locations where players currently go furthest without
       // encountering any junction. Tie-break by a deterministic seed.
       const score=Math.min(toChoice[i],toChoice[j])*1024+
@@ -116,7 +118,7 @@ export function enrichChoices(m,intensity=1){
     let crowded=false;
     for(const j of chosen){
       const xx=j%w,yy=Math.floor(j/w);
-      if(Math.abs(xx-x)+Math.abs(yy-y)<3){crowded=true;break;}
+      if(Math.abs(xx-x)+Math.abs(yy-y)<spacing){crowded=true;break;}
     }
     if(crowded||!detourIsLong(c.i,c.j))continue;
     cells[c.i]|=BITS[c.d];cells[c.j]|=REVERSE[c.d];
