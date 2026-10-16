@@ -20,7 +20,7 @@ function showRun(){
 }
 function draw(){
   if(!maze)return;
-  const data=floorPlanSvg(maze,level,{highlight:runs[selected]||null});
+  const data=floorPlanSvg(maze,level,{highlight:runs[selected]||null,showLabels:$("labels").checked});
   lastSvg=data.svg;$("map").innerHTML=data.svg;
   $("floor").textContent="Level "+level+" / "+(maze.levels-1);
   $("previous").disabled=level===0;$("next").disabled=level===maze.levels-1;
@@ -70,6 +70,7 @@ $("next").addEventListener("click",()=>{level=Math.min(maze.levels-1,level+1);dr
 $("atStart").addEventListener("click",()=>{level=maze.start.z;draw();});
 $("atExit").addEventListener("click",()=>{level=maze.exit.z;draw();});
 $("runs").addEventListener("change",()=>{showRun();draw();});
+$("labels").addEventListener("change",()=>draw());
 $("focus").addEventListener("click",()=>{if(runs[selected]){level=runs[selected].from.z;draw();}});
 $("save").addEventListener("click",()=>download(lastSvg,"natural-stairs-"+maze.seed.replace(/[^a-z0-9_-]/gi,"_")+"-z"+level+".svg","image/svg+xml"));
 $("geometry").addEventListener("click",()=>{
