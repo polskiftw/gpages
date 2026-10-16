@@ -1,4 +1,4 @@
-import {Maze,STYLES} from "./maze-core.mjs";
+import {Maze,STYLES,ENGINE_VERSION} from "./maze-core.mjs";
 import {floorSvg} from "./maze-map.mjs";
 const $=id=>document.getElementById(id),clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 let maze,level=0,x0=0,y0=0,view=32,lastSvg="";
@@ -18,7 +18,7 @@ function center(loc){
 function writeUrl(){
   const p=new URLSearchParams();
   p.set("w",maze.width);p.set("h",maze.height);p.set("floors",maze.levels);
-  p.set("seed",maze.seed);p.set("style",maze.style);p.set("floor",level+1);
+  p.set("seed",maze.seed);p.set("style",maze.style);p.set("floor",level+1);p.set("v",ENGINE_VERSION);
   history.replaceState(null,"",location.pathname+"?"+p.toString());
 }
 function render(){
@@ -33,13 +33,15 @@ function render(){
   const s=data.stats;
   $("stats").textContent="Visible "+data.width+" × "+data.height+" cells · "+s.dead+" dead ends · "
     +s.turns+" turns · "+s.straight+" straight passages · "+s.junctions+" junctions · "+s.vertical+" stair connections";
-  $("size-label").textContent=maze.width+" × "+maze.height+" × "+maze.levels;
+  $("size-label").textContent=maze.width+" × "+maze.height+" × "+maze.levels+" · "+maze.routeLength.toLocaleString()+" steps to exit";
   writeUrl();
 }
 function compare(){
   const root=$("examples");root.replaceChildren();
   for(const [key,profile] of Object.entries(STYLES)){
-    const test=new Maze({...inputs(),style:key,cacheLimit:24});
+    // Independent small comparison worlds, NOT cropped mini-mazes or chunk output.
+    // Always bounded even if the main world is millions of cells.
+    const opts=inputs(),test=new Maze({width:Math.min(48,opts.width),height:Math.min(48,opts.height),levels:Math.min(3,opts.levels),seed:opts.seed,style:key});
     const size=24,ww=Math.min(test.width,size),hh=Math.min(test.height,size);
     const bx=clamp(test.start.x-Math.floor(ww/2),0,test.width-ww);
     const by=clamp(test.start.y-Math.floor(hh/2),0,test.height-hh);
@@ -83,7 +85,10 @@ $("fit").addEventListener("click",()=>{
   x0=0;y0=0;render();
 });
 $("export").addEventListener("click",()=>{
-  const blob=new Blob([lastSvg],{type:"image/svg+xml;charset=utf-8"}),url=URL.createObjectURL(blob);
+  // Export the whole floor when reasonable; otherwise export the visible region.
+  const full=maze.width*maze.height<=65536;
+  const content=full?floorSvg(maze,{floor:level,width:maze.width,height:maze.height}).svg:lastSvg;
+  const blob=new Blob([content],{type:"image/svg+xml;charset=utf-8"}),url=URL.createObjectURL(blob);
   const a=document.createElement("a");a.href=url;a.download="maze-"+maze.seed.replace(/[^a-z0-9_-]/gi,"_").slice(0,32)+"-floor-"+(level+1)+".svg";
   document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
 });
