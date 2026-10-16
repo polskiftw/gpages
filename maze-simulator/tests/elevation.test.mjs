@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {ElevationMaze,PITCH,STORY,WIDTH,HEADROOM,SLAB,VERSION,popcount,vertical,direction,opposite} from "../elevation/stairs.mjs";
 assert.ok(STORY-(STORY/PITCH)*WIDTH>HEADROOM+SLAB,"Stacked perpendicular stair ribbons need corner clearance");
 const fixtures=[{width:24,height:24,levels:6,seed:"LOST-6549"},{width:30,height:24,levels:5,seed:"CONTINUOUS-RISE"},{width:18,height:27,levels:7,seed:"NO-PREFABS"}];
-let longestSeen=0,ascending=0,descending=0;
+let longestSeen=0,ascending=0,descending=0,mixedLandings=0,flatAfterLongRun=0;
 for(const opts of fixtures){
   const m=new ElevationMaze(opts),second=new ElevationMaze(opts);
   assert.equal(m.bits.length,m.volume);
@@ -48,6 +48,17 @@ for(const opts of fixtures){
     assert.ok(d0*d1>0&&Math.min(Math.abs(d0),Math.abs(d1))>=HEADROOM+SLAB,"occupied ribbons collide");
   }
   const runs=m.runs();
+  for(let i=0;i<m.volume;i++)if(m.used[i]){
+    const links=m.links(i);
+    if(links.length<3)continue;
+    const up=links.filter(x=>vertical(x.code)>0),down=links.filter(x=>vertical(x.code)<0);
+    if(up.some(a=>down.some(b=>direction(a.code)!==direction(b.code))))mixedLandings++;
+  }
+  for(const run of runs)if(run.steps>=3){
+    const tail=run.vertices.at(-1),i=m.index(tail.x,tail.y,tail.z);
+    if(m.links(i).some(e=>vertical(e.code)===0))flatAfterLongRun++;
+  }
+
   for(const run of runs){
     assert.equal(run.vertices.length,run.steps+1);
     assert.equal(Math.abs(run.rise),run.steps,"a continuous stair run climbs without mandatory intermediate landings");
@@ -72,6 +83,9 @@ for(const opts of fixtures){
 }
 assert.ok(ascending>0&&descending>0,"up and down stairs are reciprocal");
 assert.ok(longestSeen>=3,"at least one automatically generated flight spans three whole floors");
+assert.ok(mixedLandings>0,"seeded landings with independently chosen up and down branches must occur");
+assert.ok(flatAfterLongRun>0,"at least one uninterrupted multistory flight should reach a real flat landing");
+console.log("Mixed-height branching landings:",mixedLandings,"long flights ending at level routes:",flatAfterLongRun);
 assert.equal(VERSION,"elevation-lattice-1");
 assert.throws(()=>new ElevationMaze({width:1,height:8,levels:3}),/width/);
 assert.throws(()=>new ElevationMaze({width:12,height:12,levels:0}),/levels/);
