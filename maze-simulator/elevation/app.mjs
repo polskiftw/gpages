@@ -79,7 +79,7 @@ $("geometry").addEventListener("click",()=>{
   const info={version:VERSION,seed:maze.seed,dimensions:[maze.width,maze.height,maze.levels],
     scale:{horizontalStepMeters:PITCH,levelHeightMeters:STORY,corridorWidthMeters:WIDTH,headroomMeters:HEADROOM,slabMeters:SLAB},
     start:maze.start,exit:maze.exit,routeLength:maze.routeLength,
-    navigableCells:maze.usedCount,edges:maze.geometry(),stairNodes:maze.stairSurfaces(),unbrokenStairRuns:runs};
+    navigableCells:maze.usedCount,edges:maze.geometry(),stairNodes:maze.stairSurfaces(),overpasses:maze.overpasses(),unbrokenStairRuns:runs};
   download(JSON.stringify(info),"natural-stairs-"+maze.seed.replace(/[^a-z0-9_-]/gi,"_")+".json","application/json");
 });
 $("share").addEventListener("click",async()=>{
