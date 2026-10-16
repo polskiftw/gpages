@@ -73,8 +73,12 @@ for(const [seed,width,height,levels] of [
   assert.ok(stairTested,"test world contains actual accessible stairs");
   for(const o of m.overpasses().slice(0,12)){
     const x=(o.from.x+o.to.x)*PITCH/2,z=(o.from.y+o.to.y)*PITCH/2;
-    const lower=(o.lower.startLevel+o.lower.endLevel)*STORY/2;
-    const upper=(o.upper.startLevel+o.upper.endLevel)*STORY/2;
+    // The actual grade can flatten slightly at a real landing. Do not
+    // assume that half the horizontal span is half the change in height.
+    const elevation=(segment)=>edgeHeight(m,
+      m.index(o.from.x,o.from.y,segment.startLevel),
+      m.index(o.to.x,o.to.y,segment.endLevel),.5);
+    const lower=elevation(o.lower),upper=elevation(o.upper);
     assert.ok(upper-lower>HEADROOM);
     const low=floorAt(m,x,z,lower),high=floorAt(m,x,z,upper);
     assert.ok(low&&high,"separate underpass and overhead staircase must both have walkable surfaces");
