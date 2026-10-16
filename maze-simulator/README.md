@@ -206,3 +206,40 @@ for unintended straight stair -> one flat step -> same-direction stair
 interruptions with no real alternative route.
 
 These are 3D movement/geometry semantics, not yet full collision meshes.
+
+## Enclosed passage geometry and hidden stair overpasses
+
+Every direction from every navigable position can connect to at most **one**
+of level, ascending or descending travel. Staircases ARE corridor segments:
+there is no second walkable path around them within the same heading. The
+topology is sealed by default; a doorway/corridor opening exists only where
+a reciprocal graph edge explicitly permits it.
+
+The mathematical passage envelope has 1.5m width, 2.1m headroom and 0.25m
+floor thickness. The existing real-world XYZ graph uses 7m horizontal
+spacing and 3.5m story spacing. When projected passage centerlines coincide
+in X/Y, independent routes can lie over each other **only when the upper
+passage's underside stays above the lower passage's standing clearance
+across the entire segment**. A flat corridor below a stair is an ordinary
+valid result, not a secret tunnel prefabricated into the generator. Neither
+route has an opening to the other at their projected crossing.
+
+The shared elevation engine now exports **actual overpass records**:
+projected XY endpoints, lower/upper route type (flat or stair), level
+coordinates and minimum available headroom. The full 3D JSON export
+includes these records, but does not invent actual collision meshes.
+The UI lists their count. An independent clearance check for perpendicular
+ribbons around a shared lattice vertex uses the worst-case grade across
+the corridor width: STORY - (STORY/PITCH)*WIDTH >= HEADROOM + SLAB.
+
+On the original LOST-6549 integrated 28 x 28 x 6 example, the math detects
+**50 clearance-safe stacked flat/stair shared XY segments** with no
+interconnections. Across 12 reproducible regression worlds it detected
+668 such stacked overpasses. New unit tests also prove a manually
+constructed upper stair and lower corridor can share exactly the same
+XY footprint without being connected or colliding, and that level and
+ascending edges cannot coexist in one direction from a single position.
+
+These are enforceable mathematical properties; the future renderer must
+derive sealed wall/floor/ceiling meshes from the same graph and not
+create unintended windows, bypasses or openings.
