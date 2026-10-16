@@ -117,7 +117,8 @@ $("share").addEventListener("click",async()=>{
     setTimeout(()=>$("share").textContent="Copy seed link",1300);}
   catch{status("Copy the URL from your browser's address bar.",true);}
 });
-const typing=e=>["INPUT","TEXTAREA","SELECT","BUTTON"].includes(document.activeElement?.tagName);
+const typing=()=>{const el=document.activeElement;return ["TEXTAREA","SELECT"].includes(el?.tagName)||
+  el?.tagName==="INPUT"&&el.type!=="checkbox"||el?.tagName==="BUTTON";};
 window.addEventListener("keydown",e=>{
   if(typing(e))return;
   const k=e.key.toLowerCase();
