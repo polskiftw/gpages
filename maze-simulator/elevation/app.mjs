@@ -26,7 +26,8 @@ function draw(){
   $("previous").disabled=level===0;$("next").disabled=level===maze.levels-1;
   $("counts").textContent="On this level: "+data.stats.flats+" horizontal connections, "+data.stats.up+
     " ascending entrances, "+data.stats.down+" descending entrances, "+data.stats.landings+
-    " landing/junction cells, "+data.stats.through+" uninterrupted stair positions.";
+    " non-through cells, "+data.stats.through+" uninterrupted climbing positions.";
+  $("map").setAttribute("aria-label","Real floor "+level+" passages, "+data.stats.up+" up and "+data.stats.down+" down staircase connections");
   url();
 }
 function setupRuns(){
@@ -48,8 +49,9 @@ function generate(){
     $("error").hidden=true;setupRuns();draw();
     const long=runs.filter(x=>x.steps>=3).length;
     const junctions=Array.from(maze.used).reduce((s,u,i)=>s+(u&&maze.links(i).length>=3?1:0),0);
+    const stairPercent=(100*maze.stairs/(maze.edges-maze.pruned)).toFixed(1);
     $("summary").textContent=maze.usedCount.toLocaleString()+" walkable nodes · "+maze.stairs+
-      " climbing/descending segments";
+      " stair connections ("+stairPercent+"% of all connections)";
     $("runDetail").textContent+=" Across this world: "+long+
       " uninterrupted flights span at least three levels. There are "+junctions+
       " junctions and "+maze.loops+" extra long detours.";
@@ -87,6 +89,6 @@ $("share").addEventListener("click",async()=>{
 });
 const params=new URLSearchParams(location.search);
 for(const [field,id] of [["w","width"],["h","height"],["l","levels"],["s","seed"],["stairs","stairWeight"]])
-  if(params.has(field))$(id).value=params.get(field);
+  if(params.has(field))$(id).value=id==="stairWeight"?String(clamp(Math.round(Number(params.get(field))||2),1,8)):params.get(field);
 generate();
 if(maze&&params.has("floor")){level=clamp(Number(params.get("floor"))||0,0,maze.levels-1);draw();}
