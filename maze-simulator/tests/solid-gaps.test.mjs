@@ -28,7 +28,7 @@ function examineGapBridges(old,newer,w,h){
   for(let i=0;i<old.length;i++){
     if(!isNew(i))continue;
     opened++;
-    assert.ok(newer[i]===N|S||newer[i]===(E|W),
+    assert.ok(newer[i]===(N|S)||newer[i]===(E|W),
       "every newly carved solid cell is a continuous sealed straight passage, not a dead end or room");
   }
   for(let i=0;i<old.length;i++){
