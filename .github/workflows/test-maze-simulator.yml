@@ -20,7 +20,9 @@ jobs:
         with:
           node-version: '22'
       - name: Verify all floors, portals, seeds and rendered walls
-        run: node --test maze-simulator/tests/maze.test.mjs
+        run: |
+          node --check maze-simulator/app.mjs
+          node --test maze-simulator/tests/maze.test.mjs
 
       - name: Export five exact mathematical floor plans
         run: node maze-simulator/examples.mjs /tmp/maze-samples
