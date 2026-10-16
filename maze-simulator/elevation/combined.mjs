@@ -12,7 +12,7 @@ export class ConnectedDetours3D extends ElevationMaze{
     super({width,height,levels,seed,stairWeight,generate:false});
     this.version=COMBINED_VERSION;this.model="connected";
     this.floorMetrics=[];this.flatMasks=[];this.stairOrigins=Array.from({length:levels-1},()=>[]);
-    this.longRunsAdded=0;this.build();
+    this.longRunsAdded=0;this.flightInterior=new Uint8Array(this.volume);this.build();
   }
   flat(z){
     // Full-floor global Connected Detours topology, not 16x16 submazes.
@@ -67,10 +67,6 @@ export class ConnectedDetours3D extends ElevationMaze{
     this.stairShare=Number((100*this.stairs/this.edges).toFixed(2));
     this.longest=this.runs()[0]||null;
   }
-  clearArea(z,i,code){
-    const loc=this.loc(i),d=z===loc.z?this.loc(this.neighbor(i,code)):loc;
-    return d!==null;
-  }
   tooNear(z,a,b){
     for(const place of this.stairOrigins[z]){
       if(Math.abs(place.x-a.x)+Math.abs(place.y-a.y)<3)return true;
@@ -80,7 +76,7 @@ export class ConnectedDetours3D extends ElevationMaze{
   }
   possibleStep(i,code,requiredUsed){
     const j=this.neighbor(i,code);
-    if(j<0||this.used[j]!==requiredUsed||this.bits[i]&(1<<code))return -1;
+    if(j<0||this.used[j]!==requiredUsed||this.flightInterior[i]||this.flightInterior[j]||this.bits[i]&(1<<code))return -1;
     if(!this.clear(i,j))return -1;
     if(this.stairCountByBoundary[this.loc(i).z]>=this.maxRampsPerBoundary)return -1;
     return j;
@@ -108,7 +104,7 @@ export class ConnectedDetours3D extends ElevationMaze{
     let at=i;
     while(true){
       const j=this.neighbor(at,4+dir);
-      if(j<0||!this.clear(at,j))return null;
+      if(j<0||this.flightInterior[at]||this.flightInterior[j]||!this.clear(at,j))return null;
       const z=this.loc(at).z;
       if(this.stairCountByBoundary[z]>=target||this.stairCountByBoundary[z]>=this.maxRampsPerBoundary)return null;
       chain.push({from:at,to:j,code:4+dir,z});
@@ -123,7 +119,7 @@ export class ConnectedDetours3D extends ElevationMaze{
     let chosen=null,seen=0;
     for(let k=0;k<this.area;k++){
       const i=offset+k;
-      if(!this.used[i])continue;
+      if(!this.used[i]||this.flightInterior[i])continue;
       for(let d=0;d<4;d++){
         const chain=this.traceChain(i,4+d,target);
         if(!chain)continue;
@@ -134,8 +130,9 @@ export class ConnectedDetours3D extends ElevationMaze{
     if(!chosen)return false;
     // All intermediate cells were SOLID on their floor. They become walkable
     // only as a straight through-flight, with no floor-specific exits.
-    for(const edge of chosen){
-      this.join(edge.from,edge.to,edge.code);this.used[edge.to]=1;
+    for(let k=0;k<chosen.length;k++){
+      const edge=chosen[k];this.join(edge.from,edge.to,edge.code);this.used[edge.to]=1;
+      if(k+1<chosen.length)this.flightInterior[edge.to]=1;
       this.stairOrigins[edge.z].push(this.loc(edge.from));
     }
     return true;
