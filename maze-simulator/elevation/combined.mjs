@@ -3,7 +3,7 @@
 // additional seeded Euclidean ramp edges join independently connected floors.
 // The renderer has no say in the mathematics. No chunk-aligned portals.
 import {Maze,SOLID,E,S} from "../maze-core.mjs";
-import {ElevationMaze,vertical} from "./stairs.mjs";
+import {ElevationMaze,vertical,opposite} from "./stairs.mjs";
 export const COMBINED_VERSION="detours-elevation-v1";
 function seededRandom(seed){let x=seed>>>0;return max=>{x=(x+0x6d2b79f5)>>>0;let t=Math.imul(x^(x>>>15),1|x);t^=t+Math.imul(t^(t>>>7),61|t);return ((t^(t>>>14))>>>0)%max;};}
 
@@ -65,6 +65,7 @@ export class ConnectedDetours3D extends ElevationMaze{
     this.flatDeadEnds=this.floorMetrics.reduce((sum,x)=>sum+x.total,0);
     this.flatShortEnds=this.floorMetrics.reduce((sum,x)=>sum+x.short,0);
     this.stairShare=Number((100*this.stairs/this.edges).toFixed(2));
+    this.overpassCount=this.overpasses().length;
     this.longest=this.runs()[0]||null;
   }
   tooNear(z,a,b){
@@ -76,7 +77,8 @@ export class ConnectedDetours3D extends ElevationMaze{
   }
   possibleStep(i,code,requiredUsed){
     const j=this.neighbor(i,code);
-    if(j<0||this.used[j]!==requiredUsed||this.flightInterior[i]||this.flightInterior[j]||this.bits[i]&(1<<code))return -1;
+    if(j<0||this.used[j]!==requiredUsed||this.flightInterior[i]||this.flightInterior[j]||
+      this.headingOccupied(i,code)||this.headingOccupied(j,opposite(code)))return -1;
     if(!this.clear(i,j))return -1;
     if(this.stairCountByBoundary[this.loc(i).z]>=this.maxRampsPerBoundary)return -1;
     return j;
@@ -104,7 +106,8 @@ export class ConnectedDetours3D extends ElevationMaze{
     let at=i;
     while(true){
       const j=this.neighbor(at,4+dir);
-      if(j<0||this.flightInterior[at]||this.flightInterior[j]||!this.clear(at,j))return null;
+      if(j<0||this.flightInterior[at]||this.flightInterior[j]||
+        this.headingOccupied(at,4+dir)||this.headingOccupied(j,opposite(4+dir))||!this.clear(at,j))return null;
       const z=this.loc(at).z;
       if(this.stairCountByBoundary[z]>=target||this.stairCountByBoundary[z]>=this.maxRampsPerBoundary)return null;
       chain.push({from:at,to:j,code:4+dir,z});
