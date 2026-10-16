@@ -11,17 +11,17 @@
 </head>
 <body>
 <main>
-<header><a class="back" href="../">← gpages</a><div class="eyebrow">MAZE LAB / GLOBAL TOPOLOGY v3</div>
+<header><a class="back" href="../">← gpages</a><div class="eyebrow">MAZE LAB / DEEP BRANCHES v4</div>
 <h1>Get lost on purpose.</h1>
-<p>One globally carved labyrinth, not little mazes joined in a grid. The floor plans come straight from the navigation graph; only the viewport is loaded for display.</p></header>
+<p>A continuous seeded labyrinth with fewer annoying short dead ends. New route-growth algorithms, short-spur removal and selective long detours. These are real passage maps, not illustrations.</p></header>
 <form id="settings">
 <div class="field"><label for="width">Width (cells)</label><input id="width" type="number" min="1" max="4096" value="48" required></div>
 <div class="field"><label for="height">Height (cells)</label><input id="height" type="number" min="1" max="4096" value="48" required></div>
 <div class="field"><label for="levels">Floors</label><input id="levels" type="number" min="1" max="64" value="3" required></div>
 <div class="field"><label for="style">Passage character</label><select id="style">
-<option value="balanced">Mixed labyrinth</option>
-<option value="winding">Long corridors</option>
-<option value="branching">Many branches</option>
+<option value="deep">Deep branches</option>
+<option value="interconnected">Connected detours</option>
+<option value="roaming">Wandering branches</option>
 </select></div>
 <div class="field seed"><label for="seed">Reproducible seed</label><input id="seed" type="text" maxlength="160" value="LOST-6549" required></div>
 <button class="primary" type="submit">Generate maze</button>
@@ -44,15 +44,15 @@
 <button id="share" type="button">Copy link</button>
 </div>
 <div id="map-wrap" role="img" aria-label="Actual maze map. Drag to pan or use arrow keys." tabindex="0"></div>
-<div class="legend"><span>◉ Start</span><span>◆ Exit</span><span>↑ Goes up</span><span>↓ Goes down</span><span>↕ Both</span></div>
-<p class="hint">Drag the map to pan. Arrows mark abstract floor connections; physical staircase dimensions and collision are a later geometry task. The walls are mathematical passage boundaries, not illustrations.</p>
+<div class="legend"><span>◉ Start</span><span>◆ Exit</span><span>■ Gray = solid masonry</span><span>U Upstairs</span><span>D Downstairs</span><span>B Both</span></div>
+<p class="hint">Drag to pan. Gray regions are actual solid blocks replacing short dead-end spurs, not decorative art. Every remaining white navigable space connects to the exit. Vertical arrows are logical connections; physical stair geometry comes later.</p>
 <div id="stats" aria-live="polite"></div>
 </section>
 <section class="compare">
 <div class="eyebrow">SAME SEED / DIFFERENT PASSAGE MATH</div><h2>Choose what feels fun</h2>
-<p>These independently generated miniature worlds use the same global algorithm and seed, at up to 48 × 48 × 3 cells. They are style demonstrations, not crops of a big maze. Tap one to switch styles.</p>
+<p>These mini-worlds use the same core code and seed with three genuinely different route-growth/repair rules. Compare how far their dead-end branches run. Tap a style to generate it.</p>
 <div id="examples" class="example-grid"></div>
 </section>
-<footer>One global graph from <code>maze-core.mjs</code> + <code>maze-grow.mjs</code>. Chunks never influence passages. Large worlds are generated once in RAM; only the visible map is drawn. No game engine or server.</footer>
+<footer>Global seeded maze math, not stitched chunks. A solid gray tile is impassable masonry, not a disconnected room. No server, graphics engine or dependency.</footer>
 </main>
 </body></html>

@@ -1,73 +1,77 @@
-# Maze Lab v3 - ONE globally carved multi-floor labyrinth
+# Maze Lab v4 — deeper branches, fewer short dead ends
 
-[Open the interactive viewer](https://polskiftw.github.io/gpages/maze-simulator/)
+**Live browser viewer:** https://polskiftw.github.io/gpages/maze-simulator/
 
-## What changed
+A seeded, finite multi-floor *global* labyrinth. A plain global grid of
+navigation cells is the only source of truth. It has no chunk-local mazes
+or generation boundaries; the viewer draws a local window of the completed map.
 
-**The old chunks-as-submazes approach is gone.** There are no local mazes,
-macro chunk trees, chunk boundary portals or artificial chokepoints.
+## The problem v4 addresses
 
-The topology engine carves a **single global spanning tree** of a finite
-3D cell graph, using a seeded growing-tree traversal over ALL cells and floors.
-A sparse deterministic set of candidate vertical links connects each adjacent
-pair of floors. Each pair has a guaranteed anchor site, so the underlying graph
-is connected before carving. Optional cycle openings only add edges.
+v3's mixed mazes produced many one- to four-cell dead-end spurs: little comb
+teeth that were not interesting to explore. v4 measures **dead-end depth** along
+the passage graph from each tip up to the next junction and deliberately
+changes how passages are built.
 
-- Every cell on every floor is reachable.
-- Every passage has a reciprocal opening and every outer boundary is walled.
-- A seeded starting position and an exit on a different floor (when possible).
-  The exit is chosen from positions at least 85% as far along shortest paths
-  as the furthest reachable position on other floors.
-- Three personalities (long corridors, balanced, many branches) are settings
-  of the same global growing-tree algorithm.
-- The seed, dimensions, style, and generator version fully determine output.
-- Exactly **one byte per cell** stores the finished passage graph. The graph
-  is generated once, not when a rendering chunk becomes visible.
-- The 2D SVG floor viewer renders only the requested window and produces
-  true walls and floor-connection markers from this same passage graph.
-  Geometry streaming/chunk dimensions are solely a renderer concern.
+Three candidates, each using the same global cell graph:
 
-## Capacity (this first simple global-memory implementation)
+- **Deep branches** (default): a seeded *stroke grower* extends routes in
+  batches of 9–24 cells with some lookahead. It prunes short terminal spurs
+  (up to five cells), then selectively reconnects certain remaining stubs
+  where an alternative detour is genuinely long.
+- **Connected detours**: a second stroke-growth setting (7–17 cells) with
+  somewhat less solid masonry, additional sparse long detours and moderate
+  pruning of spurs of four cells or fewer.
+- **Wandering branches**: a mixed growing-tree traversal with short spurs
+  up to six cells removed. Its corridors turn frequently, avoiding the
+  exceptionally long *straight* hallways of the old winding preset.
 
-At most **4,194,304 cells** per maze. Examples: 256 x 256 x 16,
-512 x 512 x 16, or 1024 x 1024 x 4. One-byte final passage arrays occupy
-4 MiB at that limit; temporary generation buffers are larger.
-Building the world runs synchronously in the current browser and large
-dimensions may take noticeable time, especially on phones.
+Unlike simply braiding every dead end into a tiny square, the main new
+operation is **pruning**: when a short terminal chain meets a real junction,
+remove the cells in that chain from navigable space, convert them to solid
+wall mass (bit 64), and close the junction connection. Each removed cell is
+a leaf at removal, so this preserves connectivity of every remaining cell.
+The graph retains longer dead-end branches. Gray on SVG maps means impassable
+masonry — a real topology decision, not a decorative background.
 
-Larger-than-RAM worlds would require an *additional* storage and generation
-strategy. We intentionally do not claim that v3 generates a billion-cell maze
-on demand, or that its global graph uses bounded generation memory.
+Some extra edges reconnect a surviving leaf to another path only when
+the existing route around the proposed loop is more than nine steps.
+Sparse other connections require a loop longer than eight steps. No chunk
+boundaries influence either operation.
 
-## Staircase limitation
+## Guaranteed / tested
 
-Up/down markers are **actual reciprocal graph transitions**, not yet
-collision-verified physical flights of stairs. No engine-renderable staircase
-footprints, headroom or underpass geometry have been solved yet. We will
-evaluate and reserve actual physical stair footprints before promising a 3D
-game; that must not introduce a chunk-like layout bias.
+- Every remaining navigable cell on every floor is reachable.
+- Every opening is reciprocal and no boundary has an external opening.
+- Every adjacent level pair is connected; vertical graph edges are preserved
+  during pruning.
+- The same seed, dimensions, style and engine version regenerate byte-for-byte
+  identical passages, masonry, endpoints and statistics.
+- A random deterministic start, and a seeded distant exit in another floor
+  when the world has multiple floors.
+- One byte per cell stores its directional opening bits or SOLID (64).
+- Nothing depends on the size of the viewport or how rendering is chunked.
 
-## How to use
+The browser currently builds up to **4,194,304 cells in RAM**, with additional
+temporary working arrays; rendering windows are cheap but initial generation
+requires a complete global pass. It is not a billion-cell on-demand generator.
 
-Choose dimensions, floors, style, and seed. Pan the actual top-down map,
-switch floors, jump to start/exit, export an SVG floor plan or copy a seeded URL.
-An SVG is a faithful rendering of the global passage bits, not a design sketch.
+**Stair markers are still abstract reciprocal 3D graph connections**, not yet
+physically validated stair flights, headroom, or underpass geometry.
 
-The three on-screen **smaller style demonstrations** are independent seeded
-worlds at at most 48 x 48 x 3, generated by precisely the same global core.
-They are not slices of a larger world's graph.
+## Build-free inspection
 
-## Verification
+Pick a seed, dimensions, floors and one of the three styles. Navigate the
+true top-down geometry, change floors, inspect dead-end statistics, export
+whole-floor SVG (where small enough), or copy a reproducible URL. The small
+style cards are independent miniature mazes using the same production math.
 
-Node.js 22 or newer, no installation of packages:
+Node.js 22+ can run the regression suite and export original math diagrams:
 
     node --test tests/maze.test.mjs
     node examples.mjs /tmp/maze-samples
 
-Tests check every traversable 3D cell, reciprocal connections, different seed
-results, reproducibility, independence from renderer chunk size (7, 16, 24, 32
-and 64), absence of forced 16-cell seam chokepoints, deterministic SVG output,
-and a global 524,288-cell world. GitHub Actions exports five original SVG
-plans and passage buffers from the production maze engine.
-
-The old C++ staircase experiments are recoverable in Git history.
+CI verifies reachability, reciprocal connections, deterministic reproduction,
+solid-block safety, short-dead-end reduction and independence from 7/16/24/32/64
+render windows, then publishes five SVG floor plans plus metrics.json.
+The previous v3 version remains available through Git history.

@@ -31,8 +31,9 @@ function render(){
   $("fit").disabled=Math.max(maze.width,maze.height)>96;
   $("fit").title=$("fit").disabled?"For huge mazes, use the view-width slider to stream sections.":"Show the entire floor.";
   const s=data.stats;
-  $("stats").textContent="Visible "+data.width+" × "+data.height+" cells · "+s.dead+" dead ends · "
-    +s.turns+" turns · "+s.straight+" straight passages · "+s.junctions+" junctions · "+s.vertical+" stair connections";
+  const t=maze.metrics.after;
+  $("stats").textContent="Visible "+data.width+" × "+data.height+" positions · "+s.cells+" walkable · "+s.solid+" solid · "+s.dead+" visible dead ends · "+s.vertical+" stairs. "
+    +"Whole labyrinth: "+t.short+" short (1–4-cell) dead ends out of "+t.total+" · median branch depth "+t.median+" cells.";
   $("size-label").textContent=maze.width+" × "+maze.height+" × "+maze.levels+" · "+maze.routeLength.toLocaleString()+" steps to exit";
   writeUrl();
 }
@@ -51,7 +52,7 @@ function compare(){
     const title=document.createElement("strong");title.textContent=profile.name;
     const picture=document.createElement("div");picture.className="example-map";picture.innerHTML=map.svg;
     const detail=document.createElement("span");
-    detail.textContent=map.stats.dead+" dead ends · "+map.stats.junctions+" junctions in this sample";
+    detail.textContent=test.metrics.after.short+" short ends / "+test.metrics.after.total+" total · median depth "+test.metrics.after.median+" cells";
     button.append(title,picture,detail);
     button.addEventListener("click",()=>{$("style").value=key;generate(false);});
     root.append(button);
@@ -120,6 +121,9 @@ const params=new URLSearchParams(location.search);
 for(const [key,id] of [["w","width"],["h","height"],["floors","levels"],["seed","seed"],["style","style"]]){
   if(params.has(key))$(id).value=params.get(key);
 }
+// Old shared v3 links can still open the new v4 styles without an invalid selection.
+const older={balanced:"deep",winding:"roaming",branching:"interconnected"};
+if(params.has("style")&&Object.hasOwn(older,params.get("style")))$("style").value=older[params.get("style")];
 generate();
 if(maze&&params.has("floor")){
   level=clamp(Number(params.get("floor"))-1||0,0,maze.levels-1);render();
