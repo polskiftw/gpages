@@ -14,7 +14,7 @@ function neighbors(w,h,i,callback){
   if(x)callback(i-1,3);
 }
 function distanceFrom(m,cells,source){
-  const n=cells.length,dist=new Int16Array(n),queue=new Int32Array(n);
+  const n=cells.length,dist=new Int32Array(n),queue=new Int32Array(n);
   dist.fill(-1);let read=0,write=0;
   for(let i=0;i<n;i++)if(degree(cells[i])&&source(i)){
     dist[i]=0;queue[write++]=i;
@@ -80,9 +80,9 @@ export function enrichChoices(m,intensity=1){
   const random=randomNumber(m.salt^(intensity*0x7feb352d)^0xbaf76212);
   const candidates=[];
   for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-    const i=y*w+x;if(deg[i]!==2||toDeadEnd[i]<leafGuard||toChoice[i]<2)continue;
+    const i=y*w+x;if(deg[i]!==2||(toDeadEnd[i]>=0&&toDeadEnd[i]<leafGuard)||toChoice[i]<2)continue;
     for(const [j,d] of [[x+1<w?i+1:-1,1],[y+1<h?i+w:-1,2]]){
-      if(j<0||deg[j]!==2||(cells[i]&BITS[d])||toDeadEnd[j]<leafGuard||toChoice[j]<2)continue;
+      if(j<0||deg[j]!==2||(cells[i]&BITS[d])||(toDeadEnd[j]>=0&&toDeadEnd[j]<leafGuard)||toChoice[j]<2)continue;
       // Prioritize locations where players currently go furthest without
       // encountering any junction. Tie-break by a deterministic seed.
       const score=Math.min(toChoice[i],toChoice[j])*1024+
