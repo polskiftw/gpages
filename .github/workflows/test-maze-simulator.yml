@@ -28,6 +28,10 @@ jobs:
           node --test maze-simulator/tests/maze.test.mjs
           node --check maze-simulator/elevation/stairs.mjs
           node --test maze-simulator/tests/elevation.test.mjs
+          node --check maze-simulator/elevation/combined.mjs
+          node --test maze-simulator/tests/combined.test.mjs
+          node --check maze-simulator/unified/app.mjs
+          node --check maze-simulator/unified/examples.mjs
           node maze-simulator/elevation/bench.mjs
           node --check maze-simulator/elevation/app.mjs
           node --check maze-simulator/elevation/view.mjs
@@ -51,4 +55,17 @@ jobs:
         with:
           name: natural-stairs-math
           path: /tmp/natural-stairs/
+          retention-days: 30
+
+      - name: Export integrated Connected Detours 3D floor plans
+        run: |
+          node maze-simulator/unified/examples.mjs /tmp/combined-maze
+          test -s /tmp/combined-maze/floor-0.svg
+          test -s /tmp/combined-maze/floor-5.svg
+          test -s /tmp/combined-maze/continuous-flight.svg
+          test -s /tmp/combined-maze/stats.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: connected-detours-3d-math
+          path: /tmp/combined-maze/
           retention-days: 30

@@ -13,7 +13,7 @@ function seedValue(seed){let h=2166136261;for(const ch of seed)h=Math.imul(h^ch.
 function makeRandom(seed){let x=seed>>>0;return max=>{x=(x+0x6d2b79f5)>>>0;let t=Math.imul(x^(x>>>15),1|x);t^=t+Math.imul(t^(t>>>7),61|t);return ((t^(t>>>14))>>>0)%max;};}
 
 export class ElevationMaze{
-  constructor({width=28,height=28,levels=6,seed="LOST-6549",stairWeight=2}={}){
+  constructor({width=28,height=28,levels=6,seed="LOST-6549",stairWeight=2,generate=true}={}){
     for(const [name,value,min,max] of [["width",width,6,64],["height",height,6,64],["levels",levels,2,12],["stairWeight",stairWeight,1,8]])
       if(!Number.isSafeInteger(value)||value<min||value>max)throw new RangeError(name+" must be "+min+".."+max);
     this.width=width;this.height=height;this.levels=levels;this.area=width*height;this.volume=this.area*levels;
@@ -25,7 +25,7 @@ export class ElevationMaze{
     // floor pair can carry at most 1..8% of one floor's cells as ramp edges.
     this.maxRampsPerBoundary=Math.max(1,Math.ceil(this.area*stairWeight/100));
     this.stairCountByBoundary=new Uint16Array(levels-1);
-    this.make();
+    if(generate)this.make();
   }
   hash(a,b=0,c=0){return mix(mix(mix(this.salt^mix(a))^mix(b))^mix(c));}
   index(x,y,z){return z*this.area+y*this.width+x;}
