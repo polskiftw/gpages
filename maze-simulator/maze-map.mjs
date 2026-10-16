@@ -20,7 +20,7 @@ export function floorSvg(maze,{floor=0,x0=0,y0=0,width=32,height=32,small=false}
     if(b&(UP|DOWN)){
       stats.vertical++;
       if(!small) {
-        const label=(b&UP)&&(b&DOWN)?"↕":b&UP?"↑":"↓";
+        const label=(b&UP)&&(b&DOWN)?"B":b&UP?"U":"D";
         marks.push('<text class="stair" x="'+cx+'" y="'+(cy+0.5)+'">'+label+'</text>');
       }else marks.push('<circle class="stair-dot" cx="'+cx+'" cy="'+cy+'" r="2.3"/>');
     }
