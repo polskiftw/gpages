@@ -6,6 +6,7 @@ import {floorPlanSvg} from "../elevation/view.mjs";
 function fixture(edges) {
   const m=new ElevationMaze({width:8,height:8,levels:4,seed:"LANDING-RULE",generate:false});
   for(const [a,b,code] of edges){const i=m.index(...a),j=m.index(...b);m.used[i]=1;m.used[j]=1;m.join(i,j,code);}
+  m.start=m.loc(m.index(...edges[0][0]));m.exit=m.loc(m.index(...edges.at(-1)[1]));
   return m;
 }
 const p0=[1,2,0],p1=[2,2,1],p2=[3,2,2],south=[2,3,2],side=[2,3,1];
