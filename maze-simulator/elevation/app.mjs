@@ -26,7 +26,7 @@ function draw(){
   $("previous").disabled=level===0;$("next").disabled=level===maze.levels-1;
   $("counts").textContent="On this level: "+data.stats.flats+" horizontal connections, "+data.stats.up+
     " ascending entrances, "+data.stats.down+" descending entrances, "+data.stats.landings+
-    " non-through cells, "+data.stats.through+" uninterrupted climbing positions.";
+    " actual stair landings, turns or branches, "+data.stats.through+" uninterrupted climbing positions.";
   $("map").setAttribute("aria-label","Real floor "+level+" passages, "+data.stats.up+" up and "+data.stats.down+" down staircase connections");
   url();
 }
@@ -79,7 +79,7 @@ $("geometry").addEventListener("click",()=>{
   const info={version:VERSION,seed:maze.seed,dimensions:[maze.width,maze.height,maze.levels],
     scale:{horizontalStepMeters:PITCH,levelHeightMeters:STORY,corridorWidthMeters:WIDTH,headroomMeters:HEADROOM,slabMeters:SLAB},
     start:maze.start,exit:maze.exit,routeLength:maze.routeLength,
-    navigableCells:maze.usedCount,edges:maze.geometry(),unbrokenStairRuns:runs};
+    navigableCells:maze.usedCount,edges:maze.geometry(),stairNodes:maze.stairSurfaces(),unbrokenStairRuns:runs};
   download(JSON.stringify(info),"natural-stairs-"+maze.seed.replace(/[^a-z0-9_-]/gi,"_")+".json","application/json");
 });
 $("share").addEventListener("click",async()=>{

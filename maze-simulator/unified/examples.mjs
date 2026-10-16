@@ -17,6 +17,7 @@ const stats={version:COMBINED_VERSION,seed:maze.seed,dimensions:[maze.width,maze
   navigable:maze.usedCount,edges:maze.edges,stairs:maze.stairs,stairPercentage:maze.stairShare,
   start:maze.start,exit:maze.exit,shortestPath:maze.routeLength,
   floorDeadEnds:maze.floorMetrics,protectedThroughCells:maze.flightInterior.reduce((s,x)=>s+x,0),
+  stairLandingNodes:maze.stairSurfaces().landings.length,uninterruptedStairNodes:maze.stairSurfaces().continuous.length,
   multistoryRuns:runs.filter(r=>r.steps>=3).length,longestStair:maze.longest,
   stairBudgetPerFloorPair:maze.maxRampsPerBoundary,
   stairCountPerFloorPair:[...maze.stairCountByBoundary]};

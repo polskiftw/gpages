@@ -36,8 +36,8 @@
 <label class="stair-toggle"><input id="labels" type="checkbox"> U/D letters</label>
 </div>
 <div id="map" class="stair-map" tabindex="0" role="img" aria-label="Exact navigable corridors on current floor. Drag to pan, arrow keys to move."></div>
-<div class="legend"><span>White = walkable</span><span>Gray = solid</span><span>▲ = climbs</span><span>▼ = descends</span><span>● = junction</span><span>Ring = selected staircase</span></div>
-<p class="hint">Drag to pan or use arrow keys. The only vertical passages are real horizontally displaced slopes. Each floor's horizontal graph is the original Connected Detours algorithm, untouched. Gray tiles can include the middle of a staircase on another level.</p>
+<div class="legend"><span>White = walkable</span><span>Gray = solid</span><span>▲ = climbs</span><span>▼ = descends</span><span>● = junction</span><span>□ = stair landing</span><span>Ring = selected staircase</span></div>
+<p class="hint">Drag to pan or use arrow keys. The only vertical passages are real horizontally displaced slopes. Each floor's horizontal graph is the original Connected Detours algorithm, untouched. Gray tiles can include the middle of a staircase on another level. A straight through-flight is never given a fake floor platform.</p>
 <div id="counts"></div>
 </section>
 <section class="panel stair-runs">

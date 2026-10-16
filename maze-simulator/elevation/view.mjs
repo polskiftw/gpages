@@ -14,9 +14,11 @@ export function floorPlanSvg(m,z,{x0=0,y0=0,width=m.width,height=m.height,highli
   for(let y=y0;y<y0+h;y++)for(let x=x0;x<x0+w;x++){
     const i=m.index(x,y,z);if(!m.used[i])continue;
     const [cx,cy]=at(x,y),links=m.links(i);
-    const isThrough=m.through(i);
-    if(isThrough)through++;else landings++;
-    pads.push('<rect x="'+(cx-3.3)+'" y="'+(cy-3.3)+'" width="6.6" height="6.6" fill="#fff"/>');
+    const kind=m.stairNodeKind(i),isThrough=kind==="continuous-flight",isLanding=kind==="landing";
+    if(isThrough)through++;else if(isLanding)landings++;
+    // A through-flight has no flat landing; don't draw even a tiny square pad.
+    if(!isThrough)pads.push('<rect x="'+(cx-3.3)+'" y="'+(cy-3.3)+'" width="6.6" height="6.6" fill="#fff"/>');
+    if(isLanding)markers.push('<rect x="'+(cx-3.9)+'" y="'+(cy-3.9)+'" width="7.8" height="7.8" class="landing-marker"/>');
     if(!isThrough&&links.length>=3)
       markers.push('<circle cx="'+cx+'" cy="'+cy+'" r="2.4" fill="#1d3145"/>');
     for(const {to,code} of links){
@@ -46,7 +48,7 @@ export function floorPlanSvg(m,z,{x0=0,y0=0,width=m.width,height=m.height,highli
   }
   const sw=w*CELL+PAD*2,sh=h*CELL+PAD*2;
   const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+sw+' '+sh+'" role="img" aria-label="Exact navigable network at elevation '+z+'">'
-    +'<style>.back{fill:#d3dbe2}.flat{fill:none;stroke:#fff;stroke-width:7;stroke-linecap:square}.ramp{fill:none;stroke:#fff;stroke-width:7;stroke-linecap:round}.rise{fill:#071d31;font:900 10px monospace;text-anchor:middle;dominant-baseline:central}.rise-marker{fill:#172e42;stroke:white;stroke-width:.6}.endpoint{font:bold 8px sans-serif;text-anchor:middle;dominant-baseline:central;fill:#0d263b}.selected{fill:none;stroke:#99502a;stroke-width:2.4}</style>'
+    +'<style>.back{fill:#d3dbe2}.flat{fill:none;stroke:#fff;stroke-width:7;stroke-linecap:square}.ramp{fill:none;stroke:#fff;stroke-width:7;stroke-linecap:round}.rise{fill:#071d31;font:900 10px monospace;text-anchor:middle;dominant-baseline:central}.rise-marker{fill:#172e42;stroke:white;stroke-width:.6}.landing-marker{fill:none;stroke:#142b41;stroke-width:1.45}.endpoint{font:bold 8px sans-serif;text-anchor:middle;dominant-baseline:central;fill:#0d263b}.selected{fill:none;stroke:#99502a;stroke-width:2.4}</style>'
     +'<rect class="back" width="'+sw+'" height="'+sh+'"/>'+path.join('')+pads.join('')+signs.join('')+markers.join('')+'</svg>';
   return {svg,stats:{flats,up,down,landings,through}};
 }

@@ -184,3 +184,25 @@ topology statistics, not artistic mockups.
 This is now the strongest base for a subsequent 3D renderer. We have **not**
 replaced the existing original maze version or claimed that wall/ceiling
 collision meshes have been completed.
+
+## Landings versus uninterrupted staircases
+
+**A straight staircase continuing uphill at the same slope, without an
+alternate choice, is one uninterrupted flight.** Crossing a numeric floor
+height does not automatically require a landing. A real landing occurs at
+a change of heading, a usable branch, a transition to a level corridor,
+or a change from ascending to descending.
+
+The reusable elevation engine now classifies stair-bearing nodes as
+continuous-flight or landing straight from the graph. SVG maps omit
+the square platform at continuous-flight nodes, but mark genuine landings
+with a hollow square. The exported 3D navigation JSON includes both sets
+of exact coordinates so a future wall/floor/collision renderer can apply
+the same decision without inventing floor-boundary platforms.
+
+CI tests straight uninterrupted flights, turning stairs, real junctions,
+transitions to level travel, and generated unified worlds. It also checks
+for unintended straight stair -> one flat step -> same-direction stair
+interruptions with no real alternative route.
+
+These are 3D movement/geometry semantics, not yet full collision meshes.
