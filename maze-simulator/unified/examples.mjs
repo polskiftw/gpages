@@ -15,6 +15,7 @@ for(let z=0;z<maze.levels;z++){
 writeFileSync(dir+"/continuous-flight.svg",runProfileSvg(long));
 const stats={version:COMBINED_VERSION,seed:maze.seed,dimensions:[maze.width,maze.height,maze.levels],
   navigable:maze.usedCount,edges:maze.edges,stairs:maze.stairs,stairPercentage:maze.stairShare,
+  overpassCount:maze.overpassCount,examplesOfEnclosedOverpasses:maze.overpasses().slice(0,12),
   start:maze.start,exit:maze.exit,shortestPath:maze.routeLength,
   floorDeadEnds:maze.floorMetrics,protectedThroughCells:maze.flightInterior.reduce((s,x)=>s+x,0),
   stairLandingNodes:maze.stairSurfaces().landings.length,uninterruptedStairNodes:maze.stairSurfaces().continuous.length,
