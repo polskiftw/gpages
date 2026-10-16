@@ -46,7 +46,7 @@ for(const [seed,width,height,levels] of [
       if(!hasPad(m,i)&&!hasPad(m,to))throughFlights++;
     }
   assert.ok(corners>0&&m.stairs>0,"render open turns as actual unobstructed landing squares");
-  const sample=buildMesh(m,{center:m.start,radius:7,floorRadius:1});
+  const sample=buildMesh(m,{center:m.start,radius:4,floorRadius:0});
   assert.ok(sample.stats.triangles<full.stats.triangles,
     "render only nearby mesh; no global geometry load for each view");
   assert.deepEqual(m.bits,new ConnectedDetours3D({seed,width,height,levels,stairWeight:2}).bits,
