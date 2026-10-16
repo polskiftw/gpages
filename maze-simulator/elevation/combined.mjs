@@ -5,14 +5,14 @@
 import {Maze,SOLID,E,S} from "../maze-core.mjs";
 import {ElevationMaze,vertical,opposite} from "./stairs.mjs";
 import {enrichChoices} from "./choices.mjs";
-export const COMBINED_VERSION="detours-elevation-v2";
+export const COMBINED_VERSION="detours-elevation-v3";
 const ORIGINAL_FLOOR_VERSION="detours-elevation-v1";
 function seededRandom(seed){let x=seed>>>0;return max=>{x=(x+0x6d2b79f5)>>>0;let t=Math.imul(x^(x>>>15),1|x);t^=t+Math.imul(t^(t>>>7),61|t);return ((t^(t>>>14))>>>0)%max;};}
 
 export class ConnectedDetours3D extends ElevationMaze{
-  constructor({width=28,height=28,levels=6,seed="LOST-6549",stairWeight=2,choices=2}={}){
+  constructor({width=28,height=28,levels=6,seed="LOST-6549",stairWeight=2,choices=3}={}){
     super({width,height,levels,seed,stairWeight,generate:false});
-    if(!Number.isInteger(choices)||choices<0||choices>2)throw new RangeError("Choices must be 0 (original), 1 (more), or 2 (many)");
+    if(!Number.isInteger(choices)||choices<0||choices>3)throw new RangeError("Choices must be 0 (original), 1 (more), or 2 (many)");
     this.version=COMBINED_VERSION;this.model="connected";this.choices=choices;
     this.choiceDiagnostics=[];
     this.floorMetrics=[];this.flatMasks=[];this.stairOrigins=Array.from({length:levels-1},()=>[]);
@@ -72,6 +72,8 @@ export class ConnectedDetours3D extends ElevationMaze{
     this.flatShortEnds=this.floorMetrics.reduce((sum,x)=>sum+x.short,0);
     this.junctions=this.choiceDiagnostics.reduce((sum,x)=>sum+x.after.junctions,0);
     this.extraChoices=this.choiceDiagnostics.reduce((sum,x)=>sum+x.added,0);
+    this.bridges=this.choiceDiagnostics.reduce((sum,x)=>sum+(x.bridges||0),0);
+    this.carvedCells=this.choiceDiagnostics.reduce((sum,x)=>sum+(x.carved||0),0);
     this.stairShare=Number((100*this.stairs/this.edges).toFixed(2));
     this.overpassCount=this.overpasses().length;
     this.longest=this.runs()[0]||null;
