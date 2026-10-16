@@ -22,9 +22,12 @@ jobs:
       - name: Verify all floors, portals, seeds and rendered walls
         run: |
           node --check maze-simulator/app.mjs
+          node --check maze-simulator/maze-core.mjs
+          node --check maze-simulator/maze-grow.mjs
+          node --check maze-simulator/examples.mjs
           node --test maze-simulator/tests/maze.test.mjs
 
-      - name: Export five exact mathematical floor plans
+      - name: Export five global mathematical floor plans
         run: node maze-simulator/examples.mjs /tmp/maze-samples
       - uses: actions/upload-artifact@v4
         with:
