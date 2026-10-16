@@ -56,6 +56,7 @@ const seeds=["LOST-6549","A-LOT-OF-CORRIDORS","TANGLED-WAY","LONG-HALLWAY"];
 let checked=0,totalBridge=0,totalCarved=0;
 for(const seed of seeds){
   const o={seed,width:28,height:28,levels:6,stairWeight:2};
+  const legacy=new ConnectedDetours3D({...o,choices:0});
   const old=new ConnectedDetours3D({...o,choices:2});
   const upgraded=new ConnectedDetours3D({...o,choices:3});
   const rerun=new ConnectedDetours3D({...o,choices:3});
@@ -73,7 +74,7 @@ for(const seed of seeds){
   assert.equal(upgraded.levelCounts.length,upgraded.levels);
   let bridges=0,opened=0;
   for(let z=0;z<o.levels;z++){
-    const original=old.flatMasks[z],rich=upgraded.flatMasks[z];
+    const original=legacy.flatMasks[z],rich=upgraded.flatMasks[z];
     for(let i=0;i<original.length;i++)if(!(original[i]&SOLID)){
       assert.ok(!(rich[i]&SOLID),"original corridors never turn solid");
       assert.equal(original[i]&rich[i],original[i],"original corridor links are never deleted");
