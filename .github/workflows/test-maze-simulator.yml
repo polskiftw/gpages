@@ -26,6 +26,8 @@ jobs:
           node --check maze-simulator/maze-grow.mjs
           node --check maze-simulator/examples.mjs
           node --test maze-simulator/tests/maze.test.mjs
+          node --check maze-simulator/elevation/stairs.mjs
+          node --test maze-simulator/tests/elevation.test.mjs
 
       - name: Export original v4 floor plans and depth metrics
         run: node maze-simulator/examples.mjs /tmp/maze-samples
