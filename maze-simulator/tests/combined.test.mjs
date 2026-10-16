@@ -15,7 +15,7 @@ for(const seed of ["LOST-6549","NO-PREFABS","CONNECTED-DETOURS","A-REAL-LOST-PLA
     assert.deepEqual(a.start,b.start);assert.deepEqual(a.exit,b.exit);
     assert.deepEqual(a.flatMasks,b.flatMasks);
     assert.equal(a.routeLength,b.routeLength);
-    assert.equal(a.flatMetrics.length,levels);
+    assert.equal(a.floorMetrics.length,levels);
     assert.ok(a.stairs>0,"at least one real stair exists");
     assert.ok(a.stairs/a.edges<.04,"rare stairs remain a small share of total travel");
     assert.ok(a.stairCountByBoundary.every((n,z)=>n>=1&&n<=a.maxRampsPerBoundary),
@@ -75,7 +75,7 @@ for(const seed of ["LOST-6549","NO-PREFABS","CONNECTED-DETOURS","A-REAL-LOST-PLA
       assert.ok(flatEdges>20,"a floor must retain a deep level-corridor graph");
     }
     console.log("PASS INTEGRATED",seed,width+"x"+height+"x"+levels,
-      "flat-median",a.flatMetrics.map(x=>x.median).join("/"),
+      "flat-median",a.floorMetrics.map(x=>x.median).join("/"),
       "stairs",a.stairs,"total",a.edges,"stair%",a.stairShare,
       "uninterrupted runs",a.runs().filter(r=>r.steps>=3).length);
     worlds++;
