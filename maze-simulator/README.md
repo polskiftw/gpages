@@ -304,3 +304,48 @@ Run the regression and browser smoke tests:
 GitHub Actions also launches real Chromium with WebGL on a local server,
 walks forward from the generated entrance, resets the run, checks JS
 and GPU errors, and uploads a screenshot from inside the maze.
+
+## More meaningful decisions in Connected Detours — v10
+
+The playable renderer, textures, collision solver and enclosed-passage
+geometry are unchanged. The new elevation/choices.mjs enhances the
+*entire original Connected Detours floor* before staircases are attached.
+
+The original floor graph is preserved as the starting point, byte for
+byte. Extra connections link *already navigable*, degree-two corridors.
+Each new reciprocal edge creates two three-way junctions. It does not
+introduce new dangling dead-end spurs, room prefabs, staircases or chunk
+boundaries. Every new detour must be at least 12-14 cells longer through
+the old graph: small four-cell braids are deliberately forbidden. Links
+near terminal dead ends are rejected to preserve their medium/long depth.
+
+Branching in both the playable maze and the mathematical floor-plan view
+has three settings:
+
+- Original routes (0): the exact old v1 floor layout with all old stair
+  positions, endpoints and passages. Old saved URLs without a choices
+  parameter continue to use this mode.
+- More choices (1): a modest increase in decisions and long detours.
+- Many choices (2, default): more branches per walkable area, emphasizing
+  real route decisions rather than long directionless corridors.
+
+The graph is seeded and reproducible for each mode. A new selected mode
+is a deliberately different maze topology, not a change in graphics.
+
+On LOST-6549 at 28x28x6, stair frequency 2:
+
+| Metric | Original | Many choices |
+|---|---:|---:|
+| Junctions | 238 | 386 |
+| Additional long detours | 0 | 74 |
+| Mean cell distance to the nearest junction | 4.84 | 3.20 |
+| Navigable cells | 3,542 | 3,542 |
+| Stair passages | 35 | 35 |
+| Existing leaf/dead-end tips | unchanged | unchanged |
+
+CI compares 4 seeds in all 3 modes, verifies exact preservation of old
+corridors, full 3D connectivity and headroom, terminal branch protection,
+determinism, and genuine improvement in choice proximity. It also exports
+true math SVGs of the original, moderate and many-choice layouts, and
+uses Chromium to walk through the high-choice version and switch back
+to the original without browser errors.
