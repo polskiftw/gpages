@@ -26,6 +26,8 @@ try{
   assert.ok(initial.includes("LOST-6549"),"seed-loaded 3D world is displayed");
   assert.ok((await page.locator("#layoutStats").innerText()).includes("386 junctions"),
     "the game must use choice-rich generated topology, not the old sparse network");
+  assert.ok((await page.locator("#mapLink").getAttribute("href")).includes("choices=2"),
+    "floor-plan link must preserve the actual maze mode");
   const gl=await page.evaluate(()=>{
     const c=document.getElementById("view"),gl=c.getContext("webgl");
     return {ok:!!gl,buffer:c.width*c.height,version:gl?.getParameter(gl.VERSION),
