@@ -13,14 +13,14 @@
 <a class="back" href="../">← Main Maze Lab</a>
 <div class="eyebrow">CONNECTED DETOURS × NATURAL STAIRCASES / UNIFIED MATHEMATICS</div>
 <h1>The whole labyrinth, now in 3D.</h1>
-<p>Actual Connected Detours corridors on each floor, linked by <strong>rare, physical stair passages</strong>. Same deep branches, no visible maze chunks, no impossible same-coordinate elevators. An occasional stair flight can pass several stories without a landing.</p>
+<p>Actual Connected Detours corridors on each floor, linked by <strong>rare, physical stair passages</strong>. Deep branches with optional connections through unused solid space, no visible maze chunks, no impossible same-coordinate elevators. An occasional stair flight can pass several stories without a landing.</p>
 </header>
 <form id="setup">
 <div class="field"><label for="width">Width (cells)</label><input id="width" type="number" value="28" min="6" max="64" required></div>
 <div class="field"><label for="height">Height (cells)</label><input id="height" type="number" value="28" min="6" max="64" required></div>
 <div class="field"><label for="levels">Floors</label><input id="levels" type="number" value="6" min="2" max="12" required></div>
 <div class="field"><label for="stairWeight">Stairs (1 = rare, 8 = more)</label><input id="stairWeight" type="number" value="2" min="1" max="8" required></div>
-<div class="field"><label for="choices">Branching</label><select id="choices"><option value="0">Original routes</option><option value="1">More choices</option><option value="2" selected>Many choices</option></select></div>
+<div class="field"><label for="choices">Branching</label><select id="choices"><option value="0">Original routes</option><option value="1">More choices</option><option value="2">Many choices</option><option value="3" selected>Bridge corridor gaps</option></select></div>
 <div class="field seed"><label for="seed">Reproducible seed</label><input id="seed" type="text" value="LOST-6549" maxlength="100" required></div>
 <button class="primary" type="submit">Generate full labyrinth</button><button id="reroll" type="button">Random seed</button>
 </form>

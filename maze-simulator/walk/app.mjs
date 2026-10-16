@@ -39,9 +39,10 @@ function generate(){
     maze=next;$("error").hidden=true;
     const base=maze.choiceDiagnostics.reduce((sum,x)=>sum+x.before.junctions,0);
     const current=maze.choiceDiagnostics.reduce((sum,x)=>sum+x.after.junctions,0);
-    const mode=maze.choices===0?"Original":maze.choices===1?"More":"Many";
+    const mode=["Original","More","Many","Gap-bridged"][maze.choices];
     $("layoutStats").textContent=mode+" branching · "+current+" junctions"+
       (maze.choices?" (original: "+base+") · "+maze.extraChoices+" new long detours":" · original routes")+
+      (maze.bridges?" · "+maze.bridges+" gap bridges through "+maze.carvedCells+" solid cells":"")+
       " · "+maze.stairShare+"% stairs";
     reset();query();
     $("stats").textContent="Seed "+maze.seed+" · "+maze.levels+" floors";

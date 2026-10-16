@@ -16,7 +16,7 @@ try{
   page.on("pageerror",err=>errs.push(err.stack||err.message));
   page.on("console",msg=>{if(msg.type()==="error")errs.push(msg.text());});
   const base="http://127.0.0.1:8765/maze-simulator/walk/";
-  await page.goto(base+"?s=LOST-6549&w=28&h=28&l=6&stairs=2&choices=2",{waitUntil:"networkidle"});
+  await page.goto(base+"?s=LOST-6549&w=28&h=28&l=6&stairs=2&choices=3",{waitUntil:"networkidle"});
   await page.waitForFunction(()=>{
     const c=document.querySelector("#view");
     return !!c&&c.width>500&&c.height>250;
@@ -24,9 +24,10 @@ try{
   assert.equal(await page.locator("#error").isVisible(),false,"no error alert when generating seed");
   const initial=await page.locator("#stats").innerText();
   assert.ok(initial.includes("LOST-6549"),"seed-loaded 3D world is displayed");
-  assert.ok((await page.locator("#layoutStats").innerText()).includes("386 junctions"),
-    "the game must use choice-rich generated topology, not the old sparse network");
-  assert.ok((await page.locator("#mapLink").getAttribute("href")).includes("choices=2"),
+  const initialLayout=await page.locator("#layoutStats").innerText();
+  const junctions=Number(initialLayout.match(/(\d+) junctions/)?.[1]);
+  assert.ok(junctions>386,"the 3D game must load the denser seeded gap-bridged topology");
+  assert.ok((await page.locator("#mapLink").getAttribute("href")).includes("choices=3"),
     "floor-plan link must preserve the actual maze mode");
   const gl=await page.evaluate(()=>{
     const c=document.getElementById("view"),gl=c.getContext("webgl");
@@ -49,6 +50,13 @@ try{
   await page.waitForTimeout(450);
   const back=await page.locator("#stats").innerText();
   assert.notEqual(back,after,"restart goes back to original entrance");
+  const bridgeCount=Number((await page.locator("#layoutStats").innerText()).match(/(\d+) gap bridges/)?.[1]);
+  assert.ok(bridgeCount>0,"new routes actually carve solid gaps between corridors");
+  await page.locator("#choices").selectOption("2");
+  await page.locator("#generate").click();
+  await page.waitForTimeout(400);
+  assert.ok((await page.locator("#layoutStats").innerText()).includes("386 junctions"),
+    "old many-choice seed remains reproducible");
   await page.locator("#choices").selectOption("0");
   await page.locator("#generate").click();
   await page.waitForTimeout(400);

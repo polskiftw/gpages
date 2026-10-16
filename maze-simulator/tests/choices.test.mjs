@@ -5,7 +5,7 @@ import {Maze,SOLID} from "../maze-core.mjs";
 const COUNT=4;
 const seeds=["LOST-6549","A-LOT-OF-CORRIDORS","TANGLED-WAY","LONG-HALLWAY"];
 assert.throws(()=>new ConnectedDetours3D({choices:-1}),/Choices/);
-assert.throws(()=>new ConnectedDetours3D({choices:3}),/Choices/);
+assert.throws(()=>new ConnectedDetours3D({choices:4}),/Choices/);
 for(const seed of seeds){
   const opts={seed,width:28,height:28,levels:6,stairWeight:2};
   const versions=[0,1,2].map(choices=>new ConnectedDetours3D({...opts,choices}));

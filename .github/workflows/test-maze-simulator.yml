@@ -33,6 +33,7 @@ jobs:
           node maze-simulator/elevation/choice-bench.mjs
           node --test maze-simulator/tests/combined.test.mjs
           node --test maze-simulator/tests/choices.test.mjs
+          node --test maze-simulator/tests/solid-gaps.test.mjs
           node --check maze-simulator/elevation/choice-examples.mjs
           node --test maze-simulator/tests/stair-landings.test.mjs
           node --test maze-simulator/tests/enclosed-overpasses.test.mjs
@@ -73,6 +74,7 @@ jobs:
           node maze-simulator/elevation/choice-examples.mjs /tmp/maze-junction-previews
           test -s /tmp/maze-junction-previews/comparisons.json
           test -s /tmp/maze-junction-previews/choices-2-floor-0.svg
+          test -s /tmp/maze-junction-previews/choices-3-floor-0.svg
       - uses: actions/upload-artifact@v4
         with:
           name: maze-junction-choice-comparisons
