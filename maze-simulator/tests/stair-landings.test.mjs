@@ -45,7 +45,7 @@ function redundantStraightFlatStep(m) {
     const links=m.links(i);
     if(links.length!==2)continue;
     const incline=links.find(e=>vertical(e.code)!==0),flat=links.find(e=>vertical(e.code)===0);
-    if(!incline||!flat)continue;
+    if(!incline||!flat||i>=flat.to)continue; // Count an undirected flat interruption only once.
     const other=m.links(flat.to);
     if(other.length!==2||!other.some(e=>e.to===i))continue;
     const nextIncline=other.find(e=>vertical(e.code)!==0);
