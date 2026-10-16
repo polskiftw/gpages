@@ -28,7 +28,7 @@ On Gentoo, from this directory:
     sh run-preview.sh
 
 This builds the math-only C++ tools (no SDL3/OpenGL), creates
-`previews/index.html`, and opens it in Firefox if installed. It never
+`previews/standalone.html` (one portable offline file), and opens it in Firefox if installed. It never
 starts a server, service, or daemon. Run only the generator if desired:
 
     cmake -S . -B build -DMAZE_BUILD_PLAYABLE=OFF
