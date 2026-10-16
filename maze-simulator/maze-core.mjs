@@ -14,6 +14,7 @@ export class Maze {
   constructor({width=64,height=64,levels=3,seed="LOST-6549",style="balanced",cacheLimit=96}={}){
     for(const [k,n,limit] of [["width",width,4096],["height",height,4096],["levels",levels,64],["cacheLimit",cacheLimit,512]])
       if(!Number.isSafeInteger(n)||n<1||n>limit)throw new RangeError(k+" must be 1.."+limit);
+    if(width*height*levels<2)throw new RangeError("at least two cells needed");
     if(!Object.hasOwn(STYLES,style))throw new RangeError("unknown maze style");
     this.width=width;this.height=height;this.levels=levels;this.seed=String(seed);this.style=style;
     this.profile=STYLES[style];this.cacheLimit=cacheLimit;
