@@ -30,10 +30,11 @@
 <div class="controls">
 <button id="previous" type="button">◀ Lower</button><strong id="floor" aria-live="polite">Level 0</strong><button id="next" type="button">Higher ▶</button>
 <button id="atStart" type="button">Start</button><button id="atExit" type="button">Exit</button>
+<label class="stair-toggle"><input id="labels" type="checkbox"> Show exact U/D letters</label>
 </div>
 <div id="map" class="stair-map" role="img" aria-label="Mathematically generated corridors and stair connections"></div>
-<div class="legend"><span>White = walkable</span><span>Gray = solid</span><span>U = goes up</span><span>D = goes down</span><span>● = junction</span><span>Ring = selected run</span></div>
-<p class="hint">Each U/D marker is a real stair edge to an adjacent horizontal position on the next/previous level. The next section can climb again; no automatic landing is inserted. The white passages and gray solids are generated geometry.</p>
+<div class="legend"><span>White = walkable</span><span>Gray = solid</span><span>▲ = goes up</span><span>▼ = goes down</span><span>● = junction</span><span>Ring = selected run</span></div>
+<p class="hint">Each ▲/▼ marker is a real stair edge to an adjacent horizontal position on the next/previous level. The next section can climb again; no automatic landing is inserted. The white passages and gray solids are generated geometry.</p>
 <div id="counts"></div>
 </section>
 <section class="panel stair-runs">
