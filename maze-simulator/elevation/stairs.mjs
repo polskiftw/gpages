@@ -193,7 +193,7 @@ export class ElevationMaze{
         const oldRise=oldCode===255?0:vertical(oldCode);
         for(let code=0;code<12;code++){
           const j=this.neighbor(cursor,code);
-          if(j<0||this.used[j]||!this.clear(cursor,j))continue;
+          if(j<0||this.used[j]||this.headingOccupied(cursor,code)||this.headingOccupied(j,opposite(code))||!this.clear(cursor,j))continue;
           const rise=vertical(code),destLevel=this.loc(j).z;
           const continuation=!!rise && rise===oldRise && oldDirection===direction(code)
             && this.links(cursor).length===1;
@@ -230,7 +230,7 @@ export class ElevationMaze{
     for(let i=0;i<this.volume;i++)if(this.used[i]){
       for(let code=4;code<12;code++){
         const j=this.neighbor(i,code);
-        if(j<0||this.used[j]||this.loc(j).z!==missing||!this.clear(i,j))continue;
+        if(j<0||this.used[j]||this.loc(j).z!==missing||this.headingOccupied(i,code)||this.headingOccupied(j,opposite(code))||!this.clear(i,j))continue;
         const boundary=Math.min(this.loc(i).z,missing);
         if(this.stairCountByBoundary[boundary]>=this.maxRampsPerBoundary)continue;
         if(random(++choices)===0)bridge={i,j,code};
@@ -260,7 +260,7 @@ export class ElevationMaze{
       const codes=[random(4),random(4),random(4)];
       for(const code of codes){
         const j=this.neighbor(i,code);
-        if(j<0||!this.used[j]||i>=j||this.bits[i]&(1<<code)||!this.clear(i,j))continue;
+        if(j<0||!this.used[j]||i>=j||this.headingOccupied(i,code)||this.headingOccupied(j,opposite(code))||!this.clear(i,j))continue;
         if(closeBy(i,j))continue;
         this.join(i,j,code);this.loops++;break;
       }
