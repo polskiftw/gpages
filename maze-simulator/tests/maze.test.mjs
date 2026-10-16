@@ -75,4 +75,11 @@ for(const style of Object.keys(STYLES)){
   assert.ok(svg.svg.includes('<path class="wall"')&&svg.stats.cells===1024);
   assert.equal(floorSvg(a,{floor:0,width:32,height:32}).svg,svg.svg,"SVG deterministic");
 }
+{
+  const huge=new Maze({width:4096,height:4096,levels:64,seed:"STREAMED-ONLY",cacheLimit:4});
+  for(const [x,y,z] of [[0,0,0],[4095,4095,63],[2048,2048,32],[15,16,1],[4095,0,62]])
+    assert.ok(huge.passages(x,y,z)>=0);
+  assert.ok(huge.cache.size<=4,"world-scale sampling must honor bounded cache");
+  console.log("PASS huge lazily generated world");
+}
 console.log("All topology, symmetry, reachability, LRU-order and SVG checks passed.");
