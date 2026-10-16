@@ -17,6 +17,7 @@ const info={version:VERSION,seed:world.seed,dimensions:[world.width,world.height
   scale:{horizontalStepMeters:PITCH,levelHeightMeters:STORY,widthMeters:WIDTH,headroomMeters:HEADROOM,slabMeters:SLAB},
   start:world.start,exit:world.exit,routeLength:world.routeLength,
   navigableCells:world.usedCount,levelCounts:world.levelCounts,edges:world.edges,stairSegments:world.stairs,
+  stairLandingNodes:world.stairSurfaces().landings.length,uninterruptedStairNodes:world.stairSurfaces().continuous.length,
   extraDetours:world.loops,removedDeadEndCells:world.pruned,
   stairPercent:Number((100*world.stairs/(world.edges-world.pruned)).toFixed(2)),stairBudgetEachPair:world.maxRampsPerBoundary,
   uninterruptedRunsAtLeast3:runs.filter(r=>r.steps>=3).length,
