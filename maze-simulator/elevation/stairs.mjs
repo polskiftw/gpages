@@ -3,7 +3,7 @@
 // (+/-1,0,+/-1) / (0,+/-1,+/-1). Every step moves horizontally.
 export const PITCH=7, STORY=3.5, WIDTH=1.5, HEADROOM=2.1, SLAB=0.25;
 export const DIRECTIONS=[{dx:0,dy:-1,name:"N"},{dx:1,dy:0,name:"E"},{dx:0,dy:1,name:"S"},{dx:-1,dy:0,name:"W"}];
-export const VERSION="elevation-lattice-1";
+export const VERSION="elevation-lattice-2";
 export const opposite=code=>{const d=(code+2)%4;return code<4?d:code<8?d+8:d+4;};
 export const vertical=code=>code<4?0:code<8?1:-1;
 export const direction=code=>code%4;
@@ -13,14 +13,18 @@ function seedValue(seed){let h=2166136261;for(const ch of seed)h=Math.imul(h^ch.
 function makeRandom(seed){let x=seed>>>0;return max=>{x=(x+0x6d2b79f5)>>>0;let t=Math.imul(x^(x>>>15),1|x);t^=t+Math.imul(t^(t>>>7),61|t);return ((t^(t>>>14))>>>0)%max;};}
 
 export class ElevationMaze{
-  constructor({width=28,height=28,levels=6,seed="LOST-6549",stairWeight=3}={}){
-    for(const [name,value,min,max] of [["width",width,6,64],["height",height,6,64],["levels",levels,2,12],["stairWeight",stairWeight,2,60]])
+  constructor({width=28,height=28,levels=6,seed="LOST-6549",stairWeight=2}={}){
+    for(const [name,value,min,max] of [["width",width,6,64],["height",height,6,64],["levels",levels,2,12],["stairWeight",stairWeight,1,8]])
       if(!Number.isSafeInteger(value)||value<min||value>max)throw new RangeError(name+" must be "+min+".."+max);
     this.width=width;this.height=height;this.levels=levels;this.area=width*height;this.volume=this.area*levels;
     this.seed=String(seed);this.stairWeight=stairWeight;
     this.salt=seedValue([seed,width,height,levels,stairWeight,VERSION].join("|"));
     this.bits=new Uint16Array(this.volume);this.used=new Uint8Array(this.volume);
     this.reservations=new Map();this.edges=0;this.stairs=0;this.loops=0;this.pruned=0;
+    // Density is a hard MAXIMUM, not a relative RNG weight. Each adjacent
+    // floor pair can carry at most 1..8% of one floor's cells as ramp edges.
+    this.maxRampsPerBoundary=Math.max(1,Math.ceil(this.area*stairWeight/100));
+    this.stairCountByBoundary=new Uint16Array(levels-1);
     this.make();
   }
   hash(a,b=0,c=0){return mix(mix(mix(this.salt^mix(a))^mix(b))^mix(c));}
@@ -65,7 +69,13 @@ export class ElevationMaze{
     this.bits[i]|=1<<code;this.bits[j]|=1<<opposite(code);
     const r=this.reservation(i,j),existing=this.reservations.get(r.key)||[];
     existing.push(r);this.reservations.set(r.key,existing);
-    this.edges++;if(vertical(code)!==0)this.stairs++;
+    this.edges++;
+    if(vertical(code)!==0){
+      const floor=Math.min(this.loc(i).z,this.loc(j).z);
+      if(++this.stairCountByBoundary[floor]>this.maxRampsPerBoundary)
+        throw new Error("Stair density budget exceeded");
+      this.stairs++;
+    }
   }
   // True directed 3D route edges, using floor-level positions in real meters.
   geometry(){
@@ -114,6 +124,14 @@ export class ElevationMaze{
     const byFloor=new Uint32Array(this.levels);
     this.used[root]=1;byFloor[0]++;active.push(root);let usedCount=1;
     const opts=[],weights=[];
+    // Once a floor is reached, flat passages win overwhelmingly. An eligible
+    // new climb needs BOTH a seeded sparse opening AND remaining floor-pair
+    // budget. Consecutive climbing edges may bypass the sparse-entry gate,
+    // allowing spontaneous multi-story flights without prefab stair shapes.
+    // If an unusually small seed strands an entire floor, one seeded
+    // geometric bridging edge restarts carving; it uses the same join/clear
+    // geometry tests, not an arbitrary vertical teleport.
+    while(true){
     while(active.length){
       const at=random(100)<68?active.length-1:random(active.length);
       let cursor=active[at],steps=5+random(11);
@@ -125,14 +143,19 @@ export class ElevationMaze{
           const j=this.neighbor(cursor,code);
           if(j<0||this.used[j]||!this.clear(cursor,j))continue;
           const rise=vertical(code),destLevel=this.loc(j).z;
-          let weight=rise===0?14:this.stairWeight;
-          if(rise&&byFloor[destLevel]===0)weight*=10;
-          // A flight can naturally continue through floor boundaries, with
-          // the same horizontal vector and slope. No compulsory landings.
-          if(oldRise&&oldDirection===direction(code)&&rise===oldRise)weight*=12;
-          else if(oldDirection===direction(code)&&rise===0)weight*=2;
-          else if(oldRise&&rise)weight=Math.max(1,Math.floor(weight/2));
-          if(oldCode!==255&&random(100)<13)weight+=7;
+          const continuation=!!rise && rise===oldRise && oldDirection===direction(code)
+            && this.links(cursor).length===1;
+          if(rise){
+            const boundary=Math.min(this.loc(cursor).z,destLevel);
+            if(this.stairCountByBoundary[boundary]>=this.maxRampsPerBoundary)continue;
+            // Sparse candidate locations are attached to real world edges,
+            // not 16-cell chunks or a prefabricated staircase footprint.
+            if(!continuation&&this.hash(777,Math.min(cursor,j),Math.max(cursor,j))%10000>=this.stairWeight*80)continue;
+          }
+          let weight=rise===0?18:continuation?68:3;
+          if(rise&&byFloor[destLevel]===0)weight*=5;
+          else if(!rise&&oldDirection===direction(code))weight*=2;
+          if(oldCode!==255&&!rise&&random(100)<13)weight+=7;
           opts.push({j,code});weights.push(weight);
         }
         if(!opts.length){
@@ -146,6 +169,25 @@ export class ElevationMaze{
         this.join(cursor,j,code);this.used[j]=1;usedCount++;byFloor[this.loc(j).z]++;
         heads[j]=code;active.push(j);cursor=j;
       }
+    }
+    const missing=byFloor.findIndex(count=>count===0);
+    if(missing<0)break;
+    // Connect the next missing floor using a real, legal, naturally oriented
+    // ramp from any already explored neighbor. This is rare for normal sizes.
+    let bridge=null,choices=0;
+    for(let i=0;i<this.volume;i++)if(this.used[i]){
+      for(let code=4;code<12;code++){
+        const j=this.neighbor(i,code);
+        if(j<0||this.used[j]||this.loc(j).z!==missing||!this.clear(i,j))continue;
+        const boundary=Math.min(this.loc(i).z,missing);
+        if(this.stairCountByBoundary[boundary]>=this.maxRampsPerBoundary)continue;
+        if(random(++choices)===0)bridge={i,j,code};
+      }
+    }
+    if(!bridge)throw new Error("Unable to connect level "+missing+" with a physical slope");
+    this.join(bridge.i,bridge.j,bridge.code);
+    this.used[bridge.j]=1;usedCount++;byFloor[missing]++;
+    heads[bridge.j]=bridge.code;active.push(bridge.j);
     }
     // A few long alternative routes produce Connected-Detours-like choices,
     // without prefab stairs or isolated loops of four cells.
@@ -162,7 +204,8 @@ export class ElevationMaze{
       return false;
     };
     for(let i=0;i<this.volume;i++)if(this.used[i]&&random(100)<13){
-      const codes=[random(12),random(12),random(12)];
+      // Detours reconnect level corridors; do not turn them into stair spam.
+      const codes=[random(4),random(4),random(4)];
       for(const code of codes){
         const j=this.neighbor(i,code);
         if(j<0||!this.used[j]||i>=j||this.bits[i]&(1<<code)||!this.clear(i,j))continue;
