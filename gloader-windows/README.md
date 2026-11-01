@@ -314,7 +314,7 @@ Raw source mods execute with the same privileges as Terraria. Only use code you 
 
 ## License and third-party software
 
-Original code and assets in this repository are licensed to the public under the PolyForm Noncommercial License 1.0.0 unless a file says otherwise; see `LICENSE.md`.
+Original code and assets in this subproject are licensed to the public under the **Apache License 2.0** unless a file says otherwise; see `LICENSE.md`.
 
 **Re-Logic, Inc. is separately granted broad commercial and proprietary-use rights to the original contributions covered by `RELOGIC-LICENSE.md`.** That special grant permits use, modification, incorporation, sublicensing, relicensing, and commercialization without payment, attribution, source disclosure, or further permission.
 
