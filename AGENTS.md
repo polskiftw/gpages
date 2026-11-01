@@ -17,7 +17,7 @@ Use the newest relevant state of the work, even when it is unmerged, unless Clai
 
 # License Compatibility and Code Reuse
 
-The repository-wide default license is the **PolyForm Noncommercial License 1.0.0** in the root `LICENSE` file. It applies to all repository content that does not declare its own separate license.
+The repository-wide default license is **Apache License 2.0** in the root `LICENSE` file. It applies to original repository content that does not declare its own separate license and for which contributors have the right to grant that license. Subprojects and imported third-party material with separate licenses remain under those respective terms.
 
 For any game mod or other self-contained subproject in this repository, Claire grants standing authorization to change, replace, or add that mod/subproject's license **without asking for confirmation first** when doing so is necessary to lawfully incorporate, adapt, port, or otherwise reuse code from another project.
 
