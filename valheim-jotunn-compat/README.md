@@ -106,7 +106,7 @@ See [COMPATIBILITY.md](COMPATIBILITY.md).
 
 ## License
 
-This subproject is MIT licensed.
+Original code in this subproject is licensed under the **Apache License 2.0**; see [`LICENSE`](LICENSE). Jotunn's original MIT copyright and license are preserved in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 Jotunn itself is MIT licensed and remains the compatibility/API reference:
 https://github.com/Valheim-Modding/Jotunn
