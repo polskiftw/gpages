@@ -20,7 +20,7 @@ This grant is effective immediately and does not require Re-Logic to request sep
 
 This grant applies only to rights that the repository owner or applicable licensor actually owns or has authority to license. It does not grant rights in material owned by Re-Logic or by any other third party, and it does not override any license or notice that independently applies to third-party material.
 
-For everyone other than Re-Logic and the parties covered by this special grant, the repository's general license remains unchanged. Unless a file states otherwise, original code and assets in this repository are made available to the public under the **PolyForm Noncommercial License 1.0.0** in `LICENSE.md`.
+For everyone other than Re-Logic and the parties covered by this special grant, the repository's general license remains unchanged. Unless a file states otherwise, original code and assets in this subproject are made available to the public under the **Apache License 2.0** in `LICENSE.md`.
 
 ## No Warranty
 
