@@ -2,10 +2,10 @@ THIRD-PARTY NOTICES
 ===================
 
 This repository and its release packages include third-party software and
-assets that remain subject to their own license terms. The PolyForm
-Noncommercial License 1.0.0 in LICENSE.md applies to the original portions of
-this repository; it does not replace, restrict, or relicense third-party
-components under the terms below.
+assets that remain subject to their own license terms. The Apache
+License 2.0 in LICENSE.md applies to original portions of this subproject;
+it does not replace, restrict, or relicense third-party components under
+the terms below.
 
 The dependency versions named here match the versions currently referenced or
 shipped by GLoader and Gelatin. Build/test-only packages that are restored from
