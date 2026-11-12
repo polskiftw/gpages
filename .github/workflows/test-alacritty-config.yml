@@ -1,0 +1,22 @@
+name: Test Alacritty Config Generator
+
+on:
+  push:
+    paths:
+      - 'alacritty-config/**'
+      - '.github/workflows/test-alacritty-config.yml'
+  pull_request:
+    paths:
+      - 'alacritty-config/**'
+      - '.github/workflows/test-alacritty-config.yml'
+
+jobs:
+  generator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify generated TOML and inline script
+        run: node --test alacritty-config/tests/generator.test.mjs
