@@ -150,3 +150,64 @@ test("every statically referenced browser control exists in the HTML", () => {
   const result = spawnSync("node", ["--check", new URL("../app.mjs", import.meta.url).pathname], {encoding: "utf8"});
   assert.equal(result.status, 0, result.stderr);
 });
+
+
+test("shared HOME and working directory create one mountpoint, even when mounted read-only", () => {
+  const p = make({
+    name: "FF9",
+    home: "/workspace",
+    workdir: "/workspace",
+    mounts: [{source: "~/Documents/ff9", target: "/workspace", access: "ro"}]
+  });
+  const {script, warnings} = buildLauncher(p);
+  syntax(script);
+  const dirFlags = script.split("\n").filter((line) => line.includes("--dir") && line.includes("/workspace"));
+  assert.deepEqual(dirFlags, ["bwrap_args+=(--dir '/workspace')"]);
+  assert.match(script, /add_mount '~\/Documents\/ff9' '\/workspace' 'ro' 0/);
+  assert.ok(script.indexOf("--dir '/workspace'") < script.indexOf("add_mount '~/Documents/ff9'"));
+  assert.ok(warnings.some((warning) => warning.includes("HOME (/workspace)") && warning.includes("read-only mount")));
+  assert.doesNotMatch(script, /if \[\[ 'full' == 'full' \]\]/);
+  assert.doesNotMatch(script, /mount_tool\(\)/);
+});
+
+test("distinct HOME and workdir paths are emitted once and kept before mounts", () => {
+  const {script} = buildLauncher(make({
+    home: "/home/sandbox",
+    workdir: "/workspace/project",
+    mounts: [{source: "/tmp/example", target: "/workspace", access: "ro", optional: true}]
+  }));
+  syntax(script);
+  const dirs = [...script.matchAll(/bwrap_args\+=\(--dir '([^']+)'\)/g)].map((x) => x[1]);
+  assert.deepEqual(dirs, ["/workspace", "/home", "/home/sandbox", "/workspace/project"]);
+  assert.equal(new Set(dirs).size, dirs.length);
+  assert.ok(script.indexOf("--dir '/workspace/project'") < script.indexOf("add_mount '/tmp/example'"));
+});
+
+test("selected-tool launcher excludes unused full-runtime branch", () => {
+  const {script} = buildLauncher(make({runtime: "selected", tools: ["ls"]}));
+  syntax(script);
+  assert.match(script, /mount_tool 'ls'/);
+  assert.doesNotMatch(script, /for path in \/usr \/bin \/sbin \/lib \/lib64 \/lib32/);
+  assert.doesNotMatch(script, /if \[\[ 'selected' == 'full' \]\]/);
+});
+
+test("generated bwrap argument list has no duplicate directory creation", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "bwrap-dedupe-"));
+  const p = make({
+    home: "/workspace",
+    workdir: "/workspace",
+    mounts: [{source: dir, target: "/workspace", access: "ro"}]
+  });
+  const ctx = runWithBwrapStub(p);
+  try {
+    const result = ctx.run();
+    assert.equal(result.status, 0, result.stderr);
+    const args = readFileSync(ctx.capture, "utf8").trim().split("\n");
+    const dirLocations = args.flatMap((arg, index) => arg === "--dir" ? [args[index + 1]] : []);
+    assert.equal(dirLocations.filter((location) => location === "/workspace").length, 1);
+    assert.ok(args.some((arg, index) => arg === "--ro-bind" && args[index + 1] === dir && args[index + 2] === "/workspace"));
+  } finally {
+    ctx.clean();
+    rmSync(dir, {recursive: true, force: true});
+  }
+});
