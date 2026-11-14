@@ -8,6 +8,7 @@ Small static browser tools hosted with GitHub Pages.
 - `/maze-simulator/` — mobile-friendly reproducible multi-floor mathematical maze previews
 - `/terraria-shopping/` — Terraria Shopping acquisition planner
 - `/boolean-search/` — Boolean Search Builder
+- `/bubblewrap-launcher/` — client-side Bubblewrap sandbox `start-isolated.sh` generator (mounts, tools, GPU/CUDA, network)
 - `/boink-local/` — manually-run local Reddit media archiver with SQLite/content dedupe
 - `/tag-harvester/` — legacy browser/bookmarklet Tag Gremlin
 - `/tag-gremlin/` — desktop Tag Gremlin CLI, SQLite harvester, and synonym-map exporter
