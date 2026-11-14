@@ -13,9 +13,29 @@ A standalone, browser-only editor for generating Linux Bubblewrap launch scripts
    ./start-isolated.sh
    ```
    Or pass a command: `./start-isolated.sh /bin/bash -lc 'echo hello'`.
-5. Export/import a JSON profile for repeat use. The browser cannot enumerate real Linux folders, so it does not provide a native folder picker with absolute host paths.
+5. Export/import a JSON profile for repeat use. The browser cannot enumerate real Linux folders, so it does not provide a native folder picker with absolute host paths. When MCP bridge mode is selected, no-argument execution starts the server; use `--shell` to open a terminal.
 
 **Requirements:** Linux with Bubblewrap (`bwrap`), Bash on the host, user namespaces / appropriate Bubblewrap setup, and any selected applications installed on the host. This is a launcher generator, not an installer or an MCP-server/tunnel configuration tool.
+
+## Gentoo Shell MCP bridge mode (compatible with start-gentoo-shell)
+
+**This is the primary startup mode for a Gentoo Shell Bridge.** It wraps the existing MCP server instead of dropping into an interactive shell. The generator does not install or modify the separate tunnel client / connector, which is what the user's $HOME/.local/bin/start-gentoo-shell convenience command normally starts.
+
+1. Under **What happens when this launcher starts?**, select **Start Gentoo Shell MCP server**. Existing profiles saved before the mode was added automatically select MCP bridge mode; the Empty/minimal shell preset explicitly keeps plain shell mode.
+2. **MCP server host folder** defaults to \`$HOME/Documents/gentoo-shell-mcp\`, which must contain \`server.py\` and an executable \`.venv/bin/python\`. This host directory is exposed **read-only** at \`/opt/mcp\`; it is **not** the same as the project folder.
+3. Choose a project directory (e.g. \`$HOME/Documents/ff9\`) and mount it at \`/workspace\`. Set HOME and working directory to \`/workspace\` if you want the same arrangement as the original Minecraft dev bridge.
+4. Download \`start-isolated.sh\` and back up your existing MCP launcher before replacing it at the location your existing bridge wrapper already references. Do not overwrite \`server.py\`, \`.venv\`, or your tunnel configuration.
+5. Run \`bash start-isolated.sh --test\` on the host to check the server files/imports **inside the sandbox**, then use your normal \`$HOME/.local/bin/start-gentoo-shell\` wrapper to start the existing tunnel. \`--shell\` opens an interactive troubleshooting shell inside the same sandbox.
+
+With no arguments, the script runs the existing MCP stdio entrypoint:
+
+\`\`\`bash
+/opt/mcp/.venv/bin/python /opt/mcp/server.py
+\`\`\`
+
+This matches the **default startup** of the existing Minecraft launcher but does *not* recreate Minecraft-specific operations like \`--setup\` (fetch Fabric template), \`--build\`, \`--run-client\`, \`--run-server\`, \`--prism-paths\`, automatic Prism discovery, or the Minecraft-specific comprehensive integration test. Those are specialized automation in the original project launcher, separate from the MCP connection contract. Add explicit mounts for the Minecraft, Prism and game directories you actually want instead of expecting automatic discovery.
+
+Shell-only mode is still available, and keeps the old behavior of opening a shell with no arguments. **Shell-only mode cannot serve the MCP connection** just by being named \`start-isolated.sh\`. The wrapper's executable path and command-line invocation must match the generated script; this site cannot inspect a workstation's actual wrapper configuration.
 
 ## What each toggle really does
 
