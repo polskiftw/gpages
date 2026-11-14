@@ -239,7 +239,7 @@ test("FF9-style profile keeps filesystem isolation boundaries explicit", () => {
   assert.equal((script.match(/--dir '\/home'/g) || []).length, 0);
   assert.doesNotMatch(script, /--ro-bind-try \/sys \/sys/);
   assert.match(script, /\/sys\/module \/sys\/bus\/pci \/sys\/class\/drm/);
-  assert.match(script, /--perms 0700 --dir \"\$XDG_RUNTIME_DIR\"/);
+  assert.match(script, /--perms 0700 --dir \"\/run\/user\/\$uid\"/);
   assert.match(script, /--setenv XDG_RUNTIME_DIR/);
   assert.match(script, /--setenv CUDA_HOME/);
   assert.match(script, /--setenv LD_LIBRARY_PATH/);
@@ -281,6 +281,18 @@ test("runtime command arguments are captured without repeated clearenv or PATH a
   } finally { ctx.clean(); }
 });
 
+
+test("Wayland passthrough uses one private runtime socket, not an entire host /run directory", () => {
+  const p = make({wayland: true});
+  const {script} = buildLauncher(p);
+  syntax(script);
+  assert.match(script, /host_runtime_dir="\$\{XDG_RUNTIME_DIR:-\/run\/user\/\$uid\}"/);
+  assert.match(script, /for candidate in "\$host_runtime_dir"\/wayland-\*/);
+  assert.match(script, /--tmpfs \/run --dir \/run\/user --perms 0700 --dir/);
+  assert.match(script, /--bind "\$host_wayland_socket" "\/run\/user\/\$uid\/wayland-0"/);
+  assert.match(script, /--setenv WAYLAND_DISPLAY wayland-0/);
+  assert.doesNotMatch(script, /--bind "\$XDG_RUNTIME_DIR" "\$XDG_RUNTIME_DIR"/);
+});
 
 test("MCP bridge preset matches existing start-gentoo-shell startup contract", () => {
   for (const id of ["bridge", "minecraft", "developer"]) {
