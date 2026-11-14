@@ -191,6 +191,10 @@ function renderEnv() {
 function setPanelVisibility() {
   const selected = profile.runtime === "selected";
   $("toolsPanel").hidden = !selected;
+  $("mcpPanel").hidden = profile.launchMode !== "mcp";
+  $("launchModeHint").textContent = profile.launchMode === "mcp"
+    ? "MCP bridge mode starts the existing server over stdio when called with no arguments, just like your current start-isolated.sh. It does not install or register the external tunnel client."
+    : "Interactive shell mode does NOT launch the MCP server. Use MCP bridge mode for your start-gentoo-shell workflow.";
   $("runtimeHint").textContent = selected
     ? "Selected mode mounts only the named executable files into /usr/bin, alongside libraries and support files. It may not work with every program and is NOT a security-grade executable allowlist."
     : "Full mode exposes all executables in your host's /usr, /bin and related system folders, read-only. This is the recommended mode for toolchains, Java, Python, Git, Minecraft and CUDA.";
@@ -198,7 +202,9 @@ function setPanelVisibility() {
 function renderControls() {
   for (const [id, key] of [
     ["profileName", "name"], ["shell", "shell"], ["workdir", "workdir"],
-    ["home", "home"], ["runtime", "runtime"], ["gpu", "gpu"], ["extraTools", "extraTools"]
+    ["home", "home"], ["runtime", "runtime"], ["gpu", "gpu"], ["extraTools", "extraTools"],
+  ["launchMode", "launchMode"], ["mcpHostDir", "mcpHostDir"],
+    ["launchMode", "launchMode"], ["mcpHostDir", "mcpHostDir"]
   ]) $(id).value = profile[key] ?? "";
   for (const key of ["network", "cudaToolkit", "wayland", "pid", "ipc", "uts", "clearenv"]) {
     $(key).checked = Boolean(profile[key]);
@@ -238,6 +244,7 @@ function update() {
     profile.mounts.length + " mounts",
     profile.network ? "host network" : "network isolated",
     (profile.gpu === "nvidia" ? "NVIDIA + DRI" : profile.gpu === "dri" ? "DRI only" : "no GPU"),
+    profile.launchMode === "mcp" ? "MCP server on startup" : "interactive shell on startup",
     profile.runtime === "full" ? "full system tools" : new Set([...checked.tools, "bash", "sh", "env"]).size + " selected tools incl. shell essentials"
   ].join(" · ");
   if (errors.length) {
@@ -252,6 +259,9 @@ function update() {
       $("scriptOutput").value = "# " + error.message;
     }
   }
+  $("downloadHint").textContent = profile.launchMode === "mcp"
+    ? "MCP mode: back up your current bridge launcher, place the downloaded start-isolated.sh where your existing start-gentoo-shell wrapper expects it, and run start-isolated.sh --test first. The external tunnel/client configuration remains unchanged."
+    : "Shell mode: chmod +x start-isolated.sh, then ./start-isolated.sh. This does not start the MCP bridge.";
   $("downloadScript").disabled = !compiled;
   $("copyScript").disabled = !compiled;
   store();
@@ -276,7 +286,7 @@ for (const [id, key] of [
   const el = $(id);
   el.addEventListener(el.type === "checkbox" || el.tagName === "SELECT" ? "change" : "input", () => {
     profile[key] = el.type === "checkbox" ? el.checked : el.value;
-    if (key === "runtime") setPanelVisibility();
+    if (key === "runtime" || key === "launchMode") setPanelVisibility();
     update();
   });
 }

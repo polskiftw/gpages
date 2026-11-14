@@ -12,6 +12,8 @@ const BASE = {
   network: false,
   runtime: "full",
   shell: "bash",
+  launchMode: "mcp",
+  mcpHostDir: "$HOME/Documents/gentoo-shell-mcp",
   workdir: "/workspace",
   home: "/home/sandbox",
   gpu: "none",
@@ -29,7 +31,10 @@ const BASE = {
 
 export function makePreset(id = "empty") {
   const p = structuredClone(BASE);
-  if (id === "bridge") {
+  if (id === "empty") {
+    p.launchMode = "shell";
+  } else if (id === "bridge") {
+    p.home = "/workspace";
     p.name = "Gentoo shell bridge";
     p.network = true;
     p.mounts = [
@@ -37,6 +42,7 @@ export function makePreset(id = "empty") {
     ];
     p.tools = [...TOOL_GROUPS.basic, ...TOOL_GROUPS.development, "python3", "node"];
   } else if (id === "minecraft") {
+    p.home = "/workspace";
     p.name = "Minecraft + CUDA";
     p.network = true;
     p.gpu = "nvidia";
@@ -47,6 +53,7 @@ export function makePreset(id = "empty") {
     ];
     p.tools = [...TOOL_GROUPS.basic, ...TOOL_GROUPS.development, "python3", "java", "javac", "nvcc", "nvidia-smi"];
   } else if (id === "developer") {
+    p.home = "/workspace";
     p.name = "Development workspace";
     p.network = true;
     p.mounts = [
@@ -84,6 +91,8 @@ export function validateProfile(input) {
   if (typeof p.name !== "string" || !p.name.trim() || hasControls(p.name)) errors.push("Give this launcher a one-line name.");
   if (!["full", "selected"].includes(p.runtime)) errors.push("Choose a valid system tool mode.");
   if (!["bash", "sh"].includes(p.shell)) errors.push("Choose Bash or sh.");
+  if (!["shell", "mcp"].includes(p.launchMode)) errors.push("Choose an MCP bridge or interactive-shell startup mode.");
+  if (p.launchMode === "mcp" && !isHostPath(p.mcpHostDir)) errors.push("MCP server host folder must be an absolute path, ~/path, or $HOME/path.");
   if (!["none", "dri", "nvidia"].includes(p.gpu)) errors.push("Choose a valid GPU mode.");
   if (!isTargetPath(p.workdir) || p.workdir === "/") errors.push("Working directory must be an absolute sandbox path.");
   if (!isTargetPath(p.home) || p.home === "/") errors.push("HOME must be an absolute sandbox path.");
@@ -104,6 +113,7 @@ export function validateProfile(input) {
     if (!isTargetPath(m.target)) errors.push("Mount " + (i + 1) + ": sandbox path must be absolute, without . or .. segments.");
     if (reserved.has(m.target)) errors.push("Mount " + (i + 1) + ": " + m.target + " is reserved for the sandbox runtime.");
     if (destinations.has(m.target)) errors.push("Mount " + (i + 1) + ": duplicate sandbox destination " + m.target + ".");
+    if (p.launchMode === "mcp" && (m.target === "/opt" || m.target === "/opt/mcp")) errors.push("Mount " + (i + 1) + ": /opt/mcp is reserved for the automatically mounted MCP server.");
     destinations.add(m.target);
     if (m.access !== "mask") {
       m.source = typeof m.source === "string" ? m.source : "";
@@ -139,6 +149,7 @@ export function validateProfile(input) {
     return e;
   });
 
+  if (p.launchMode === "mcp" && p.runtime === "selected") warnings.push("MCP mode works best with the full host toolset; selected-tools mode may omit Python interpreter helpers or program dependencies.");
   if (p.runtime === "selected") warnings.push("Selected tools mode is best-effort, not a strict execution whitelist: interpreters, shared libraries, and scripts can still execute other code. Complex tools may need full runtime.");
   if (p.network) warnings.push("Network ON shares the host network namespace; it is not an outbound-only firewall.");
   if (p.gpu !== "none") warnings.push("GPU device access exposes real host hardware interfaces and increases sandbox privileges.");
@@ -179,6 +190,7 @@ export function buildLauncher(input) {
     "  --proc /proc",
     "  --dev /dev",
     "  --tmpfs /tmp",
+    "  --dir /etc",
     ")",
     "",
   ].filter(Boolean);
@@ -237,7 +249,7 @@ export function buildLauncher(input) {
     "for path in /etc/passwd /etc/group /etc/hosts /etc/hostname /etc/resolv.conf /etc/nsswitch.conf /etc/host.conf /etc/gai.conf /etc/localtime /etc/ld.so.cache /etc/ld.so.conf; do",
     "  [[ ! -e \"$path\" ]] || bwrap_args+=(--ro-bind \"$path\" \"$path\")",
     "done",
-    "for path in /etc/ssl /etc/ca-certificates /etc/pki /etc/ld.so.conf.d; do",
+    "for path in /etc/ssl /etc/ca-certificates /etc/pki /etc/ld.so.conf.d /etc/java-config-2; do",
     "  [[ ! -d \"$path\" ]] || bwrap_args+=(--ro-bind \"$path\" \"$path\")",
     "done",
     "",
@@ -274,7 +286,7 @@ export function buildLauncher(input) {
     "",
     "# Prepare each sandbox directory once, before applying user mounts."
   );
-  for (const dir of new Set(["/workspace", ...(p.home.startsWith("/home/") || p.home === "/home" ? ["/home"] : []), p.home, p.workdir])) {
+  for (const dir of new Set(["/workspace", ...(p.launchMode === "mcp" || p.cudaToolkit ? ["/opt"] : []), ...(p.home.startsWith("/home/") || p.home === "/home" ? ["/home"] : []), p.home, p.workdir])) {
     lines.push("bwrap_args+=(--dir " + shellQuote(dir) + ")");
   }
   lines.push(
@@ -284,6 +296,20 @@ export function buildLauncher(input) {
   for (const m of p.mounts) {
     if (m.access === "mask") lines.push("bwrap_args+=(--tmpfs " + shellQuote(m.target) + ") # empty temporary directory");
     else lines.push("add_mount " + shellQuote(m.source) + " " + shellQuote(m.target) + " " + shellQuote(m.access) + " " + (m.optional ? "1" : "0"));
+  }
+  if (p.launchMode === "mcp") {
+    lines.push(
+      "",
+      "# Mount the existing Gentoo Shell MCP server read-only.",
+      "# This is separate from /workspace, which contains your project files.",
+      "mcp_server_dir=\"$(expand_host_path " + shellQuote(p.mcpHostDir) + ")\"",
+      "if [[ ! -f \"$mcp_server_dir/server.py\" || ! -x \"$mcp_server_dir/.venv/bin/python\" ]]; then",
+      "  echo \"Error: MCP server.py or .venv/bin/python is missing in $mcp_server_dir\" >&2",
+      "  echo 'Install the existing Gentoo Shell MCP server and venv first.' >&2",
+      "  exit 1",
+      "fi",
+      "bwrap_args+=(--ro-bind \"$mcp_server_dir\" /opt/mcp)"
+    );
   }
   lines.push("");
   if (p.gpu === "dri" || p.gpu === "nvidia") {
@@ -339,13 +365,33 @@ export function buildLauncher(input) {
   }
   if (p.wayland) {
     lines.push(
-      "# A desktop socket is powerful: it is not required for headless CUDA.",
-      "if [[ \"@@{XDG_RUNTIME_DIR:-}\" == /* && -n \"@@{WAYLAND_DISPLAY:-}\" && -S \"$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY\" ]]; then",
-      "  bwrap_args+=(--perms 0700 --dir \"$XDG_RUNTIME_DIR\")",
-      "  bwrap_args+=(--bind \"$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY\" \"$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY\")",
-      "  bwrap_args+=(--setenv XDG_RUNTIME_DIR \"$XDG_RUNTIME_DIR\" --setenv WAYLAND_DISPLAY \"$WAYLAND_DISPLAY\")",
+      "# Mount exactly one Wayland socket; never expose the entire host runtime directory.",
+      "uid=\"$(id -u)\"",
+      "host_runtime_dir=\"@@{XDG_RUNTIME_DIR:-/run/user/$uid}\"",
+      "host_wayland_socket=''",
+      "if [[ -n \"@@{WAYLAND_DISPLAY:-}\" ]]; then",
+      "  if [[ \"$WAYLAND_DISPLAY\" == /* ]]; then",
+      "    host_wayland_socket=\"$WAYLAND_DISPLAY\"",
+      "  else",
+      "    host_wayland_socket=\"$host_runtime_dir/$WAYLAND_DISPLAY\"",
+      "  fi",
       "else",
-      "  echo 'Warning: no Wayland session socket found.' >&2",
+      "  # When the wrapper lacks WAYLAND_DISPLAY, use exactly one detected socket.",
+      "  for candidate in \"$host_runtime_dir\"/wayland-*; do",
+      "    [[ -S \"$candidate\" ]] || continue",
+      "    if [[ -n \"$host_wayland_socket\" ]]; then",
+      "      host_wayland_socket=''",
+      "      break",
+      "    fi",
+      "    host_wayland_socket=\"$candidate\"",
+      "  done",
+      "fi",
+      "if [[ -n \"$host_wayland_socket\" && -S \"$host_wayland_socket\" ]]; then",
+      "  bwrap_args+=(--tmpfs /run --dir /run/user --perms 0700 --dir \"/run/user/$uid\")",
+      "  bwrap_args+=(--bind \"$host_wayland_socket\" \"/run/user/$uid/wayland-0\")",
+      "  bwrap_args+=(--setenv XDG_RUNTIME_DIR \"/run/user/$uid\" --setenv WAYLAND_DISPLAY wayland-0 --setenv XDG_SESSION_TYPE wayland)",
+      "else",
+      "  echo 'Warning: no unambiguous Wayland session socket found; GPU compute still works.' >&2",
       "fi"
     );
   }
@@ -378,12 +424,35 @@ export function buildLauncher(input) {
   lines.push(
     "bwrap_args+=(--chdir " + shellQuote(p.workdir) + ")",
     "",
-    "# Pass an optional command to the launcher; otherwise open an interactive shell.",
-    "if (( $# )); then",
-    "  cmd=(\"$@\")",
-    "else",
-    p.shell === "bash" ? (p.runtime === "selected" ? "  cmd=(/usr/bin/bash --noprofile --norc -i)" : "  cmd=(/bin/bash --noprofile --norc -i)") : (p.runtime === "selected" ? "  cmd=(/usr/bin/sh -i)" : "  cmd=(/bin/sh -i)"),
-    "fi",
+    "# Command to execute after setting up the sandbox."
+  );
+  const shellCommand = p.shell === "bash"
+    ? (p.runtime === "selected" ? "/usr/bin/bash --noprofile --norc -i" : "/bin/bash --noprofile --norc -i")
+    : (p.runtime === "selected" ? "/usr/bin/sh -i" : "/bin/sh -i");
+  if (p.launchMode === "mcp") {
+    const testShell = p.runtime === "selected" ? "/usr/bin/bash" : "/bin/bash";
+    const testScript = 'cd /opt/mcp; test -r server.py; /opt/mcp/.venv/bin/python -c \'import server; print("PASS: MCP server imports")\'; echo "PASS: MCP sandbox starts in $PWD (HOME=$HOME)"';
+    lines.push(
+      "# No arguments starts the MCP server over stdio, as the existing bridge expects.",
+      "case \"@@{1:-}\" in",
+      "  '') cmd=(/opt/mcp/.venv/bin/python /opt/mcp/server.py) ;;",
+      "  --shell) cmd=(" + shellCommand + ") ;;",
+      "  --test) cmd=(" + testShell + " -ec " + shellQuote(testScript) + ") ;;",
+      "  --help|-h) echo 'Usage: start-isolated.sh [--shell|--test|COMMAND [ARGS...]]'; exit 0 ;;",
+      "  *) cmd=(\"$@\") ;;",
+      "esac"
+    );
+  } else {
+    lines.push(
+      "# General-purpose shell mode; pass a command to run it instead of a shell.",
+      "if (( $# )); then",
+      "  cmd=(\"$@\")",
+      "else",
+      "  cmd=(" + shellCommand + ")",
+      "fi"
+    );
+  }
+  lines.push(
     "exec bwrap \"@@{bwrap_args[@]}\" -- \"@@{cmd[@]}\"",
     ""
   );
