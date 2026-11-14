@@ -515,3 +515,12 @@ test("CUDA compiler discovery ignores installations without nvcc and exports CUD
   assert.match(script, /no executable nvcc found under/);
   assert.doesNotMatch(script, /if \[\[ -d "\$candidate" \]\]; then/);
 });
+
+
+test("MCP smoke test imports from server folder without changing startup workdir", () => {
+  const {script} = buildLauncher(makePreset("bridge"));
+  syntax(script);
+  assert.match(script, /\(cd \/opt\/mcp && \/opt\/mcp\/.venv\/bin\/python -c/);
+  assert.match(script, /PASS: sandbox working directory: \$PWD \(HOME=\$HOME\)/);
+  assert.doesNotMatch(script, /'cd \/opt\/mcp; test -r server\.py/);
+});
