@@ -9,7 +9,7 @@ try {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) {
     const candidate = JSON.parse(saved);
-    if (!validateProfile(candidate).errors.length) profile = candidate;
+    if (!validateProfile(candidate).errors.length) profile = validateProfile(candidate).profile;
   }
 } catch {
   // Private browsing or blocked storage should not break the generator.
@@ -238,7 +238,7 @@ function update() {
     profile.mounts.length + " mounts",
     profile.network ? "host network" : "network isolated",
     (profile.gpu === "nvidia" ? "NVIDIA + DRI" : profile.gpu === "dri" ? "DRI only" : "no GPU"),
-    profile.runtime === "full" ? "full system tools" : (checked.tools.length + 3) + " selected tools incl. shell essentials"
+    profile.runtime === "full" ? "full system tools" : new Set([...checked.tools, "bash", "sh", "env"]).size + " selected tools incl. shell essentials"
   ].join(" · ");
   if (errors.length) {
     compiled = "";
@@ -351,7 +351,7 @@ $("profileFile").addEventListener("change", async (event) => {
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) throw new Error("Expected a JSON object.");
     const {errors} = validateProfile(candidate);
     if (errors.length) throw new Error(errors.join(" "));
-    profile = candidate;
+    profile = validateProfile(candidate).profile;
     renderControls();
     update();
     notify("JSON profile loaded.");
