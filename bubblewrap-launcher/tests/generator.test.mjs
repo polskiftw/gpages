@@ -280,3 +280,103 @@ test("runtime command arguments are captured without repeated clearenv or PATH a
     assert.ok(args.includes("--new-session"));
   } finally { ctx.clean(); }
 });
+
+
+test("MCP bridge preset matches existing start-gentoo-shell startup contract", () => {
+  for (const id of ["bridge", "minecraft", "developer"]) {
+    const p = makePreset(id);
+    assert.equal(p.launchMode, "mcp", id);
+    assert.equal(p.home, "/workspace", id);
+    assert.equal(p.mcpHostDir, "$HOME/Documents/gentoo-shell-mcp");
+    const {script} = buildLauncher(p);
+    syntax(script);
+    assert.match(script, /bwrap_args\+=\(--ro-bind "\$mcp_server_dir" \/opt\/mcp\)/);
+    assert.match(script, /cmd=\(\/opt\/mcp\/.venv\/bin\/python \/opt\/mcp\/server.py\)/);
+    assert.match(script, /case "\$\{1:-\}" in/);
+    assert.match(script, /--shell\) cmd=\(/);
+    assert.match(script, /--test\) cmd=\(/);
+    assert.match(script, /--dir '\/opt'/);
+    assert.ok(script.indexOf("--dir '/opt'") < script.indexOf('--ro-bind "$mcp_server_dir" /opt/mcp'));
+    assert.doesNotMatch(script, /cmd=\(\/bin\/bash --noprofile --norc -i\)\nfi/);
+  }
+});
+
+test("old FF9 profiles without startup mode migrate to the MCP bridge by default", () => {
+  const p = makePreset("empty");
+  delete p.launchMode;
+  const normalized = validateProfile(p);
+  assert.deepEqual(normalized.errors, []);
+  assert.equal(normalized.profile.launchMode, "mcp");
+  assert.equal(normalized.profile.mcpHostDir, "$HOME/Documents/gentoo-shell-mcp");
+});
+
+test("MCP host folder is mounted read-only and no-argument launch runs server", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "bwrap-mcp-host-"));
+  mkdirSync(path.join(dir, ".venv", "bin"), {recursive: true});
+  writeFileSync(path.join(dir, "server.py"), "# test server\n");
+  writeFileSync(path.join(dir, ".venv", "bin", "python"), "#!/bin/sh\nexit 0\n", {mode: 0o755});
+  const p = makePreset("bridge");
+  p.mcpHostDir = dir;
+  p.mounts = [];
+  const ctx = runWithBwrapStub(p);
+  try {
+    const run = ctx.run();
+    assert.equal(run.status, 0, run.stderr);
+    const args = readFileSync(ctx.capture, "utf8").trim().split("\n");
+    assert.ok(args.some((x, i) => x === "--ro-bind" && args[i+1] === dir && args[i+2] === "/opt/mcp"));
+    assert.deepEqual(args.slice(-3), ["--", "/opt/mcp/.venv/bin/python", "/opt/mcp/server.py"]);
+  } finally {
+    ctx.clean();
+    rmSync(dir, {recursive: true, force: true});
+  }
+});
+
+test("MCP --shell and --test use expected commands while missing MCP files fail clearly", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "bwrap-mcp-options-"));
+  mkdirSync(path.join(dir, ".venv", "bin"), {recursive: true});
+  writeFileSync(path.join(dir, "server.py"), "# dummy\n");
+  writeFileSync(path.join(dir, ".venv", "bin", "python"), "#!/bin/sh\nexit 0\n", {mode: 0o755});
+  const p = makePreset("bridge");
+  p.mcpHostDir = dir;
+  p.mounts = [];
+  for (const [flag, expected] of [["--shell", "/bin/bash"], ["--test", "-ec"]]) {
+    const ctx = runWithBwrapStub(p, [flag]);
+    try {
+      const run = ctx.run();
+      assert.equal(run.status, 0, run.stderr);
+      const args = readFileSync(ctx.capture, "utf8").trim().split("\n");
+      assert.ok(args.includes(expected), flag + " missing " + expected);
+      assert.equal(args.includes("/opt/mcp/server.py"), false, flag + " should not run MCP server");
+    } finally { ctx.clean(); }
+  }
+  rmSync(dir, {recursive: true, force: true});
+  const missing = makePreset("bridge");
+  missing.mcpHostDir = "/nonexistent/mcp-root";
+  missing.mounts = [];
+  const ctx = runWithBwrapStub(missing);
+  try {
+    const run = ctx.run();
+    assert.notEqual(run.status, 0);
+    assert.match(run.stderr, /MCP server.py or .venv\/bin\/python is missing/);
+    assert.equal(existsSync(ctx.capture), false, "must fail before bwrap starts");
+  } finally { ctx.clean(); }
+});
+
+test("interactive shell remains selectable and has no hidden MCP mount", () => {
+  const p = makePreset("empty");
+  assert.equal(p.launchMode, "shell");
+  const {script} = buildLauncher(p);
+  syntax(script);
+  assert.doesNotMatch(script, /mcp_server_dir=/);
+  assert.doesNotMatch(script, /\/opt\/mcp\/server.py/);
+  assert.match(script, /cmd=\(\/bin\/bash --noprofile --norc -i\)/);
+});
+
+test("MCP server mount cannot be overridden by another user mount", () => {
+  const p = makePreset("bridge");
+  p.mounts.push({source: "/tmp/other", target: "/opt/mcp", access: "rw"});
+  assert.ok(validateProfile(p).errors.some((x) => x.includes("/opt/mcp is reserved")));
+  assert.throws(() => buildLauncher(p));
+  p.mounts[1].target = "/opt";
+  assert.ok(validateProfile(p).errors.some((x) => x.includes("/opt/mcp is reserved")));
+});
