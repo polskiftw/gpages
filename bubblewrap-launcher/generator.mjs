@@ -23,6 +23,7 @@ const BASE = {
   ipc: true,
   uts: true,
   clearenv: true,
+  privateIdentity: true,
   mounts: [],
   tools: ["ls", "cat", "git", "python3"],
   extraTools: "",
@@ -33,6 +34,7 @@ export function makePreset(id = "empty") {
   const p = structuredClone(BASE);
   if (id === "empty") {
     p.launchMode = "shell";
+    p.privateIdentity = false;
   } else if (id === "bridge") {
     p.home = "/workspace";
     p.name = "Gentoo shell bridge";
@@ -87,6 +89,7 @@ export function validateProfile(input) {
   p.mounts = Array.isArray(p.mounts) ? p.mounts : [];
   p.tools = Array.isArray(p.tools) ? p.tools : [];
   p.env = Array.isArray(p.env) ? p.env : [];
+  p.privateIdentity = Boolean(p.privateIdentity);
 
   if (typeof p.name !== "string" || !p.name.trim() || hasControls(p.name)) errors.push("Give this launcher a one-line name.");
   if (!["full", "selected"].includes(p.runtime)) errors.push("Choose a valid system tool mode.");
@@ -156,6 +159,7 @@ export function validateProfile(input) {
   if (p.cudaToolkit && p.gpu !== "nvidia") warnings.push("CUDA toolkit access does not itself grant NVIDIA GPU device access.");
   if (p.wayland) warnings.push("Wayland socket access permits interaction with the desktop session, not merely GPU compute.");
   if (!p.clearenv) warnings.push("Inherited host environment variables may expose credentials and private settings.");
+  if (!p.privateIdentity && p.launchMode === "mcp") warnings.push("The MCP bridge will see your host passwd/group/hosts files. Enable private sandbox identity files to make account lookups agree with the sandbox HOME.");
   const homeMount = p.mounts.filter((m) => p.home === m.target || p.home.startsWith(m.target + "/")).at(-1);
   if (homeMount?.access === "ro") {
     warnings.push("HOME (" + p.home + ") is under a read-only mount (" + homeMount.target + "). Programs cannot create files directly in HOME; choose read/write for this mount or use a separate writable HOME.");
@@ -243,10 +247,38 @@ export function buildLauncher(input) {
       lines.push("mount_tool " + shellQuote(tool));
     }
   }
+  if (p.privateIdentity) {
+    const loginShell = p.runtime === "selected"
+      ? (p.shell === "bash" ? "/usr/bin/bash" : "/usr/bin/sh")
+      : (p.shell === "bash" ? "/bin/bash" : "/bin/sh");
+    lines.push(
+      "# Generate private /etc/passwd, /etc/group, and /etc/hosts in memory.",
+      "# --ro-bind-data reads inherited file descriptors; no host files are created.",
+      "sandbox_user=\"$(id -un)\"",
+      "sandbox_group=\"$(id -gn)\"",
+      "sandbox_uid=\"$(id -u)\"",
+      "sandbox_gid=\"$(id -g)\"",
+      "if [[ \"$sandbox_user\" == *:* || \"$sandbox_group\" == *:* ]]; then",
+      "  echo 'Error: host username or group contains a colon; cannot create a safe passwd/group entry.' >&2",
+      "  exit 1",
+      "fi",
+      "exec {sandbox_passwd_fd}< <(printf '%s:x:%s:%s:Sandbox User:%s:%s\\n' \"$sandbox_user\" \"$sandbox_uid\" \"$sandbox_gid\" " + shellQuote(p.home) + " " + shellQuote(loginShell) + ")",
+      "exec {sandbox_group_fd}< <(printf '%s:x:%s:\\n' \"$sandbox_group\" \"$sandbox_gid\")",
+      "exec {sandbox_hosts_fd}< <(printf '127.0.0.1 localhost\\n::1 localhost\\n')",
+      "bwrap_args+=(--ro-bind-data \"$sandbox_passwd_fd\" /etc/passwd)",
+      "bwrap_args+=(--ro-bind-data \"$sandbox_group_fd\" /etc/group)",
+      "bwrap_args+=(--ro-bind-data \"$sandbox_hosts_fd\" /etc/hosts)",
+      ""
+    );
+  }
   lines.push(
     "",
-    "# Only a small group of non-secret /etc configuration files is visible.",
-    "for path in /etc/passwd /etc/group /etc/hosts /etc/hostname /etc/resolv.conf /etc/nsswitch.conf /etc/host.conf /etc/gai.conf /etc/localtime /etc/ld.so.cache /etc/ld.so.conf; do",
+    p.privateIdentity
+      ? "# Expose limited system settings, but NOT the host's passwd/group/hosts files."
+      : "# Expose limited host system settings, including read-only passwd/group/hosts.",
+    "for path in " +
+      (p.privateIdentity ? "" : "/etc/passwd /etc/group /etc/hosts ") +
+      "/etc/hostname /etc/resolv.conf /etc/nsswitch.conf /etc/host.conf /etc/gai.conf /etc/localtime /etc/ld.so.cache /etc/ld.so.conf; do",
     "  [[ ! -e \"$path\" ]] || bwrap_args+=(--ro-bind \"$path\" \"$path\")",
     "done",
     "for path in /etc/ssl /etc/ca-certificates /etc/pki /etc/ld.so.conf.d /etc/java-config-2; do",

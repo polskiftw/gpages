@@ -206,7 +206,7 @@ function renderControls() {
   ["launchMode", "launchMode"], ["mcpHostDir", "mcpHostDir"],
     ["launchMode", "launchMode"], ["mcpHostDir", "mcpHostDir"]
   ]) $(id).value = profile[key] ?? "";
-  for (const key of ["network", "cudaToolkit", "wayland", "pid", "ipc", "uts", "clearenv"]) {
+  for (const key of ["network", "cudaToolkit", "wayland", "pid", "ipc", "uts", "clearenv", "privateIdentity"]) {
     $(key).checked = Boolean(profile[key]);
   }
   setPanelVisibility();
@@ -245,6 +245,7 @@ function update() {
     profile.network ? "host network" : "network isolated",
     (profile.gpu === "nvidia" ? "NVIDIA + DRI" : profile.gpu === "dri" ? "DRI only" : "no GPU"),
     profile.launchMode === "mcp" ? "MCP server on startup" : "interactive shell on startup",
+    profile.privateIdentity ? "private identity files" : "host identity files",
     profile.runtime === "full" ? "full system tools" : new Set([...checked.tools, "bash", "sh", "env"]).size + " selected tools incl. shell essentials"
   ].join(" · ");
   if (errors.length) {
@@ -281,7 +282,8 @@ for (const [id, key] of [
   ["profileName", "name"], ["shell", "shell"], ["workdir", "workdir"],
   ["home", "home"], ["runtime", "runtime"], ["gpu", "gpu"], ["extraTools", "extraTools"],
   ["network", "network"], ["cudaToolkit", "cudaToolkit"], ["wayland", "wayland"],
-  ["pid", "pid"], ["ipc", "ipc"], ["uts", "uts"], ["clearenv", "clearenv"]
+  ["pid", "pid"], ["ipc", "ipc"], ["uts", "uts"], ["clearenv", "clearenv"],
+  ["privateIdentity", "privateIdentity"]
 ]) {
   const el = $(id);
   el.addEventListener(el.type === "checkbox" || el.tagName === "SELECT" ? "change" : "input", () => {
