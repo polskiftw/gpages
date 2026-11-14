@@ -1,0 +1,98 @@
+:root{
+  color-scheme:light dark;
+  --bg:#f4f4f7;--card:#fff;--field:#f6f7fa;--text:#171820;--muted:#5e6471;
+  --border:#d0d4df;--accent:#1464df;--danger:#a12c41;--good:#138058;--warn:#a76a00;
+  --shadow:0 8px 24px #00000009
+}
+@media(prefers-color-scheme:dark){
+ :root{--bg:#11141c;--card:#1b202b;--field:#10141e;--text:#f1f3f8;--muted:#b0b8c8;--border:#4a5263;--accent:#80b5ff;--danger:#ff929f;--good:#8ee1b4;--warn:#ffcd82;--shadow:none}
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;padding:20px 14px 32px}
+main{max-width:1400px;margin:auto}
+h1{font-size:clamp(28px,4vw,42px);line-height:1.1;margin:10px 0}
+h2{font-size:20px;margin:0 0 11px}
+h3{font-size:16px;margin:0 0 6px}
+p{margin:8px 0}
+code,textarea,.mount-heading{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+a{color:var(--accent)}
+.topline{display:flex;justify-content:space-between;gap:14px;align-items:center}
+.back{font-weight:750;text-decoration:none}
+.version{color:var(--muted);font-size:12px}
+.subtitle{max-width:880px;color:var(--muted);margin:0 0 20px}
+.card{border:1px solid var(--border);background:var(--card);padding:18px;margin:0 0 16px;border-radius:16px;box-shadow:var(--shadow)}
+.intro{border-left:4px solid var(--accent)}
+.layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(310px,1fr);gap:16px;align-items:start}
+.section-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px}
+.section-head h2,.section-head h3{margin-bottom:4px}
+.hint{font-size:13px;color:var(--muted);line-height:1.55}
+.preset-bar{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:12px}
+.field{display:grid;gap:5px;min-width:0;margin:0}
+.field>span,.field>label{font-weight:700;font-size:13px}
+.field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+input,select,button,textarea{font:inherit}
+input[type=text],select,textarea{width:100%;min-width:0;border:1px solid var(--border);color:var(--text);background:var(--field);padding:10px 11px;border-radius:9px}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button{cursor:pointer;border-radius:9px;border:1px solid var(--border);padding:10px 13px;font-weight:740;background:var(--field);color:var(--text);min-height:42px}
+button:hover{filter:brightness(1.09)}
+button:disabled{opacity:.48;cursor:not-allowed}
+.primary{background:#126ce0;border-color:#126ce0;color:#fff}
+.secondary{background:var(--field);color:var(--text)}
+.danger{color:var(--danger)}
+.compact{white-space:nowrap;min-height:36px;padding:6px 10px;font-size:13px}
+.tiny{min-height:31px;font-size:12px;padding:4px 9px}
+.stack{display:grid;gap:10px}
+.mount-heading{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-weight:800}
+.mount-card{padding:13px;border:1px solid var(--border);border-radius:12px;background:var(--field)}
+.mount-header{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:10px}
+.mount-number{font-size:13px;font-weight:800}
+.mount-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mount-options{display:grid;grid-template-columns:minmax(0,1fr) 1fr;align-items:center;gap:12px;margin-top:11px}
+.mount-options label.checkbox-row{display:flex;gap:8px;align-items:center;font-size:13px}
+.mount-options input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)}
+.mask-note{font-size:12px;color:var(--muted);margin:10px 0 0}
+.empty{padding:17px;border:1px dashed var(--border);border-radius:10px;color:var(--muted);font-size:13px}
+.toggle{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid var(--border)}
+.toggle>input{accent-color:var(--accent);width:19px;height:19px;flex:0 0 auto;margin:2px 0}
+.toggle span{display:grid;gap:3px}
+.toggle small{font-size:12px;color:var(--muted);line-height:1.45}
+.tools-panel{margin:16px 0 0;padding:15px;border:1px solid var(--border);border-radius:12px;background:var(--field)}
+.tool-groups{display:grid;gap:10px;margin:14px 0}
+.tool-group{padding:12px;border:1px solid var(--border);border-radius:9px}
+.tool-group h4{margin:0 0 9px;font-size:13px}
+.tool-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.tool-list label{display:flex;gap:6px;align-items:center;font-size:12px;overflow-wrap:anywhere}
+.tool-list input{accent-color:var(--accent)}
+.advanced{padding:0}
+.advanced summary{padding:16px;font-weight:800;font-size:18px;cursor:pointer}
+.advanced-content{padding:0 18px 18px}
+.env-row{display:grid;grid-template-columns:1fr 1.5fr auto;gap:8px;align-items:end}
+.output-column{position:sticky;top:12px;max-height:calc(100vh - 12px);overflow:auto;scrollbar-width:thin}
+.output .section-head{align-items:center}
+.status-badge{font-size:12px;font-weight:800;color:var(--good);border:1px solid currentColor;border-radius:999px;padding:4px 10px}
+.status-badge.invalid{color:var(--danger)}
+.summary{font-size:13px;color:var(--muted);margin:10px 0}
+.feedback{max-height:170px;overflow:auto;font-size:12px;margin:0 0 12px}
+.feedback ul{margin:5px 0;padding-left:20px}
+.feedback .errors{color:var(--danger);font-weight:700}
+.feedback .warnings{color:var(--warn)}
+textarea#scriptOutput{height:min(48vh,530px);min-height:240px;resize:vertical;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:2;white-space:pre}
+.buttons{display:grid;grid-template-columns:1.3fr 1fr;gap:9px;margin-top:10px}
+.small-buttons{grid-template-columns:1fr 1fr}
+.message{font-size:12px;color:var(--muted);min-height:18px;margin-top:7px}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:12px 4px 2px}
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr}
+  .output-column{position:static;max-height:none;overflow:visible}
+  textarea#scriptOutput{height:360px}
+}
+@media(max-width:570px){
+  body{padding:13px 10px}
+  .card{padding:13px}
+  .field-grid,.mount-fields,.mount-options,.preset-bar,.env-row{grid-template-columns:1fr}
+  .tool-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .section-head{flex-wrap:wrap}
+  .buttons{grid-template-columns:1fr}
+  .advanced{padding:0}
+}
