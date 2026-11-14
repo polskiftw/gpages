@@ -254,7 +254,7 @@ test("clearenv occurs before CUDA/Wayland custom environment and PATH is set onl
   syntax(script);
   const firstClear = script.indexOf("  --clearenv");
   assert.ok(firstClear > 0, "clearenv should be in bwrap initial argument array");
-  assert.equal((script.match(/\b--clearenv\b/g) || []).filter(() => true).length, 2, "one flag and one explanatory comment");
+  assert.equal((script.match(/--clearenv/g) || []).length, 2, "one flag and one explanatory comment");
   for (const name of ["XDG_RUNTIME_DIR", "WAYLAND_DISPLAY", "CUDA_HOME", "CUDA_PATH", "LD_LIBRARY_PATH", "PATH", "EDITOR"]) {
     assert.ok(script.indexOf("--setenv " + name) > firstClear, name + " should be set after clearenv");
   }
