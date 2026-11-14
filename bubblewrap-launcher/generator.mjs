@@ -159,6 +159,7 @@ export function validateProfile(input) {
   if (p.cudaToolkit && p.gpu !== "nvidia") warnings.push("CUDA toolkit access does not itself grant NVIDIA GPU device access.");
   if (p.wayland) warnings.push("Wayland socket access permits interaction with the desktop session, not merely GPU compute.");
   if (!p.clearenv) warnings.push("Inherited host environment variables may expose credentials and private settings.");
+  if (!p.privateIdentity && p.launchMode === "mcp") warnings.push("The MCP bridge will see your host passwd/group/hosts files. Enable private sandbox identity files to make account lookups agree with the sandbox HOME.");
   const homeMount = p.mounts.filter((m) => p.home === m.target || p.home.startsWith(m.target + "/")).at(-1);
   if (homeMount?.access === "ro") {
     warnings.push("HOME (" + p.home + ") is under a read-only mount (" + homeMount.target + "). Programs cannot create files directly in HOME; choose read/write for this mount or use a separate writable HOME.");
