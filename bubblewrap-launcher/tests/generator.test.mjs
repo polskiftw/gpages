@@ -211,3 +211,71 @@ test("generated bwrap argument list has no duplicate directory creation", () => 
     rmSync(dir, {recursive: true, force: true});
   }
 });
+
+
+test("FF9-style profile keeps filesystem isolation boundaries explicit", () => {
+  const p = make({
+    name: "FF9",
+    network: true,
+    runtime: "full",
+    home: "/workspace",
+    workdir: "/workspace",
+    gpu: "nvidia",
+    cudaToolkit: true,
+    wayland: true,
+    mounts: [{source: "~/Documents/ff9", target: "/workspace", access: "rw"}]
+  });
+  const {script, warnings} = buildLauncher(p);
+  syntax(script);
+  assert.match(script, /--unshare-user/);
+  assert.match(script, /--new-session/);
+  assert.match(script, /--unshare-pid/);
+  assert.match(script, /--unshare-ipc/);
+  assert.match(script, /--unshare-uts/);
+  assert.doesNotMatch(script, /--unshare-net/);
+  assert.ok(warnings.some((w) => w.includes("host network")));
+  assert.match(script, /add_mount '~\/Documents\/ff9' '\/workspace' 'rw' 0/);
+  assert.equal((script.match(/--dir '\/workspace'/g) || []).length, 1);
+  assert.equal((script.match(/--dir '\/home'/g) || []).length, 0);
+  assert.doesNotMatch(script, /--ro-bind-try \/sys \/sys/);
+  assert.match(script, /\/sys\/module \/sys\/bus\/pci \/sys\/class\/drm/);
+  assert.match(script, /--perms 0700 --dir \"\$XDG_RUNTIME_DIR\"/);
+  assert.match(script, /--setenv XDG_RUNTIME_DIR/);
+  assert.match(script, /--setenv CUDA_HOME/);
+  assert.match(script, /--setenv LD_LIBRARY_PATH/);
+});
+
+test("clearenv occurs before CUDA/Wayland custom environment and PATH is set only once", () => {
+  const p = make({
+    gpu: "nvidia", cudaToolkit: true, wayland: true,
+    env: [{name: "EDITOR", value: "vim"}]
+  });
+  const {script} = buildLauncher(p);
+  syntax(script);
+  const firstClear = script.indexOf("  --clearenv");
+  assert.ok(firstClear > 0, "clearenv should be in bwrap initial argument array");
+  assert.equal((script.match(/\b--clearenv\b/g) || []).filter(() => true).length, 2, "one flag and one explanatory comment");
+  for (const name of ["XDG_RUNTIME_DIR", "WAYLAND_DISPLAY", "CUDA_HOME", "CUDA_PATH", "LD_LIBRARY_PATH", "PATH", "EDITOR"]) {
+    assert.ok(script.indexOf("--setenv " + name) > firstClear, name + " should be set after clearenv");
+  }
+  assert.equal((script.match(/bwrap_args\+=\(--setenv PATH /g) || []).length, 1);
+  assert.match(script, /sandbox_path="\$cuda_root\/bin:\$sandbox_path"/);
+  assert.match(script, /cuda_real="\$\(readlink -e -- "\$candidate"\)"/);
+});
+
+test("runtime command arguments are captured without repeated clearenv or PATH assignments", () => {
+  const p = make({home: "/workspace", workdir: "/workspace", env: [{name: "FF9_TEST", value: "ok"}]});
+  const ctx = runWithBwrapStub(p, ["/usr/bin/true"]);
+  try {
+    const result = ctx.run();
+    assert.equal(result.status, 0, result.stderr);
+    const args = readFileSync(ctx.capture, "utf8").trim().split("\n");
+    const clearIndexes = args.flatMap((part, i) => part === "--clearenv" ? [i] : []);
+    const pathIndexes = args.flatMap((part, i) => part === "--setenv" && args[i + 1] === "PATH" ? [i] : []);
+    assert.equal(clearIndexes.length, 1);
+    assert.equal(pathIndexes.length, 1);
+    assert.ok(clearIndexes[0] < pathIndexes[0]);
+    assert.ok(args.some((part, i) => part === "--setenv" && args[i + 1] === "FF9_TEST" && args[i + 2] === "ok"));
+    assert.ok(args.includes("--new-session"));
+  } finally { ctx.clean(); }
+});
