@@ -97,7 +97,7 @@ export function validateProfile(input) {
   const normalized = [];
   p.mounts.forEach((raw, i) => {
     const m = {...raw};
-    m.target = typeof m.target === "string" ? cleanPath(m.target.trim()) : "";
+    m.target = typeof m.target === "string" ? cleanPath(m.target) : "";
     m.access = m.access || "ro";
     m.optional = Boolean(m.optional);
     if (!["rw", "ro", "mask"].includes(m.access)) errors.push("Mount " + (i + 1) + ": invalid permission.");
@@ -106,7 +106,7 @@ export function validateProfile(input) {
     if (destinations.has(m.target)) errors.push("Mount " + (i + 1) + ": duplicate sandbox destination " + m.target + ".");
     destinations.add(m.target);
     if (m.access !== "mask") {
-      m.source = typeof m.source === "string" ? m.source.trim() : "";
+      m.source = typeof m.source === "string" ? m.source : "";
       if (!isHostPath(m.source)) errors.push("Mount " + (i + 1) + ": host path must be absolute or start with ~/ or $HOME/.");
       if (m.access === "rw" && (m.source === "$HOME" || m.source === "~" || m.source === "/home")) {
         warnings.push("Mount " + (i + 1) + " gives writable access to a very broad home directory.");
@@ -344,7 +344,7 @@ export function buildLauncher(input) {
     "if (( $# )); then",
     "  cmd=(\"$@\")",
     "else",
-    p.shell === "bash" ? "  cmd=(/bin/bash --noprofile --norc -i)" : "  cmd=(/bin/sh -i)",
+    p.shell === "bash" ? (p.runtime === "selected" ? "  cmd=(/usr/bin/bash --noprofile --norc -i)" : "  cmd=(/bin/bash --noprofile --norc -i)") : (p.runtime === "selected" ? "  cmd=(/usr/bin/sh -i)" : "  cmd=(/bin/sh -i)"),
     "fi",
     "exec bwrap \"@@{bwrap_args[@]}\" -- \"@@{cmd[@]}\"",
     ""
