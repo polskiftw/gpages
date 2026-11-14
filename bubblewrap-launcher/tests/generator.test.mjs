@@ -139,3 +139,14 @@ test("environment names are checked and values quoted", () => {
   syntax(script);
   assert.ok(validateProfile(make({env: [{name: "BAD NAME", value: "x"}]})).errors.length);
 });
+
+test("every statically referenced browser control exists in the HTML", () => {
+  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  const browserCode = readFileSync(new URL("../app.mjs", import.meta.url), "utf8");
+  const ids = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
+  const referenced = [...browserCode.matchAll(/\$\("([A-Za-z][A-Za-z0-9]*)"\)/g)].map((m) => m[1]);
+  assert.ok(referenced.length > 15);
+  for (const id of referenced) assert.ok(ids.has(id), "Missing HTML control: " + id);
+  const result = spawnSync("node", ["--check", new URL("../app.mjs", import.meta.url).pathname], {encoding: "utf8"});
+  assert.equal(result.status, 0, result.stderr);
+});
