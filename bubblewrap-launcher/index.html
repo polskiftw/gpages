@@ -43,6 +43,22 @@
           <label class="field"><span>HOME <code>(inside)</code></span><input id="home" type="text" spellcheck="false" placeholder="/home/sandbox"></label>
         </div>
         <p class="hint">These are locations <em>inside</em> the sandbox. A path like <code>/workspace</code> doesn't create a new host folder; only the mounts below connect to your real files. HOME is temporary unless you explicitly mount storage there.</p>
+        <div class="field-grid" style="margin-top:15px">
+          <label class="field"><span>What happens when this launcher starts?</span>
+            <select id="launchMode">
+              <option value="mcp">Start Gentoo Shell MCP server (bridge compatible)</option>
+              <option value="shell">Open an interactive shell only</option>
+            </select>
+          </label>
+        </div>
+        <div id="mcpPanel" class="tools-panel">
+          <h3>Gentoo Shell MCP bridge</h3>
+          <label class="field"><span>Host folder containing <code>server.py</code> and <code>.venv/</code></span>
+            <input id="mcpHostDir" type="text" spellcheck="false" placeholder="$HOME/Documents/gentoo-shell-mcp">
+          </label>
+          <p class="hint">This host folder is automatically mounted read-only at <code>/opt/mcp</code>, separately from your project at <code>/workspace</code>. With no arguments, the launcher executes <code>/opt/mcp/.venv/bin/python /opt/mcp/server.py</code> (stdio). <code>--shell</code> opens a troubleshooting shell; <code>--test</code> checks whether the MCP server imports. Your existing <code>start-gentoo-shell</code> wrapper handles the tunnel and is not created by this generator.</p>
+        </div>
+        <p id="launchModeHint" class="hint"></p>
       </section>
 
       <section class="card" aria-labelledby="mountsTitle">
@@ -121,7 +137,7 @@
           <button id="downloadScript" type="button" class="primary">Download start-isolated.sh</button>
           <button id="copyScript" type="button" class="secondary">Copy script</button>
         </div>
-        <p class="hint">After downloading: <code>chmod +x start-isolated.sh</code>, then <code>./start-isolated.sh</code>. Pass a command to run it instead of the default interactive shell.</p>
+        <p class="hint" id="downloadHint">If you want to use your existing bridge, back up its current <code>start-isolated.sh</code>, put the generated file at the path your wrapper already calls, and test it before switching. The wrapper/tunnel itself is not changed.</p>
       </section>
 
       <section class="card profiles">
