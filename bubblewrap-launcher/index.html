@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en" class="retro-tool">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#20004e">
+  <meta name="description" content="Build portable Bubblewrap sandbox launchers in your browser. No server, no tracking, no uploaded paths.">
+  <title>Bubblewrap Launcher Generator | gpages</title>
+  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="../retro.css">
+</head>
+<body>
+<main>
+  <div class="topline"><a class="back" href="../">‹ gpages</a><span class="version">Bubblewrap · Linux · Client-side</span></div>
+  <h1>Bubblewrap Launcher Generator</h1>
+  <p class="subtitle">Click together a sandbox and download a ready-to-edit <code>start-isolated.sh</code>. Choose which host folders it can see, what it can change, and whether it gets network, GPU, CUDA, or desktop access.</p>
+
+  <section class="card intro">
+    <strong>Everything happens in this browser tab.</strong> Nothing runs on GitHub Pages, and no paths are uploaded. The downloaded script will run locally on Linux with your own user privileges. <strong>Start with a preset, adjust the permissions, then inspect the script before running it.</strong>
+  </section>
+
+  <section class="card">
+    <div class="section-head"><div><h2>1. Start with a template</h2><p class="hint">Templates fill in examples; your actual host paths are never guessed or scanned by the browser.</p></div></div>
+    <div class="preset-bar">
+      <label class="field"><span>Preset</span><select id="preset">
+        <option value="empty">Empty / minimal shell (safest start)</option>
+        <option value="bridge">Gentoo Shell Bridge workspace</option>
+        <option value="minecraft">Minecraft + Prism + CUDA</option>
+        <option value="developer">General development workspace</option>
+      </select></label>
+      <button class="secondary" id="applyPreset" type="button">Apply preset</button>
+    </div>
+  </section>
+
+  <div class="layout">
+    <div class="editor">
+      <section class="card" aria-labelledby="basicsTitle">
+        <h2 id="basicsTitle">2. Identity &amp; paths</h2>
+        <div class="field-grid">
+          <label class="field"><span>Launcher name</span><input id="profileName" type="text" spellcheck="false" placeholder="My shell sandbox"></label>
+          <label class="field"><span>Startup shell</span><select id="shell"><option value="bash">Bash</option><option value="sh">POSIX sh</option></select></label>
+          <label class="field"><span>Working directory <code>(inside)</code></span><input id="workdir" type="text" spellcheck="false" placeholder="/workspace"></label>
+          <label class="field"><span>HOME <code>(inside)</code></span><input id="home" type="text" spellcheck="false" placeholder="/home/sandbox"></label>
+        </div>
+        <p class="hint">These are locations <em>inside</em> the sandbox. A path like <code>/workspace</code> doesn't create a new host folder; only the mounts below connect to your real files. HOME is temporary unless you explicitly mount storage there.</p>
+      </section>
+
+      <section class="card" aria-labelledby="mountsTitle">
+        <div class="section-head">
+          <div><h2 id="mountsTitle">3. Folders, files &amp; mount points</h2><p class="hint">Add real host paths and choose exactly where they appear inside the sandbox.</p></div>
+          <button id="addMount" class="secondary compact" type="button">+ Add mount</button>
+        </div>
+        <div class="mount-heading"><span>HOST → SANDBOX</span><span>PERMISSION</span></div>
+        <div id="mountList" class="stack" aria-live="polite"></div>
+        <p class="hint">Host paths may start with <code>$HOME/</code>, <code>~/</code>, or <code>/</code>. Read/write access applies to the directory <strong>and its contents</strong>; more-specific nested mounts override parents. “Hide (empty)” masks an existing sandbox directory with temporary empty storage. Folder selection must be typed or pasted: webpages cannot browse absolute host paths.</p>
+      </section>
+
+      <section class="card" aria-labelledby="accessTitle">
+        <h2 id="accessTitle">4. Access &amp; system tools</h2>
+        <label class="toggle">
+          <input id="network" type="checkbox">
+          <span><strong>Allow network access</strong><small>OFF creates a separate network namespace. ON shares the host network (not just outbound traffic).</small></span>
+        </label>
+        <div class="field">
+          <span>System program visibility</span>
+          <select id="runtime">
+            <option value="full">Full host toolset, read-only (best compatibility)</option>
+            <option value="selected">Selected command names (best-effort)</option>
+          </select>
+        </div>
+        <p id="runtimeHint" class="hint"></p>
+        <div id="toolsPanel" class="tools-panel" hidden>
+          <div class="section-head"><h3>Available commands</h3><button id="clearTools" class="secondary tiny" type="button">Clear optional tools</button></div>
+          <p class="hint">Bash, sh, and env are always present. Selected commands are individually mounted into <code>/usr/bin</code>. Libraries and support files remain accessible, so this is <strong>not</strong> a hardened executable whitelist.</p>
+          <div id="toolGroups" class="tool-groups"></div>
+          <label class="field"><span>Extra command names (commas or spaces)</span><input id="extraTools" type="text" spellcheck="false" placeholder="rg jq ffmpeg"></label>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="gpuTitle">
+        <h2 id="gpuTitle">5. Graphics &amp; CUDA</h2>
+        <label class="field"><span>GPU hardware</span>
+          <select id="gpu">
+            <option value="none">No host GPU devices</option>
+            <option value="dri">DRI devices only (/dev/dri)</option>
+            <option value="nvidia">NVIDIA / CUDA GPU devices + DRI</option>
+          </select>
+        </label>
+        <label class="toggle">
+          <input id="cudaToolkit" type="checkbox">
+          <span><strong>Expose CUDA toolkit / nvcc</strong><small>Read-only mounts for installed <code>/opt/cuda*</code> and <code>/usr/local/cuda*</code>; system driver libraries come from the read-only OS runtime.</small></span>
+        </label>
+        <label class="toggle">
+          <input id="wayland" type="checkbox">
+          <span><strong>Allow Wayland desktop connection</strong><small>Optional desktop-session socket for GUI apps. Not needed for headless CUDA. Grants access to the graphical session.</small></span>
+        </label>
+        <p class="hint">GPU access uses existing device nodes, not a second driver installation. The script discovers NVIDIA devices and CUDA paths <strong>when launched</strong>, so it can adapt to driver updates.</p>
+      </section>
+
+      <details class="card advanced">
+        <summary>6. Advanced isolation &amp; environment</summary>
+        <div class="advanced-content">
+          <label class="toggle"><input id="pid" type="checkbox"><span><strong>Separate PID namespace</strong><small>Sandbox sees its own process tree.</small></span></label>
+          <label class="toggle"><input id="ipc" type="checkbox"><span><strong>Separate IPC namespace</strong><small>Isolate System V shared memory and message queues.</small></span></label>
+          <label class="toggle"><input id="uts" type="checkbox"><span><strong>Separate UTS namespace</strong><small>Isolate hostname-related settings.</small></span></label>
+          <label class="toggle"><input id="clearenv" type="checkbox"><span><strong>Clear inherited environment</strong><small>Prevents accidentally exposing environment variables and host credentials.</small></span></label>
+          <div class="section-head"><h3>Additional environment variables</h3><button id="addEnv" type="button" class="secondary compact">+ Add variable</button></div>
+          <div id="envList" class="stack"></div>
+          <p class="hint">Environment values are embedded directly into the launcher. Don't save tokens, passwords, or private keys here.</p>
+        </div>
+      </details>
+    </div>
+
+    <aside class="output-column">
+      <section class="card output" aria-labelledby="previewTitle">
+        <div class="section-head"><div><h2 id="previewTitle">Generated launcher</h2><p class="hint">Live preview; updates as you edit.</p></div><span id="validBadge" class="status-badge">Valid</span></div>
+        <div id="summary" class="summary"></div>
+        <div id="feedback" class="feedback" aria-live="polite"></div>
+        <textarea id="scriptOutput" readonly spellcheck="false" aria-label="Generated Bash launcher"></textarea>
+        <div class="buttons">
+          <button id="downloadScript" type="button" class="primary">Download start-isolated.sh</button>
+          <button id="copyScript" type="button" class="secondary">Copy script</button>
+        </div>
+        <p class="hint">After downloading: <code>chmod +x start-isolated.sh</code>, then <code>./start-isolated.sh</code>. Pass a command to run it instead of the default interactive shell.</p>
+      </section>
+
+      <section class="card profiles">
+        <h2>Keep or move this setup</h2>
+        <p class="hint">Your edits are automatically saved in this browser only. Export/import a JSON profile to move the settings between devices.</p>
+        <div class="buttons small-buttons">
+          <button class="secondary" type="button" id="exportProfile">Export JSON profile</button>
+          <button class="secondary" type="button" id="importProfile">Import profile</button>
+          <input type="file" id="profileFile" accept=".json,application/json" hidden>
+          <button class="danger" type="button" id="resetProfile">Reset all</button>
+        </div>
+        <div id="message" class="message" aria-live="polite"></div>
+      </section>
+    </aside>
+  </div>
+  <footer>Based on <a href="https://github.com/containers/bubblewrap">Bubblewrap</a>. Namespace isolation limits access but cannot make malicious host files, drivers, or writable mounts harmless. Review the generated launcher before using it with untrusted code.</footer>
+</main>
+<script type="module" src="./app.mjs"></script>
+</body>
+</html>
