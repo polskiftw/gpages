@@ -1,0 +1,22 @@
+name: Test Bubblewrap launcher generator
+
+on:
+  push:
+    paths:
+      - 'bubblewrap-launcher/**'
+      - '.github/workflows/test-bubblewrap-launcher.yml'
+  pull_request:
+    paths:
+      - 'bubblewrap-launcher/**'
+      - '.github/workflows/test-bubblewrap-launcher.yml'
+
+jobs:
+  test-generator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test generated Bash and path handling
+        run: node --test bubblewrap-launcher/tests/*.test.mjs
