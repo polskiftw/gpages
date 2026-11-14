@@ -392,3 +392,99 @@ test("MCP server mount cannot be overridden by another user mount", () => {
   p.mounts[1].target = "/opt";
   assert.ok(validateProfile(p).errors.some((x) => x.includes("/opt/mcp is reserved")));
 });
+
+
+test("private identity defaults on for MCP bridge profiles and remains optional for shell presets", () => {
+  for (const name of ["bridge", "minecraft", "developer"]) {
+    const p = makePreset(name);
+    assert.equal(p.privateIdentity, true, name);
+    const {script} = buildLauncher(p);
+    syntax(script);
+    assert.match(script, /--ro-bind-data "\$sandbox_passwd_fd" \/etc\/passwd/);
+    assert.match(script, /--ro-bind-data "\$sandbox_group_fd" \/etc\/group/);
+    assert.match(script, /--ro-bind-data "\$sandbox_hosts_fd" \/etc\/hosts/);
+    assert.doesNotMatch(script, /for path in \/etc\/passwd \/etc\/group \/etc\/hosts/);
+  }
+  assert.equal(makePreset("empty").privateIdentity, false);
+  const shellScript = buildLauncher(makePreset("empty")).script;
+  assert.match(shellScript, /for path in \/etc\/passwd \/etc\/group \/etc\/hosts/);
+  assert.doesNotMatch(shellScript, /--ro-bind-data/);
+});
+
+test("old saved FF9 profiles get private identity enabled without losing their settings", () => {
+  const p = makePreset("bridge");
+  p.name = "ff9";
+  p.home = "/workspace";
+  p.mounts = [{source: "~/Documents/ff9", target: "/workspace", access: "rw"}];
+  delete p.privateIdentity;
+  const {profile, errors} = validateProfile(p);
+  assert.deepEqual(errors, []);
+  assert.equal(profile.privateIdentity, true);
+  assert.equal(profile.mounts[0].source, "~/Documents/ff9");
+  assert.equal(profile.workdir, "/workspace");
+});
+
+test("private passwd/group/hosts content travels via inherited file descriptors, not host files", () => {
+  const p = makePreset("empty");
+  p.privateIdentity = true;
+  p.home = "/workspace";
+  const ctx = runWithBwrapStub(p, ["/usr/bin/true"]);
+  const stub = path.join(ctx.dir, "bin", "bwrap");
+  writeFileSync(stub, [
+    "#!/usr/bin/env bash",
+    "set -euo pipefail",
+    "printf '%s\\n' \"$@\" > \"$CAPTURE_FILE\"",
+    "args=(\"$@\")",
+    "for ((i=0; i < $#; i++)); do",
+    "  if [[ \"\${args[i]}\" == --ro-bind-data ]]; then",
+    "    fd=\"\${args[i+1]}\"",
+    "    dest=\"\${args[i+2]##*/}\"",
+    "    cat \"/proc/self/fd/$fd\" > \"$CAPTURE_FILE.$dest\"",
+    "  fi",
+    "done",
+    ""
+  ].join("\n"), {mode: 0o755});
+  try {
+    const result = ctx.run();
+    assert.equal(result.status, 0, result.stderr);
+    const args = readFileSync(ctx.capture, "utf8").trim().split("\n");
+    for (const target of ["/etc/passwd", "/etc/group", "/etc/hosts"]) {
+      assert.ok(args.some((arg, i) => arg === "--ro-bind-data" && /^\d+$/.test(args[i + 1]) && args[i + 2] === target), target);
+      assert.equal(args.some((arg, i) => arg === "--ro-bind" && args[i + 1] === target && args[i + 2] === target), false);
+    }
+    const passwd = readFileSync(ctx.capture + ".passwd", "utf8");
+    const group = readFileSync(ctx.capture + ".group", "utf8");
+    const hosts = readFileSync(ctx.capture + ".hosts", "utf8");
+    const uid = process.getuid();
+    const gid = process.getgid();
+    assert.ok(passwd.includes(":x:" + uid + ":" + gid + ":Sandbox User:/workspace:/bin/bash\n"), passwd);
+    assert.ok(group.includes(":x:" + gid + ":\n"), group);
+    assert.equal(hosts, "127.0.0.1 localhost\n::1 localhost\n");
+    assert.equal(passwd.split("\n").filter(Boolean).length, 1);
+    assert.equal(group.split("\n").filter(Boolean).length, 1);
+    assert.doesNotMatch(buildLauncher(p).script, /mktemp|\.sandbox\/passwd|\.sandbox\/group|\.sandbox\/hosts/);
+  } finally {
+    ctx.clean();
+  }
+});
+
+test("turning off private files preserves host read-only binds and warns for MCP", () => {
+  const p = makePreset("bridge");
+  p.privateIdentity = false;
+  const {script, warnings} = buildLauncher(p);
+  syntax(script);
+  assert.doesNotMatch(script, /--ro-bind-data/);
+  assert.match(script, /for path in \/etc\/passwd \/etc\/group \/etc\/hosts/);
+  assert.ok(warnings.some((w) => w.includes("host passwd/group/hosts")));
+});
+
+test("private identity file HOME and shell match profile customization", () => {
+  const p = makePreset("bridge");
+  p.home = "/home/sandbox";
+  p.shell = "sh";
+  p.runtime = "selected";
+  const {script} = buildLauncher(p);
+  syntax(script);
+  assert.match(script, /'\/home\/sandbox' '\/usr\/bin\/sh'/);
+  assert.match(script, /--ro-bind-data "\$sandbox_passwd_fd" \/etc\/passwd/);
+});
