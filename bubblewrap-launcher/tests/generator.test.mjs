@@ -13,7 +13,7 @@ function syntax(script) {
   const result = spawnSync("bash", ["-n"], {input: script, encoding: "utf8"});
   assert.equal(result.status, 0, result.stderr);
 }
-function runWithBwrapStub(profile, extraArgs = []) {
+function runWithBwrapStub(profile, extraArgs = [], cwd = undefined) {
   const dir = mkdtempSync(path.join(tmpdir(), "bwrap-generator-test-"));
   const bin = path.join(dir, "bin");
   mkdirSync(bin);
@@ -26,6 +26,7 @@ function runWithBwrapStub(profile, extraArgs = []) {
     dir, capture, scriptPath,
     run: () => spawnSync("bash", [scriptPath, ...extraArgs], {
       encoding: "utf8",
+      cwd,
       env: {...process.env, CAPTURE_FILE: capture, PATH: bin + ":/usr/local/bin:/usr/bin:/bin"}
     }),
     clean: () => rmSync(dir, {recursive: true, force: true})
@@ -77,10 +78,10 @@ test("invalid paths, duplicate mount points and bad tool names are rejected", ()
 test("shell metacharacters in host path are data, not code", () => {
   const tmp = mkdtempSync(path.join(tmpdir(), "bwrap-quoting-"));
   const marker = path.join(tmp, "UNWANTED");
-  const source = path.join(tmp, "space ' apostrophe; $(touch " + marker + ") and symbols");
+  const source = path.join(tmp, "space ' apostrophe; $(touch UNWANTED) and symbols");
   mkdirSync(source);
   const p = make({mounts: [{source, target: "/workspace/quoted", access: "rw"}]});
-  const ctx = runWithBwrapStub(p, ["/bin/true"]);
+  const ctx = runWithBwrapStub(p, ["/bin/true"], tmp);
   try {
     const result = ctx.run();
     assert.equal(result.status, 0, result.stderr);
