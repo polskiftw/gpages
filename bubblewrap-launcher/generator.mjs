@@ -145,6 +145,10 @@ export function validateProfile(input) {
   if (p.cudaToolkit && p.gpu !== "nvidia") warnings.push("CUDA toolkit access does not itself grant NVIDIA GPU device access.");
   if (p.wayland) warnings.push("Wayland socket access permits interaction with the desktop session, not merely GPU compute.");
   if (!p.clearenv) warnings.push("Inherited host environment variables may expose credentials and private settings.");
+  const homeMount = p.mounts.filter((m) => p.home === m.target || p.home.startsWith(m.target + "/")).at(-1);
+  if (homeMount?.access === "ro") {
+    warnings.push("HOME (" + p.home + ") is under a read-only mount (" + homeMount.target + "). Programs cannot create files directly in HOME; choose read/write for this mount or use a separate writable HOME.");
+  }
   if (p.mounts.length === 0) warnings.push("No host folders are shared. /workspace exists but is temporary.");
   if (p.mounts.some((m) => m.access === "rw")) warnings.push("Read/write mounts can change or delete real host files, including their contents.");
   return {profile: p, errors, warnings};
@@ -172,59 +176,59 @@ export function buildLauncher(input) {
     "  --proc /proc",
     "  --dev /dev",
     "  --tmpfs /tmp",
-    "  --dir /workspace",
-    "  --dir /home",
     ")",
     "",
-    "# Keep host system tools read-only; they are NOT a per-command whitelist.",
-    "if [[ " + shellQuote(p.runtime) + " == 'full' ]]; then",
-    "  for path in /usr /bin /sbin /lib /lib64 /lib32; do",
-    "    if [[ -L \"$path\" ]]; then",
-    "      bwrap_args+=(--symlink \"$(readlink \"$path\")\" \"$path\")",
-    "    elif [[ -d \"$path\" ]]; then",
-    "      bwrap_args+=(--ro-bind \"$path\" \"$path\")",
-    "    fi",
-    "  done",
-    "else",
-    "  bwrap_args+=(--dir /usr --dir /usr/bin --dir /usr/sbin)",
-    "  for path in /usr/lib /usr/lib64 /lib /lib64 /lib32; do",
-    "    if [[ -L \"$path\" ]]; then",
-    "      bwrap_args+=(--symlink \"$(readlink \"$path\")\" \"$path\")",
-    "    elif [[ -d \"$path\" ]]; then",
-    "      bwrap_args+=(--ro-bind \"$path\" \"$path\")",
-    "    fi",
-    "  done",
-    "  # /usr/share is needed by many ordinary utilities, interpreters and compilers.",
-    "  [[ ! -d /usr/share ]] || bwrap_args+=(--ro-bind /usr/share /usr/share)",
-    "  # Gentoo and other merged-/usr distros rely on these compatibility paths.",
-    "  for path in /bin /sbin; do",
-    "    if [[ -L \"$path\" ]]; then",
-    "      bwrap_args+=(--symlink \"$(readlink \"$path\")\" \"$path\")",
-    "    else",
-    "      bwrap_args+=(--dir \"$path\")",
-    "    fi",
-    "  done",
-    "  mount_tool() {",
-    "    local tool=\"$1\" src",
-    "    if ! src=\"$(type -P \"$tool\")\" || [[ ! -f \"$src\" ]]; then",
-    "      echo \"Error: selected tool '$tool' is not installed on the host.\" >&2",
-    "      exit 1",
-    "    fi",
-    "    bwrap_args+=(--ro-bind \"$src\" \"/usr/bin/$tool\")",
-    "  }",
-    "  # Core interpreters are always needed to launch a shell and shebang scripts.",
-    "  mount_tool bash",
-    "  mount_tool sh",
-    "  mount_tool env"
   ].filter(Boolean);
-  if (p.runtime === "selected") {
-    // Only the selected-mode shell path runs this loop, not the full-mode path.
+  if (p.runtime === "full") {
+    lines.push(
+      "# Host system executables are available read-only.",
+      "for path in /usr /bin /sbin /lib /lib64 /lib32; do",
+      "  if [[ -L \"$path\" ]]; then",
+      "    bwrap_args+=(--symlink \"$(readlink \"$path\")\" \"$path\")",
+      "  elif [[ -d \"$path\" ]]; then",
+      "    bwrap_args+=(--ro-bind \"$path\" \"$path\")",
+      "  fi",
+      "done"
+    );
+  } else {
+    lines.push(
+      "# Selected executables (best-effort, not a security whitelist).",
+      "bwrap_args+=(--dir /usr --dir /usr/bin --dir /usr/sbin)",
+      "for path in /usr/lib /usr/lib64 /lib /lib64 /lib32; do",
+      "  if [[ -L \"$path\" ]]; then",
+      "    bwrap_args+=(--symlink \"$(readlink \"$path\")\" \"$path\")",
+      "  elif [[ -d \"$path\" ]]; then",
+      "    bwrap_args+=(--ro-bind \"$path\" \"$path\")",
+      "  fi",
+      "done",
+      "# /usr/share is needed by many utilities, interpreters, and compilers.",
+      "[[ ! -d /usr/share ]] || bwrap_args+=(--ro-bind /usr/share /usr/share)",
+      "# Gentoo and other merged-/usr distros use compatibility paths.",
+      "for path in /bin /sbin; do",
+      "  if [[ -L \"$path\" ]]; then",
+      "    bwrap_args+=(--symlink \"$(readlink \"$path\")\" \"$path\")",
+      "  else",
+      "    bwrap_args+=(--dir \"$path\")",
+      "  fi",
+      "done",
+      "mount_tool() {",
+      "  local tool=\"$1\" src",
+      "  if ! src=\"$(type -P \"$tool\")\" || [[ ! -f \"$src\" ]]; then",
+      "    echo \"Error: selected tool '$tool' is not installed on the host.\" >&2",
+      "    exit 1",
+      "  fi",
+      "  bwrap_args+=(--ro-bind \"$src\" \"/usr/bin/$tool\")",
+      "}",
+      "# Core interpreters are always needed for shells and shebang scripts.",
+      "mount_tool bash",
+      "mount_tool sh",
+      "mount_tool env"
+    );
     for (const tool of p.tools.filter((t) => !["bash", "sh", "env"].includes(t))) {
-      lines.push("  mount_tool " + shellQuote(tool));
+      lines.push("mount_tool " + shellQuote(tool));
     }
   }
   lines.push(
-    "fi",
     "",
     "# Only a small group of non-secret /etc configuration files is visible.",
     "for path in /etc/passwd /etc/group /etc/hosts /etc/hostname /etc/resolv.conf /etc/nsswitch.conf /etc/host.conf /etc/gai.conf /etc/localtime /etc/ld.so.cache /etc/ld.so.conf; do",
@@ -265,9 +269,12 @@ export function buildLauncher(input) {
     "  fi",
     "}",
     "",
-    "# Prepare the sandbox paths before user mounts are applied.",
-    "bwrap_args+=(--dir " + shellQuote(p.home) + ")",
-    "bwrap_args+=(--dir " + shellQuote(p.workdir) + ")",
+    "# Prepare each sandbox directory once, before applying user mounts."
+  );
+  for (const dir of new Set(["/workspace", "/home", p.home, p.workdir])) {
+    lines.push("bwrap_args+=(--dir " + shellQuote(dir) + ")");
+  }
+  lines.push(
     "",
     "# Your mounts, ordered parent-first so child overrides work correctly."
   );
