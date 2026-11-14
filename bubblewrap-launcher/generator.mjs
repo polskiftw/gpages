@@ -169,6 +169,9 @@ export function buildLauncher(input) {
     "",
     "bwrap_args=(",
     "  --die-with-parent",
+    "  --new-session",
+    "  --unshare-user",
+    p.clearenv ? "  --clearenv" : "",
     p.pid ? "  --unshare-pid" : "",
     p.ipc ? "  --unshare-ipc" : "",
     p.uts ? "  --unshare-uts" : "",
@@ -271,7 +274,7 @@ export function buildLauncher(input) {
     "",
     "# Prepare each sandbox directory once, before applying user mounts."
   );
-  for (const dir of new Set(["/workspace", "/home", p.home, p.workdir])) {
+  for (const dir of new Set(["/workspace", ...(p.home.startsWith("/home/") || p.home === "/home" ? ["/home"] : []), p.home, p.workdir])) {
     lines.push("bwrap_args+=(--dir " + shellQuote(dir) + ")");
   }
   lines.push(
@@ -287,7 +290,11 @@ export function buildLauncher(input) {
     lines.push(
       "# Direct Rendering Infrastructure nodes (actual host GPU devices).",
       "if [[ -d /dev/dri ]]; then bwrap_args+=(--dev-bind /dev/dri /dev/dri); fi",
-      "bwrap_args+=(--ro-bind-try /sys /sys)"
+      "# Share only GPU-relevant sysfs metadata (not the entire host /sys).",
+      "bwrap_args+=(--dir /sys)",
+      "for path in /sys/module /sys/bus/pci /sys/class/drm /sys/devices /sys/dev/char; do",
+      "  [[ ! -d \"$path\" ]] || bwrap_args+=(--ro-bind \"$path\" \"$path\")",
+      "done"
     );
   }
   if (p.gpu === "nvidia") {
@@ -302,18 +309,29 @@ export function buildLauncher(input) {
   }
   if (p.cudaToolkit) {
     lines.push(
-      "# CUDA compiler / toolkit directories. Libraries under /usr are already visible.",
+      "# Expose one CUDA toolkit, preferring the unversioned host installation.",
       "cuda_root=''",
-      "for root in /opt/cuda /opt/cuda-* /usr/local/cuda /usr/local/cuda-*; do",
-      "  if [[ -d \"$root\" ]]; then",
-      "    bwrap_args+=(--ro-bind \"$root\" \"$root\")",
-      "    [[ -n \"$cuda_root\" ]] || cuda_root=\"$root\"",
+      "cuda_real=''",
+      "for candidate in /opt/cuda /usr/local/cuda /opt/cuda-* /usr/local/cuda-*; do",
+      "  if [[ -d \"$candidate\" ]]; then",
+      "    cuda_root=\"$candidate\"",
+      "    cuda_real=\"$(readlink -e -- \"$candidate\")\"",
+      "    break",
       "  fi",
       "done",
       "if [[ -n \"$cuda_root\" ]]; then",
-      "  bwrap_args+=(--setenv CUDA_HOME \"$cuda_root\" --setenv CUDA_PATH \"$cuda_root\")",
-      "  bwrap_args+=(--setenv PATH \"$cuda_root/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\")",
-      "  bwrap_args+=(--setenv LD_LIBRARY_PATH \"$cuda_root/lib64:$cuda_root/targets/x86_64-linux/lib:/usr/lib64:/usr/lib\")",
+      "  # Mount the resolved target only once; do not duplicate versioned installs.",
+      "  bwrap_args+=(--ro-bind \"$cuda_real\" \"$cuda_real\")",
+      "  if [[ \"$cuda_root\" != \"$cuda_real\" ]]; then",
+      "    case \"$cuda_root\" in",
+      "      /usr/*)",
+      p.runtime === "selected"
+        ? "        bwrap_args+=(--symlink \"$cuda_real\" \"$cuda_root\")"
+        : "        # /usr is already mounted read-only, including this host symlink.",
+      "        ;;",
+      "      *) bwrap_args+=(--symlink \"$cuda_real\" \"$cuda_root\") ;;",
+      "    esac",
+      "  fi",
       "else",
       "  echo 'Warning: CUDA toolkit not found under /opt/cuda* or /usr/local/cuda*.' >&2",
       "fi"
@@ -322,7 +340,8 @@ export function buildLauncher(input) {
   if (p.wayland) {
     lines.push(
       "# A desktop socket is powerful: it is not required for headless CUDA.",
-      "if [[ -n \"@@{XDG_RUNTIME_DIR:-}\" && -n \"@@{WAYLAND_DISPLAY:-}\" && -S \"$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY\" ]]; then",
+      "if [[ \"@@{XDG_RUNTIME_DIR:-}\" == /* && -n \"@@{WAYLAND_DISPLAY:-}\" && -S \"$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY\" ]]; then",
+      "  bwrap_args+=(--perms 0700 --dir \"$XDG_RUNTIME_DIR\")",
       "  bwrap_args+=(--bind \"$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY\" \"$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY\")",
       "  bwrap_args+=(--setenv XDG_RUNTIME_DIR \"$XDG_RUNTIME_DIR\" --setenv WAYLAND_DISPLAY \"$WAYLAND_DISPLAY\")",
       "else",
@@ -333,16 +352,28 @@ export function buildLauncher(input) {
   lines.push(
     "",
     "# Sandbox environment, working directory, and startup command.",
-    p.clearenv ? "bwrap_args+=(--clearenv)" : "# Inheriting host environment (less isolated).",
+    "# --clearenv is applied before any --setenv entries in this script.",
     "bwrap_args+=(--setenv HOME " + shellQuote(p.home) + ")",
-    "bwrap_args+=(--setenv PATH '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin')",
     "bwrap_args+=(--setenv LANG 'C.UTF-8')",
-    "bwrap_args+=(--setenv TERM \"@@{TERM:-xterm-256color}\")"
+    "bwrap_args+=(--setenv TERM \"@@{TERM:-xterm-256color}\")",
+    "sandbox_path='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'"
   );
-  // CUDA overrides PATH after the base environment, so its compiler is discoverable.
   if (p.cudaToolkit) {
-    lines.push("if [[ -n \"@@{cuda_root:-}\" ]]; then bwrap_args+=(--setenv PATH \"$cuda_root/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"); fi");
+    lines.push(
+      "if [[ -n \"$cuda_root\" ]]; then",
+      "  sandbox_path=\"$cuda_root/bin:$sandbox_path\"",
+      "  bwrap_args+=(--setenv CUDA_HOME \"$cuda_root\" --setenv CUDA_PATH \"$cuda_root\")",
+      "  cuda_libs=''",
+      "  for subdir in lib64 targets/x86_64-linux/lib lib; do",
+      "    if [[ -d \"$cuda_root/$subdir\" ]]; then",
+      "      cuda_libs=\"@@{cuda_libs:+$cuda_libs:}$cuda_root/$subdir\"",
+      "    fi",
+      "  done",
+      "  [[ -z \"$cuda_libs\" ]] || bwrap_args+=(--setenv LD_LIBRARY_PATH \"$cuda_libs\")",
+      "fi"
+    );
   }
+  lines.push("bwrap_args+=(--setenv PATH \"$sandbox_path\")");
   for (const e of p.env) lines.push("bwrap_args+=(--setenv " + shellQuote(e.name) + " " + shellQuote(e.value) + ")");
   lines.push(
     "bwrap_args+=(--chdir " + shellQuote(p.workdir) + ")",
