@@ -62,11 +62,11 @@ export function makePreset(id = "empty") {
 const hasControls = (s) => /[\x00-\x1f\x7f]/.test(s);
 const cleanPath = (s) => s === "/" ? s : s.replace(/\/+$/, "");
 function isTargetPath(s) {
-  return s.startsWith("/") && !hasControls(s) &&
+  return typeof s === "string" && s.startsWith("/") && !hasControls(s) &&
     !s.split("/").some((part) => part === "." || part === "..") && !s.includes("//");
 }
 function isHostPath(s) {
-  return (s.startsWith("/") || s === "~" || s.startsWith("~/") ||
+  return typeof s === "string" && (s.startsWith("/") || s === "~" || s.startsWith("~/") ||
     s === "$HOME" || s.startsWith("$HOME/") ||
     s === "${HOME}" || s.startsWith("${HOME}/")) && !hasControls(s);
 }
@@ -144,6 +144,7 @@ export function validateProfile(input) {
   if (p.gpu !== "none") warnings.push("GPU device access exposes real host hardware interfaces and increases sandbox privileges.");
   if (p.cudaToolkit && p.gpu !== "nvidia") warnings.push("CUDA toolkit access does not itself grant NVIDIA GPU device access.");
   if (p.wayland) warnings.push("Wayland socket access permits interaction with the desktop session, not merely GPU compute.");
+  if (!p.clearenv) warnings.push("Inherited host environment variables may expose credentials and private settings.");
   if (p.mounts.length === 0) warnings.push("No host folders are shared. /workspace exists but is temporary.");
   if (p.mounts.some((m) => m.access === "rw")) warnings.push("Read/write mounts can change or delete real host files, including their contents.");
   return {profile: p, errors, warnings};
@@ -264,6 +265,10 @@ export function buildLauncher(input) {
     "  fi",
     "}",
     "",
+    "# Prepare the sandbox paths before user mounts are applied.",
+    "bwrap_args+=(--dir " + shellQuote(p.home) + ")",
+    "bwrap_args+=(--dir " + shellQuote(p.workdir) + ")",
+    "",
     "# Your mounts, ordered parent-first so child overrides work correctly."
   );
   for (const m of p.mounts) {
@@ -333,8 +338,6 @@ export function buildLauncher(input) {
   }
   for (const e of p.env) lines.push("bwrap_args+=(--setenv " + shellQuote(e.name) + " " + shellQuote(e.value) + ")");
   lines.push(
-    "bwrap_args+=(--dir " + shellQuote(p.home) + ")",
-    "bwrap_args+=(--dir " + shellQuote(p.workdir) + ")",
     "bwrap_args+=(--chdir " + shellQuote(p.workdir) + ")",
     "",
     "# Pass an optional command to the launcher; otherwise open an interactive shell.",
