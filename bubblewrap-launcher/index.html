@@ -120,6 +120,7 @@
           <label class="toggle"><input id="ipc" type="checkbox"><span><strong>Separate IPC namespace</strong><small>Isolate System V shared memory and message queues.</small></span></label>
           <label class="toggle"><input id="uts" type="checkbox"><span><strong>Separate UTS namespace</strong><small>Isolate hostname-related settings.</small></span></label>
           <label class="toggle"><input id="clearenv" type="checkbox"><span><strong>Clear inherited environment</strong><small>Prevents accidentally exposing environment variables and host credentials.</small></span></label>
+          <label class="toggle"><input id="privateIdentity" type="checkbox"><span><strong>Use private sandbox identity files</strong><small>Create minimal read-only <code>/etc/passwd</code>, <code>/etc/group</code>, and <code>/etc/hosts</code> using your current username, UID/GID, and sandbox HOME. The host versions stay hidden. Generated in memory: no files written to your real filesystem.</small></span></label>
           <div class="section-head"><h3>Additional environment variables</h3><button id="addEnv" type="button" class="secondary compact">+ Add variable</button></div>
           <div id="envList" class="stack"></div>
           <p class="hint">Environment values are embedded directly into the launcher. Don't save tokens, passwords, or private keys here.</p>
