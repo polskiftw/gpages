@@ -488,3 +488,30 @@ test("private identity file HOME and shell match profile customization", () => {
   assert.match(script, /'\/home\/sandbox' '\/usr\/bin\/sh'/);
   assert.match(script, /--ro-bind-data "\$sandbox_passwd_fd" \/etc\/passwd/);
 });
+
+
+test("private passwd/group/hosts use standard readable 0644 modes", () => {
+  const p = makePreset("bridge");
+  const {script} = buildLauncher(p);
+  syntax(script);
+  for (const [fd, file] of [
+    ["sandbox_passwd_fd", "passwd"],
+    ["sandbox_group_fd", "group"],
+    ["sandbox_hosts_fd", "hosts"]
+  ]) {
+    assert.match(script, new RegExp('bwrap_args\\+=\\(--perms 0644 --ro-bind-data "\\$' + fd + '" /etc/' + file + '\\)'));
+  }
+  assert.doesNotMatch(script, /--ro-bind \/etc\/passwd \/etc\/passwd/);
+  assert.doesNotMatch(script, /--ro-bind \/etc\/group \/etc\/group/);
+  assert.doesNotMatch(script, /--ro-bind \/etc\/hosts \/etc\/hosts/);
+});
+
+test("CUDA compiler discovery ignores installations without nvcc and exports CUDACXX", () => {
+  const p = makePreset("minecraft");
+  const {script} = buildLauncher(p);
+  syntax(script);
+  assert.match(script, /if \[\[ -x "\$candidate\/bin\/nvcc" \]\]; then/);
+  assert.match(script, /--setenv CUDA_HOME "\$cuda_root" --setenv CUDA_PATH "\$cuda_root" --setenv CUDACXX "\$cuda_root\/bin\/nvcc"/);
+  assert.match(script, /no executable nvcc found under/);
+  assert.doesNotMatch(script, /if \[\[ -d "\$candidate" \]\]; then/);
+});
