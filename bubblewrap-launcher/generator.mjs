@@ -463,7 +463,7 @@ export function buildLauncher(input) {
     : (p.runtime === "selected" ? "/usr/bin/sh -i" : "/bin/sh -i");
   if (p.launchMode === "mcp") {
     const testShell = p.runtime === "selected" ? "/usr/bin/bash" : "/bin/bash";
-    const testScript = 'cd /opt/mcp; test -r server.py; /opt/mcp/.venv/bin/python -c \'import server; print("PASS: MCP server imports")\'; echo "PASS: MCP sandbox starts in $PWD (HOME=$HOME)"';
+    const testScript = 'test -r /opt/mcp/server.py; (cd /opt/mcp && /opt/mcp/.venv/bin/python -c \'import server; print("PASS: MCP server imports")\'); echo "PASS: sandbox working directory: $PWD (HOME=$HOME)"';
     lines.push(
       "# No arguments starts the MCP server over stdio, as the existing bridge expects.",
       "case \"@@{1:-}\" in",
