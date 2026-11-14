@@ -265,9 +265,9 @@ export function buildLauncher(input) {
       "exec {sandbox_passwd_fd}< <(printf '%s:x:%s:%s:Sandbox User:%s:%s\\n' \"$sandbox_user\" \"$sandbox_uid\" \"$sandbox_gid\" " + shellQuote(p.home) + " " + shellQuote(loginShell) + ")",
       "exec {sandbox_group_fd}< <(printf '%s:x:%s:\\n' \"$sandbox_group\" \"$sandbox_gid\")",
       "exec {sandbox_hosts_fd}< <(printf '127.0.0.1 localhost\\n::1 localhost\\n')",
-      "bwrap_args+=(--ro-bind-data \"$sandbox_passwd_fd\" /etc/passwd)",
-      "bwrap_args+=(--ro-bind-data \"$sandbox_group_fd\" /etc/group)",
-      "bwrap_args+=(--ro-bind-data \"$sandbox_hosts_fd\" /etc/hosts)",
+      "bwrap_args+=(--perms 0644 --ro-bind-data \"$sandbox_passwd_fd\" /etc/passwd)",
+      "bwrap_args+=(--perms 0644 --ro-bind-data \"$sandbox_group_fd\" /etc/group)",
+      "bwrap_args+=(--perms 0644 --ro-bind-data \"$sandbox_hosts_fd\" /etc/hosts)",
       ""
     );
   }
@@ -371,7 +371,7 @@ export function buildLauncher(input) {
       "cuda_root=''",
       "cuda_real=''",
       "for candidate in /opt/cuda /usr/local/cuda /opt/cuda-* /usr/local/cuda-*; do",
-      "  if [[ -d \"$candidate\" ]]; then",
+      "  if [[ -x \"$candidate/bin/nvcc\" ]]; then",
       "    cuda_root=\"$candidate\"",
       "    cuda_real=\"$(readlink -e -- \"$candidate\")\"",
       "    break",
@@ -391,7 +391,7 @@ export function buildLauncher(input) {
       "    esac",
       "  fi",
       "else",
-      "  echo 'Warning: CUDA toolkit not found under /opt/cuda* or /usr/local/cuda*.' >&2",
+      "  echo 'Warning: no executable nvcc found under /opt/cuda* or /usr/local/cuda*.' >&2",
       "fi"
     );
   }
@@ -440,7 +440,7 @@ export function buildLauncher(input) {
     lines.push(
       "if [[ -n \"$cuda_root\" ]]; then",
       "  sandbox_path=\"$cuda_root/bin:$sandbox_path\"",
-      "  bwrap_args+=(--setenv CUDA_HOME \"$cuda_root\" --setenv CUDA_PATH \"$cuda_root\")",
+      "  bwrap_args+=(--setenv CUDA_HOME \"$cuda_root\" --setenv CUDA_PATH \"$cuda_root\" --setenv CUDACXX \"$cuda_root/bin/nvcc\")",
       "  cuda_libs=''",
       "  for subdir in lib64 targets/x86_64-linux/lib lib; do",
       "    if [[ -d \"$cuda_root/$subdir\" ]]; then",
