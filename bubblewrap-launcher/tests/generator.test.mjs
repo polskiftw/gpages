@@ -422,7 +422,7 @@ test("MCP server mount cannot be overridden by another user mount", () => {
   p.mounts.push({source: "/tmp/other", target: "/opt/mcp", access: "rw"});
   assert.ok(validateProfile(p).errors.some((x) => x.includes("/opt/mcp is reserved")));
   assert.throws(() => buildLauncher(p));
-  p.mounts[1].target = "/opt";
+  p.mounts[0].target = "/opt";
   assert.ok(validateProfile(p).errors.some((x) => x.includes("/opt/mcp is reserved")));
 });
 
