@@ -41,6 +41,24 @@ test("all presets emit syntactically valid Bash", () => {
     assert.doesNotMatch(script, /\beval\b/);
   }
 });
+test("bridge preset keeps its MCP server outside writable workspace mounts", () => {
+  const p = makePreset("bridge");
+  assert.deepEqual(p.mounts, []);
+  const {script} = buildLauncher(p);
+  assert.match(script, /--ro-bind "\$mcp_server_dir" \/opt\/mcp/);
+  assert.doesNotMatch(script, /add_mount '\$HOME\/Documents\/gentoo-shell-mcp' '\/workspace' 'rw'/);
+});
+
+test("legacy profiles that expose the MCP server read/write show a targeted warning", () => {
+  const p = makePreset("bridge");
+  p.mounts = [{source: "~/Documents/gentoo-shell-mcp/", target: "/workspace", access: "rw"}];
+  const {warnings, errors} = validateProfile(p);
+  assert.deepEqual(errors, []);
+  assert.ok(warnings.some((w) => w.includes("writable access to the MCP server host directory")));
+  p.mounts[0].source = "$HOME/Documents/project";
+  assert.equal(validateProfile(p).warnings.some((w) => w.includes("writable access to the MCP server host directory")), false);
+});
+
 test("no network and no broad host home mounts by default", () => {
   const {script, warnings} = buildLauncher(makePreset("empty"));
   assert.match(script, /--unshare-net/);
@@ -138,6 +156,21 @@ test("environment names are checked and values quoted", () => {
   assert.match(script, /--setenv 'MY_FLAG'/);
   syntax(script);
   assert.ok(validateProfile(make({env: [{name: "BAD NAME", value: "x"}]})).errors.length);
+});
+
+test("all profile controls have shared render and input-event bindings", () => {
+  const app = readFileSync(new URL("../app.mjs", import.meta.url), "utf8");
+  const block = app.match(/const PROFILE_FIELDS = \[([\s\S]*?)\];/);
+  assert.ok(block, "Missing shared profile binding list");
+  const fields = [...block[1].matchAll(/\["([^"]+)", "([^"]+)"\]/g)];
+  const ids = fields.map((match) => match[1]);
+  assert.equal(ids.length, new Set(ids).size, "Duplicate bound field");
+  for (const required of ["launchMode", "mcpHostDir"]) {
+    assert.ok(ids.includes(required), "Missing UI event binding for " + required);
+  }
+  assert.equal((app.match(/for \(const \[id, key\] of PROFILE_FIELDS\)/g) || []).length, 2,
+    "Rendering and event handling must use the same binding list");
+  assert.match(app, /el\.addEventListener\(el\.type === "checkbox"/);
 });
 
 test("every statically referenced browser control exists in the HTML", () => {
@@ -389,7 +422,7 @@ test("MCP server mount cannot be overridden by another user mount", () => {
   p.mounts.push({source: "/tmp/other", target: "/opt/mcp", access: "rw"});
   assert.ok(validateProfile(p).errors.some((x) => x.includes("/opt/mcp is reserved")));
   assert.throws(() => buildLauncher(p));
-  p.mounts[1].target = "/opt";
+  p.mounts[0].target = "/opt";
   assert.ok(validateProfile(p).errors.some((x) => x.includes("/opt/mcp is reserved")));
 });
 
