@@ -39,9 +39,8 @@ export function makePreset(id = "empty") {
     p.home = "/workspace";
     p.name = "Gentoo shell bridge";
     p.network = true;
-    p.mounts = [
-      {source: "$HOME/Documents/gentoo-shell-mcp", target: "/workspace", access: "rw", optional: false}
-    ];
+    // Do not expose the MCP server as a writable workspace.
+    // Users add a separate project mount if they need persistent storage.
     p.tools = [...TOOL_GROUPS.basic, ...TOOL_GROUPS.development, "python3", "node"];
   } else if (id === "minecraft") {
     p.home = "/workspace";
@@ -70,6 +69,10 @@ export function makePreset(id = "empty") {
 
 const hasControls = (s) => /[\x00-\x1f\x7f]/.test(s);
 const cleanPath = (s) => s === "/" ? s : s.replace(/\/+$/, "");
+// Compare common HOME spellings without executing shell expansion.
+const comparableHostPath = (path) => cleanPath(String(path || "")
+  .replace(/^~(?=\/|$)/, "$HOME")
+  .replace(/^\$\{HOME\}(?=\/|$)/, "$HOME"));
 function isTargetPath(s) {
   return typeof s === "string" && s.startsWith("/") && !hasControls(s) &&
     !s.split("/").some((part) => part === "." || part === "..") && !s.includes("//");
@@ -152,6 +155,16 @@ export function validateProfile(input) {
     return e;
   });
 
+  if (p.launchMode === "mcp") {
+    const mcpSource = comparableHostPath(p.mcpHostDir);
+    for (const m of p.mounts) {
+      if (m.access !== "rw" || !isHostPath(m.source)) continue;
+      const writableSource = comparableHostPath(m.source);
+      if (writableSource === "/" || mcpSource === writableSource || mcpSource.startsWith(writableSource + "/")) {
+        warnings.push("Read/write mount at " + m.target + " grants writable access to the MCP server host directory despite its read-only /opt/mcp mount. Use a separate project workspace.");
+      }
+    }
+  }
   if (p.launchMode === "mcp" && p.runtime === "selected") warnings.push("MCP mode works best with the full host toolset; selected-tools mode may omit Python interpreter helpers or program dependencies.");
   if (p.runtime === "selected") warnings.push("Selected tools mode is best-effort, not a strict execution whitelist: interpreters, shared libraries, and scripts can still execute other code. Complex tools may need full runtime.");
   if (p.network) warnings.push("Network ON shares the host network namespace; it is not an outbound-only firewall.");
