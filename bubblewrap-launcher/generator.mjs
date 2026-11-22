@@ -85,6 +85,13 @@ function isHostPath(s) {
 const depth = (path) => path.split("/").filter(Boolean).length;
 const shellQuote = (s) => "'" + String(s).replace(/'/g, "'\\''") + "'";
 
+export function getSelectedTools(profile) {
+  return [...new Set([
+    ...(Array.isArray(profile.tools) ? profile.tools : []),
+    ...String(profile.extraTools || "").split(/[,\s]+/).filter(Boolean)
+  ])].sort();
+}
+
 export function validateProfile(input) {
   const errors = [];
   const warnings = [];
@@ -104,6 +111,7 @@ export function validateProfile(input) {
   if (!isTargetPath(p.home) || p.home === "/") errors.push("HOME must be an absolute sandbox path.");
   p.workdir = cleanPath(String(p.workdir || ""));
   p.home = cleanPath(String(p.home || ""));
+  if (p.privateIdentity && p.home.includes(":")) errors.push("HOME cannot contain a colon when private identity files are enabled: /etc/passwd uses colons to separate fields.");
   if (p.workdir === "/proc" || p.workdir === "/dev" || p.home === "/proc" || p.home === "/dev") errors.push("HOME and workdir cannot be /proc or /dev.");
   if (p.mounts.length > 150) errors.push("Too many mounts (maximum 150).");
 
@@ -119,7 +127,7 @@ export function validateProfile(input) {
     if (!isTargetPath(m.target)) errors.push("Mount " + (i + 1) + ": sandbox path must be absolute, without . or .. segments.");
     if (reserved.has(m.target)) errors.push("Mount " + (i + 1) + ": " + m.target + " is reserved for the sandbox runtime.");
     if (destinations.has(m.target)) errors.push("Mount " + (i + 1) + ": duplicate sandbox destination " + m.target + ".");
-    if (p.launchMode === "mcp" && (m.target === "/opt" || m.target === "/opt/mcp")) errors.push("Mount " + (i + 1) + ": /opt/mcp is reserved for the automatically mounted MCP server.");
+    if (p.launchMode === "mcp" && (m.target === "/opt" || m.target === "/opt/mcp" || m.target.startsWith("/opt/mcp/"))) errors.push("Mount " + (i + 1) + ": /opt/mcp is reserved for the automatically mounted MCP server, including its contents.");
     destinations.add(m.target);
     if (m.access !== "mask") {
       m.source = typeof m.source === "string" ? m.source : "";
@@ -142,7 +150,9 @@ export function validateProfile(input) {
       errors.push("Tool names must be simple command names (letters, numbers, +, -, _, .).");
     } else toolSet.add(tool);
   }
-  p.tools = [...toolSet].sort();
+  // Keep checkbox selections separate from the editable extra-tools text.
+  // Otherwise import/reload permanently adds extra commands to the selections.
+  p.tools = [...new Set(p.tools.filter((tool) => toolSet.has(tool)))].sort();
 
   const envKeys = new Set();
   p.env = p.env.map((raw, i) => {
@@ -177,7 +187,11 @@ export function validateProfile(input) {
   if (homeMount?.access === "ro") {
     warnings.push("HOME (" + p.home + ") is under a read-only mount (" + homeMount.target + "). Programs cannot create files directly in HOME; choose read/write for this mount or use a separate writable HOME.");
   }
-  if (p.mounts.length === 0) warnings.push("No host folders are shared. /workspace exists but is temporary.");
+  for (const m of p.mounts) {
+    const parent = p.mounts.filter((other) => m.target.startsWith(other.target + "/")).at(-1);
+    if (parent?.access === "ro") warnings.push("Mount at " + m.target + " is inside read-only mount " + parent.target + ". Its destination must already exist in the parent source; the launcher checks this without creating host files.");
+  }
+  if (p.mounts.length === 0) warnings.push("No project folders are shared. /workspace exists but is temporary." + (p.launchMode === "mcp" ? " The MCP server is still mounted read-only at /opt/mcp." : ""));
   if (p.mounts.some((m) => m.access === "rw")) warnings.push("Read/write mounts can change or delete real host files, including their contents.");
   return {profile: p, errors, warnings};
 }
@@ -193,7 +207,7 @@ export function buildLauncher(input) {
     "set -Eeuo pipefail",
     "",
     "command -v bwrap >/dev/null 2>&1 || { echo 'Error: install bubblewrap (bwrap) first.' >&2; exit 1; }",
-    ": \"@@{HOME:?HOME must be set on the host}\"",
+    ": \"${HOME:?HOME must be set on the host}\"",
     "",
     "bwrap_args=(",
     "  --die-with-parent",
@@ -256,7 +270,7 @@ export function buildLauncher(input) {
       "mount_tool sh",
       "mount_tool env"
     );
-    for (const tool of p.tools.filter((t) => !["bash", "sh", "env"].includes(t))) {
+    for (const tool of getSelectedTools(p).filter((t) => !["bash", "sh", "env"].includes(t))) {
       lines.push("mount_tool " + shellQuote(tool));
     }
   }
@@ -302,19 +316,64 @@ export function buildLauncher(input) {
     "  local path=\"$1\"",
     "  case \"$path\" in",
     "    '~') printf '%s' \"$HOME\" ;;",
-    "    '~/'*) printf '%s/%s' \"$HOME\" \"@@{path:2}\" ;;",
+    "    '~/'*) printf '%s/%s' \"$HOME\" \"${path:2}\" ;;",
     "    '$HOME') printf '%s' \"$HOME\" ;;",
-    "    '$HOME/'*) printf '%s/%s' \"$HOME\" \"@@{path:6}\" ;;",
-    "    '@@{HOME}') printf '%s' \"$HOME\" ;;",
-    "    '@@{HOME}/'*) printf '%s/%s' \"$HOME\" \"@@{path:8}\" ;;",
+    "    '$HOME/'*) printf '%s/%s' \"$HOME\" \"${path:6}\" ;;",
+    "    '${HOME}') printf '%s' \"$HOME\" ;;",
+    "    '${HOME}/'*) printf '%s/%s' \"$HOME\" \"${path:8}\" ;;",
     "    /*) printf '%s' \"$path\" ;;",
     "    *) echo \"Invalid host path: $path\" >&2; return 1 ;;",
     "  esac",
     "}",
+    "# Remember successful custom mounts; skipped optional mounts must not become parents.",
+    "mount_sources=()",
+    "mount_targets=()",
+    "mount_access=()",
+    "record_mount() {",
+    "  mount_sources+=(\"$1\"); mount_targets+=(\"$2\"); mount_access+=(\"$3\")",
+    "}",
+    "check_mountpoint() {",
+    "  local target=\"$1\" kind=\"$2\" i parent source access destination suffix component",
+    "  local -a components",
+    "  for ((i=${#mount_targets[@]}-1; i>=0; i--)); do",
+    "    parent=\"${mount_targets[i]}\"",
+    "    [[ \"$target\" == \"$parent\" || \"$target\" == \"$parent/\"* ]] || continue",
+    "    source=\"${mount_sources[i]}\"; access=\"${mount_access[i]}\"",
+    "    # A mask replaces its parent with a writable, temporary directory.",
+    "    [[ \"$access\" != mask ]] || return 0",
+    "    suffix=\"${target#\"$parent\"}\"",
+    "    destination=\"$source\"",
+    "    IFS=/ read -r -a components <<< \"$suffix\"",
+    "    for component in \"${components[@]}\"; do",
+    "      [[ -n \"$component\" ]] || continue",
+    "      destination+=\"/$component\"",
+    "      # Destination symlinks resolve inside the sandbox, not on the host.",
+    "      # Leave these layouts to bwrap rather than reject a valid sandbox path.",
+    "      [[ ! -L \"$destination\" ]] || return 0",
+    "    done",
+    "    if [[ ! -e \"$destination\" && \"$access\" == ro ]]; then",
+    "      printf 'Error: destination %s is missing under read-only mount %s.\\n' \"$target\" \"$parent\" >&2",
+    "      if [[ \"$kind\" == dir ]]; then",
+    "        printf 'Create an empty directory at this host path before launching: %s\\n' \"$destination\" >&2",
+    "      else",
+    "        printf 'Create an empty file at this host path before launching: %s\\n' \"$destination\" >&2",
+    "      fi",
+    "      echo 'Alternatively, choose a destination outside the read-only mount.' >&2",
+    "      exit 1",
+    "    fi",
+    "    if [[ -e \"$destination\" ]]; then",
+    "      if [[ \"$kind\" == dir && ! -d \"$destination\" ]] || [[ \"$kind\" == file && -d \"$destination\" ]]; then",
+    "        printf 'Error: destination %s has the wrong file type in host path %s.\\n' \"$target\" \"$destination\" >&2",
+    "        exit 1",
+    "      fi",
+    "    fi",
+    "    return 0",
+    "  done",
+    "}",
     "add_mount() {",
-    "  local source target access optional",
+    "  local source target access optional kind=file",
     "  source=\"$(expand_host_path \"$1\")\"; target=\"$2\"; access=\"$3\"; optional=\"$4\"",
-    "  if [[ ! -e \"$source\" && ! -L \"$source\" ]]; then",
+    "  if [[ ! -e \"$source\" ]]; then",
     "    if [[ \"$optional\" == 1 ]]; then",
     "      printf 'Skipping optional missing path: %s\\n' \"$source\" >&2",
     "      return 0",
@@ -322,24 +381,58 @@ export function buildLauncher(input) {
     "    printf 'Error: required host path does not exist: %s\\n' \"$source\" >&2",
     "    exit 1",
     "  fi",
+    "  [[ ! -d \"$source\" ]] || kind=dir",
+    "  check_mountpoint \"$target\" \"$kind\"",
     "  if [[ \"$access\" == rw ]]; then",
     "    bwrap_args+=(--bind \"$source\" \"$target\")",
     "  else",
     "    bwrap_args+=(--ro-bind \"$source\" \"$target\")",
     "  fi",
+    "  record_mount \"$source\" \"$target\" \"$access\"",
     "}",
-    "",
-    "# Prepare each sandbox directory once, before applying user mounts."
+    "add_mask() {",
+    "  check_mountpoint \"$1\" dir",
+    "  bwrap_args+=(--tmpfs \"$1\")",
+    "  record_mount '' \"$1\" mask",
+    "}",
+    ""
   );
-  for (const dir of new Set(["/workspace", ...(p.launchMode === "mcp" || p.cudaToolkit ? ["/opt"] : []), ...(p.home.startsWith("/home/") || p.home === "/home" ? ["/home"] : []), p.home, p.workdir])) {
-    lines.push("bwrap_args+=(--dir " + shellQuote(dir) + ")");
+  if (p.wayland) {
+    lines.push(
+      "# Mount exactly one Wayland socket; never expose the entire host runtime directory.",
+      "uid=\"$(id -u)\"",
+      "host_runtime_dir=\"${XDG_RUNTIME_DIR:-/run/user/$uid}\"",
+      "host_wayland_socket=''",
+      "if [[ -n \"${WAYLAND_DISPLAY:-}\" ]]; then",
+      "  if [[ \"$WAYLAND_DISPLAY\" == /* ]]; then",
+      "    host_wayland_socket=\"$WAYLAND_DISPLAY\"",
+      "  else",
+      "    host_wayland_socket=\"$host_runtime_dir/$WAYLAND_DISPLAY\"",
+      "  fi",
+      "else",
+      "  # When the wrapper lacks WAYLAND_DISPLAY, use exactly one detected socket.",
+      "  for candidate in \"$host_runtime_dir\"/wayland-*; do",
+      "    [[ -S \"$candidate\" ]] || continue",
+      "    if [[ -n \"$host_wayland_socket\" ]]; then",
+      "      host_wayland_socket=''",
+      "      break",
+      "    fi",
+      "    host_wayland_socket=\"$candidate\"",
+      "  done",
+      "fi",
+      "if [[ -n \"$host_wayland_socket\" && -S \"$host_wayland_socket\" ]]; then",
+      "  # Initialize /run before explicit mounts so their contents remain visible.",
+      "  bwrap_args+=(--tmpfs /run)",
+      "  record_mount '' /run mask",
+      "fi"
+    );
   }
   lines.push(
     "",
     "# Your mounts, ordered parent-first so child overrides work correctly."
   );
   for (const m of p.mounts) {
-    if (m.access === "mask") lines.push("bwrap_args+=(--tmpfs " + shellQuote(m.target) + ") # empty temporary directory");
+    if (m.access === "mask") lines.push("add_mask " + shellQuote(m.target) + " # empty temporary directory");
     else lines.push("add_mount " + shellQuote(m.source) + " " + shellQuote(m.target) + " " + shellQuote(m.access) + " " + (m.optional ? "1" : "0"));
   }
   if (p.launchMode === "mcp") {
@@ -353,7 +446,8 @@ export function buildLauncher(input) {
       "  echo 'Install the existing Gentoo Shell MCP server and venv first.' >&2",
       "  exit 1",
       "fi",
-      "bwrap_args+=(--ro-bind \"$mcp_server_dir\" /opt/mcp)"
+      "bwrap_args+=(--ro-bind \"$mcp_server_dir\" /opt/mcp)",
+      "record_mount \"$mcp_server_dir\" /opt/mcp ro"
     );
   }
   lines.push("");
@@ -410,35 +504,22 @@ export function buildLauncher(input) {
   }
   if (p.wayland) {
     lines.push(
-      "# Mount exactly one Wayland socket; never expose the entire host runtime directory.",
-      "uid=\"$(id -u)\"",
-      "host_runtime_dir=\"@@{XDG_RUNTIME_DIR:-/run/user/$uid}\"",
-      "host_wayland_socket=''",
-      "if [[ -n \"@@{WAYLAND_DISPLAY:-}\" ]]; then",
-      "  if [[ \"$WAYLAND_DISPLAY\" == /* ]]; then",
-      "    host_wayland_socket=\"$WAYLAND_DISPLAY\"",
-      "  else",
-      "    host_wayland_socket=\"$host_runtime_dir/$WAYLAND_DISPLAY\"",
-      "  fi",
-      "else",
-      "  # When the wrapper lacks WAYLAND_DISPLAY, use exactly one detected socket.",
-      "  for candidate in \"$host_runtime_dir\"/wayland-*; do",
-      "    [[ -S \"$candidate\" ]] || continue",
-      "    if [[ -n \"$host_wayland_socket\" ]]; then",
-      "      host_wayland_socket=''",
-      "      break",
-      "    fi",
-      "    host_wayland_socket=\"$candidate\"",
-      "  done",
-      "fi",
       "if [[ -n \"$host_wayland_socket\" && -S \"$host_wayland_socket\" ]]; then",
-      "  bwrap_args+=(--tmpfs /run --dir /run/user --perms 0700 --dir \"/run/user/$uid\")",
+      "  check_mountpoint \"/run/user/$uid\" dir",
+      "  bwrap_args+=(--dir /run/user --perms 0700 --dir \"/run/user/$uid\")",
+      "  check_mountpoint \"/run/user/$uid/wayland-0\" file",
       "  bwrap_args+=(--bind \"$host_wayland_socket\" \"/run/user/$uid/wayland-0\")",
+      "  record_mount \"$host_wayland_socket\" \"/run/user/$uid/wayland-0\" rw",
       "  bwrap_args+=(--setenv XDG_RUNTIME_DIR \"/run/user/$uid\" --setenv WAYLAND_DISPLAY wayland-0 --setenv XDG_SESSION_TYPE wayland)",
       "else",
       "  echo 'Warning: no unambiguous Wayland session socket found; GPU compute still works.' >&2",
       "fi"
     );
+  }
+  lines.push("", "# Prepare HOME and workdir after mounts, so parent mounts cannot hide them.");
+  for (const dir of new Set(["/workspace", ...(p.launchMode === "mcp" || p.cudaToolkit ? ["/opt"] : []), ...(p.home.startsWith("/home/") || p.home === "/home" ? ["/home"] : []), p.home, p.workdir])) {
+    lines.push("check_mountpoint " + shellQuote(dir) + " dir");
+    lines.push("bwrap_args+=(--dir " + shellQuote(dir) + ")");
   }
   lines.push(
     "",
@@ -446,7 +527,7 @@ export function buildLauncher(input) {
     "# --clearenv is applied before any --setenv entries in this script.",
     "bwrap_args+=(--setenv HOME " + shellQuote(p.home) + ")",
     "bwrap_args+=(--setenv LANG 'C.UTF-8')",
-    "bwrap_args+=(--setenv TERM \"@@{TERM:-xterm-256color}\")",
+    "bwrap_args+=(--setenv TERM \"${TERM:-xterm-256color}\")",
     "sandbox_path='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'"
   );
   if (p.cudaToolkit) {
@@ -457,7 +538,7 @@ export function buildLauncher(input) {
       "  cuda_libs=''",
       "  for subdir in lib64 targets/x86_64-linux/lib lib; do",
       "    if [[ -d \"$cuda_root/$subdir\" ]]; then",
-      "      cuda_libs=\"@@{cuda_libs:+$cuda_libs:}$cuda_root/$subdir\"",
+      "      cuda_libs=\"${cuda_libs:+$cuda_libs:}$cuda_root/$subdir\"",
       "    fi",
       "  done",
       "  [[ -z \"$cuda_libs\" ]] || bwrap_args+=(--setenv LD_LIBRARY_PATH \"$cuda_libs\")",
@@ -479,7 +560,7 @@ export function buildLauncher(input) {
     const testScript = 'test -r /opt/mcp/server.py; (cd /opt/mcp && /opt/mcp/.venv/bin/python -c \'import server; print("PASS: MCP server imports")\'); echo "PASS: sandbox working directory: $PWD (HOME=$HOME)"';
     lines.push(
       "# No arguments starts the MCP server over stdio, as the existing bridge expects.",
-      "case \"@@{1:-}\" in",
+      "case \"${1:-}\" in",
       "  '') cmd=(/opt/mcp/.venv/bin/python /opt/mcp/server.py) ;;",
       "  --shell) cmd=(" + shellCommand + ") ;;",
       "  --test) cmd=(" + testShell + " -ec " + shellQuote(testScript) + ") ;;",
@@ -498,8 +579,8 @@ export function buildLauncher(input) {
     );
   }
   lines.push(
-    "exec bwrap \"@@{bwrap_args[@]}\" -- \"@@{cmd[@]}\"",
+    "exec bwrap \"${bwrap_args[@]}\" -- \"${cmd[@]}\"",
     ""
   );
-  return {script: lines.join("\n").replaceAll("@@{", "\${"), warnings};
+  return {script: lines.join("\n"), warnings};
 }

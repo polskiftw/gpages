@@ -1,4 +1,4 @@
-import {TOOL_GROUPS, makePreset, validateProfile, buildLauncher} from "./generator.mjs";
+import {TOOL_GROUPS, makePreset, validateProfile, buildLauncher, getSelectedTools} from "./generator.mjs";
 
 const $ = (id) => document.getElementById(id);
 const STORAGE_KEY = "gpages-bubblewrap-profile-v1";
@@ -58,7 +58,7 @@ function renderMounts() {
   if (!profile.mounts.length) {
     const empty = document.createElement("div");
     empty.className = "empty";
-    empty.textContent = "No host files are exposed yet. Use '+ Add mount' to share a folder.";
+    empty.textContent = "No custom mounts. Use '+ Add mount' to share a project folder.";
     list.append(empty);
     return;
   }
@@ -251,7 +251,7 @@ function update() {
     (profile.gpu === "nvidia" ? "NVIDIA + DRI" : profile.gpu === "dri" ? "DRI only" : "no GPU"),
     profile.launchMode === "mcp" ? "MCP server on startup" : "interactive shell on startup",
     profile.privateIdentity ? "private identity files" : "host identity files",
-    profile.runtime === "full" ? "full system tools" : new Set([...checked.tools, "bash", "sh", "env"]).size + " selected tools incl. shell essentials"
+    profile.runtime === "full" ? "full system tools" : new Set([...getSelectedTools(checked), "bash", "sh", "env"]).size + " selected tools incl. shell essentials"
   ].join(" · ");
   if (errors.length) {
     compiled = "";
