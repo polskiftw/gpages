@@ -218,13 +218,17 @@ integration("existing HOME and workdir under a read-only mount remain usable", (
   assert.equal(statSync(hostWork).mode, workMode);
 });
 
-integration("destination symlinks resolve against the sandbox instead of the host", (t) => {
+integration("relative destination symlinks resolve against the sandbox instead of the host", (t) => {
   const ctx = fixture(t);
   const source = ctx.directory("source");
   const output = ctx.directory("output");
   const child = ctx.directory("child");
   ctx.directory("output/mods");
-  symlinkSync("/bwrap-integration-output", path.join(source, "link"));
+  // Relative links also work with Bubblewrap 0.11; absolute destination links
+  // require its newer in-root resolver. This link is dangling on the host but
+  // resolves to the separately mounted output tree inside the sandbox.
+  symlinkSync("../bwrap-integration-output", path.join(source, "link"));
+  assert.equal(existsSync(path.join(source, "link")), false);
   writeFileSync(path.join(child, "mod.dat"), "patched");
   const result = launch({workdir: "/assets/link/mods", mounts: [
     {source, target: "/assets", access: "ro"},
@@ -234,7 +238,7 @@ integration("destination symlinks resolve against the sandbox instead of the hos
   succeeds(result);
   assert.equal(readFileSync(path.join(child, "save.dat"), "utf8"), "saved");
   assert.equal(existsSync(path.join(output, "mods", "save.dat")), false);
-  assert.equal(readlinkSync(path.join(source, "link")), "/bwrap-integration-output");
+  assert.equal(readlinkSync(path.join(source, "link")), "../bwrap-integration-output");
 });
 
 integration("a missing optional child is skipped before checking a read-only parent", (t) => {
