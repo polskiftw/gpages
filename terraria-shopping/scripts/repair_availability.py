@@ -19,6 +19,8 @@ import time
 import urllib.parse
 import urllib.request
 
+from wiki_response import validate_wiki_response
+
 API = "https://terraria.wiki.gg/api.php"
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 RECIPE_DATA = ROOT / "data.generated.js"
@@ -97,7 +99,7 @@ def request_json(params: dict[str, object], retries: int = 4) -> dict:
     for attempt in range(retries):
         try:
             with urllib.request.urlopen(req, timeout=60) as response:
-                return json.loads(response.read().decode("utf-8"))
+                return validate_wiki_response(json.loads(response.read().decode("utf-8")), params)
         except Exception as exc:
             last = exc
             if attempt + 1 < retries:
@@ -206,7 +208,7 @@ def query_sources(names: list[str], inputs_by_result: dict[str, set[str]]) -> di
             "format": "json",
             "formatversion": "2",
         })
-        plain = html_to_plain(str((payload.get("parse") or {}).get("text") or ""))
+        plain = html_to_plain(payload["parse"]["text"])
         for index, name in enumerate(batch):
             marker = f"TSFIX{index:02d}"
             match = re.search(rf"@@{marker}START@@(.*?)@@{marker}END@@", plain, flags=re.S)

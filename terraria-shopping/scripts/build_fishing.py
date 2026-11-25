@@ -27,6 +27,8 @@ import urllib.parse
 import urllib.request
 from collections import defaultdict, deque
 
+from wiki_response import validate_wiki_response
+
 API = "https://terraria.wiki.gg/api.php"
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 AVAILABILITY_DATA = ROOT / "availability.generated.js"
@@ -54,8 +56,8 @@ def request_json(params: dict[str, object], retries: int = 4) -> dict:
     for attempt in range(retries):
         try:
             with urllib.request.urlopen(req, timeout=45) as response:
-                return json.load(response)
-        except Exception as exc:  # pragma: no cover - network retry path
+                return validate_wiki_response(json.load(response), params)
+        except Exception as exc:
             last = exc
             if attempt + 1 < retries:
                 time.sleep(0.8 * (attempt + 1))
@@ -103,12 +105,12 @@ def fetch_fished_items() -> set[str]:
         if cont:
             params["cmcontinue"] = cont
         payload = request_json(params)
-        members = ((payload.get("query") or {}).get("categorymembers") or [])
+        members = payload["query"]["categorymembers"]
         for member in members:
-            name = clean_name(member.get("title"))
+            name = clean_name(member["title"])
             if name:
                 out.add(name)
-        cont = ((payload.get("continue") or {}).get("cmcontinue"))
+        cont = payload["continue"]["cmcontinue"] if "continue" in payload else None
         if not cont:
             break
     if not out:
@@ -129,13 +131,11 @@ def fetch_drop_edges() -> dict[str, set[str]]:
             "format": "json",
             "formatversion": 2,
         })
-        batch = payload.get("cargoquery") or []
-        if not isinstance(batch, list):
-            raise RuntimeError("Unexpected Drops Cargo response")
+        batch = payload["cargoquery"]
         if not batch:
             break
         for entry in batch:
-            title = entry.get("title") or {}
+            title = entry["title"]
             producer = clean_name(title.get("nameraw"))
             item = clean_name(title.get("item"))
             is_npc = cargo_bool(title.get("isfromnpc"))
