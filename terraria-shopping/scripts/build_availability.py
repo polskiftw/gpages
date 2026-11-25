@@ -24,6 +24,8 @@ import time
 import urllib.parse
 import urllib.request
 
+from wiki_response import validate_wiki_response
+
 API = "https://terraria.wiki.gg/api.php"
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 RECIPE_DATA = ROOT / "data.generated.js"
@@ -289,7 +291,7 @@ def request_json(params: dict[str, object], retries: int = 4, post: bool = False
     for attempt in range(retries):
         try:
             with urllib.request.urlopen(req, timeout=60) as response:
-                return json.loads(response.read().decode("utf-8"))
+                return validate_wiki_response(json.loads(response.read().decode("utf-8")), params)
         except Exception as exc:
             last = exc
             if attempt + 1 < retries:
@@ -317,13 +319,11 @@ def fetch_item_modes() -> dict[str, bool]:
             "action": "cargoquery", "tables": "Items", "fields": ITEM_FIELDS,
             "limit": PAGE_SIZE, "offset": offset, "format": "json", "formatversion": "2",
         })
-        batch = payload.get("cargoquery") or []
-        if not isinstance(batch, list):
-            raise RuntimeError("Unexpected Items Cargo response")
+        batch = payload["cargoquery"]
         if not batch:
             break
         for entry in batch:
-            title = entry.get("title") or {}
+            title = entry["title"]
             name = str(title.get("name") or "").strip()
             if name:
                 modes[name] = modes.get(name, False) or cargo_bool(title.get("hardmode"))
@@ -345,13 +345,11 @@ def fetch_drop_sources(wanted: set[str]) -> dict[str, str]:
             "action": "cargoquery", "tables": "Drops", "fields": "nameraw,item,isfromnpc",
             "limit": PAGE_SIZE, "offset": offset, "format": "json", "formatversion": "2",
         })
-        batch = payload.get("cargoquery") or []
-        if not isinstance(batch, list):
-            raise RuntimeError("Unexpected Drops Cargo response")
+        batch = payload["cargoquery"]
         if not batch:
             break
         for entry in batch:
-            title = entry.get("title") or {}
+            title = entry["title"]
             item = str(title.get("item") or "").strip()
             producer = str(title.get("nameraw") or "").strip()
             if item in wanted and producer:
@@ -459,7 +457,7 @@ def fetch_itemsource_sources(names: list[str], recipe_inputs_by_result: dict[str
             "title": "Terraria Shopping source audit", "text": "\n".join(chunks),
             "format": "json", "formatversion": "2",
         }, post=True)
-        rendered = str((payload.get("parse") or {}).get("text") or "")
+        rendered = payload["parse"]["text"]
         plain = html_to_plain(rendered)
         for index, name in enumerate(batch):
             marker = f"TSRC{index:02d}"

@@ -10,6 +10,8 @@ on:
       - terraria-full-catalog
     paths:
       - 'terraria-shopping/scripts/build_data.py'
+      - 'terraria-shopping/scripts/wiki_response.py'
+      - 'terraria-shopping/tests/test_wiki_refresh.py'
       - 'terraria-shopping/scripts/repair_recipe_revisions.py'
       - 'terraria-shopping/scripts/recipe_revision_rules.py'
       - 'terraria-shopping/scripts/build_availability.py'
@@ -38,6 +40,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Test Wiki refresh error handling
+        run: python terraria-shopping/tests/test_wiki_refresh.py
       - name: Build recipe graph
         run: python terraria-shopping/scripts/build_data.py
       - name: Resolve Desktop recipe revisions

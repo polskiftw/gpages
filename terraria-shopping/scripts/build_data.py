@@ -15,6 +15,8 @@ import time
 import urllib.parse
 import urllib.request
 
+from wiki_response import validate_wiki_response
+
 API = "https://terraria.wiki.gg/api.php"
 OUT = pathlib.Path(__file__).resolve().parents[1] / "data.generated.js"
 PAGE_SIZE = 500
@@ -61,8 +63,8 @@ def request_json(params: dict[str, object], retries: int = 4) -> dict:
                 if encoding == "gzip":
                     import gzip
                     raw = gzip.decompress(raw)
-                return json.loads(raw.decode("utf-8"))
-        except Exception as exc:  # pragma: no cover - network-only path
+                return validate_wiki_response(json.loads(raw.decode("utf-8")), params)
+        except Exception as exc:
             last = exc
             if attempt + 1 < retries:
                 time.sleep(2 ** attempt)
@@ -122,13 +124,11 @@ def fetch_recipes() -> list[dict[str, object]]:
                 "formatversion": "2",
             }
         )
-        batch = payload.get("cargoquery") or []
-        if not isinstance(batch, list):
-            raise RuntimeError("Unexpected Cargo response: cargoquery is not a list")
+        batch = payload["cargoquery"]
         if not batch:
             break
         for entry in batch:
-            title = entry.get("title") or {}
+            title = entry["title"]
             if str(title.get("legacy", "no")).lower() == "yes":
                 continue
             station = str(title.get("station") or "By hand").strip() or "By hand"

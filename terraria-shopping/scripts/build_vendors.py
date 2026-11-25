@@ -18,6 +18,8 @@ import time
 import urllib.parse
 import urllib.request
 
+from wiki_response import validate_wiki_response
+
 API = "https://terraria.wiki.gg/api.php"
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 AVAILABILITY_DATA = ROOT / "availability.generated.js"
@@ -54,8 +56,8 @@ def request_json(params: dict[str, object], retries: int = 4) -> dict:
     for attempt in range(retries):
         try:
             with urllib.request.urlopen(req, timeout=60) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except Exception as exc:  # pragma: no cover - network retry path
+                return validate_wiki_response(json.loads(response.read().decode("utf-8")), params)
+        except Exception as exc:
             last = exc
             if attempt + 1 < retries:
                 time.sleep(2 ** attempt)
@@ -166,7 +168,7 @@ def fetch_vendor_prices(candidates: dict[str, str]) -> dict[str, tuple[str, str]
             "title": "Terraria Shopping vendor audit", "text": "\n".join(chunks),
             "format": "json", "formatversion": "2",
         })
-        rendered = str((payload.get("parse") or {}).get("text") or "")
+        rendered = payload["parse"]["text"]
         plain = html_to_plain(rendered)
         for index, name in enumerate(batch):
             marker = f"TVND{index:02d}"

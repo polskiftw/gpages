@@ -75,13 +75,11 @@ def fetch_raw_cargo() -> list[dict[str, object]]:
             "format": "json",
             "formatversion": "2",
         })
-        batch = payload.get("cargoquery") or []
-        if not isinstance(batch, list):
-            raise RuntimeError("Unexpected Cargo response during audit")
+        batch = payload["cargoquery"]
         if not batch:
             break
         for entry in batch:
-            title = entry.get("title") or {}
+            title = entry["title"]
             recipe = raw_recipe(title)
             if recipe is None:
                 continue
