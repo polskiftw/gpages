@@ -63,7 +63,7 @@ test("no network and no broad host home mounts by default", () => {
   const {script, warnings} = buildLauncher(makePreset("empty"));
   assert.match(script, /--unshare-net/);
   assert.doesNotMatch(script, /add_mount '\$HOME'/);
-  assert.ok(warnings.some((w) => w.includes("No host folders")));
+  assert.ok(warnings.some((w) => w.includes("No project folders")));
 });
 test("network enabled means sharing the host network, not outbound-only", () => {
   const {script, warnings} = buildLauncher(make({network: true}));
@@ -78,7 +78,7 @@ test("read-only, read-write, masks and nested mount order are preserved", () => 
   ]});
   const {script} = buildLauncher(p);
   assert.ok(script.indexOf("add_mount '/tmp/base'") < script.indexOf("add_mount '/tmp/deep'"));
-  assert.ok(script.indexOf("add_mount '/tmp/deep'") < script.indexOf("bwrap_args+=(--tmpfs '/workspace/deep/private')"));
+  assert.ok(script.indexOf("add_mount '/tmp/deep'") < script.indexOf("add_mask '/workspace/deep/private'"));
   assert.match(script, /add_mount '\/tmp\/deep' '\/workspace\/deep' 'rw' 0/);
   syntax(script);
 });
@@ -197,13 +197,13 @@ test("shared HOME and working directory create one mountpoint, even when mounted
   const dirFlags = script.split("\n").filter((line) => line.includes("--dir") && line.includes("/workspace"));
   assert.deepEqual(dirFlags, ["bwrap_args+=(--dir '/workspace')"]);
   assert.match(script, /add_mount '~\/Documents\/ff9' '\/workspace' 'ro' 0/);
-  assert.ok(script.indexOf("--dir '/workspace'") < script.indexOf("add_mount '~/Documents/ff9'"));
+  assert.ok(script.indexOf("--dir '/workspace'") > script.indexOf("add_mount '~/Documents/ff9'"));
   assert.ok(warnings.some((warning) => warning.includes("HOME (/workspace)") && warning.includes("read-only mount")));
   assert.doesNotMatch(script, /if \[\[ 'full' == 'full' \]\]/);
   assert.doesNotMatch(script, /mount_tool\(\)/);
 });
 
-test("distinct HOME and workdir paths are emitted once and kept before mounts", () => {
+test("distinct HOME and workdir paths are emitted once after mounts", () => {
   const {script} = buildLauncher(make({
     home: "/home/sandbox",
     workdir: "/workspace/project",
@@ -213,7 +213,7 @@ test("distinct HOME and workdir paths are emitted once and kept before mounts", 
   const dirs = [...script.matchAll(/bwrap_args\+=\(--dir '([^']+)'\)/g)].map((x) => x[1]);
   assert.deepEqual(dirs, ["/workspace", "/home", "/home/sandbox", "/workspace/project"]);
   assert.equal(new Set(dirs).size, dirs.length);
-  assert.ok(script.indexOf("--dir '/workspace/project'") < script.indexOf("add_mount '/tmp/example'"));
+  assert.ok(script.indexOf("--dir '/workspace/project'") > script.indexOf("add_mount '/tmp/example'"));
 });
 
 test("selected-tool launcher excludes unused full-runtime branch", () => {
@@ -321,7 +321,10 @@ test("Wayland passthrough uses one private runtime socket, not an entire host /r
   syntax(script);
   assert.match(script, /host_runtime_dir="\$\{XDG_RUNTIME_DIR:-\/run\/user\/\$uid\}"/);
   assert.match(script, /for candidate in "\$host_runtime_dir"\/wayland-\*/);
-  assert.match(script, /--tmpfs \/run --dir \/run\/user --perms 0700 --dir/);
+  assert.match(script, /--tmpfs \/run/);
+  assert.match(script, /--dir \/run\/user --perms 0700 --dir/);
+  assert.ok(script.indexOf("--tmpfs /run") < script.indexOf("# Your mounts"));
+  assert.ok(script.indexOf('--bind "$host_wayland_socket"') > script.indexOf("# Your mounts"));
   assert.match(script, /--bind "\$host_wayland_socket" "\/run\/user\/\$uid\/wayland-0"/);
   assert.match(script, /--setenv WAYLAND_DISPLAY wayland-0/);
   assert.doesNotMatch(script, /--bind "\$XDG_RUNTIME_DIR" "\$XDG_RUNTIME_DIR"/);
@@ -341,7 +344,6 @@ test("MCP bridge preset matches existing start-gentoo-shell startup contract", (
     assert.match(script, /--shell\) cmd=\(/);
     assert.match(script, /--test\) cmd=\(/);
     assert.match(script, /--dir '\/opt'/);
-    assert.ok(script.indexOf("--dir '/opt'") < script.indexOf('--ro-bind "$mcp_server_dir" /opt/mcp'));
     assert.doesNotMatch(script, /cmd=\(\/bin\/bash --noprofile --norc -i\)\nfi/);
   }
 });

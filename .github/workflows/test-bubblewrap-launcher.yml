@@ -18,5 +18,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Test generated Bash and path handling
+      - name: Install Bubblewrap for real sandbox tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes bubblewrap python3
+      - name: Enable user namespaces on the ephemeral test runner
+        run: |
+          # Bubblewrap's own CI enables this on Ubuntu runners as well.
+          # This affects only the disposable runner, never generated launchers.
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+      - name: Test generated Bash, path handling, and real sandbox mounts
+        env:
+          BWRAP_INTEGRATION_REQUIRED: '1'
         run: node --test bubblewrap-launcher/tests/*.test.mjs
