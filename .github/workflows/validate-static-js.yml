@@ -32,3 +32,5 @@ jobs:
             exit 1
           fi
           echo "Static JavaScript syntax looks good."
+      - name: Test checklist storage
+        run: node --test terraria-shopping/tests/test_checklist_storage.js

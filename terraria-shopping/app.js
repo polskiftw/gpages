@@ -52,9 +52,14 @@ const projectNodes=graphReady?[...nodeMap.values()].filter(n=>n.endpoint):fallba
 const componentNodes=graphReady?[...nodeMap.values()]:fallbackNodes;
 const shoppingCache=new Map();
 
-let acquired={};
-try{acquired=JSON.parse(localStorage.getItem('terraria-shopping-progress-v2')||'{}')||{}}catch(_){acquired={}}
-if(!Object.keys(acquired).length){
+let acquired=null;
+try{
+  const saved=JSON.parse(localStorage.getItem('terraria-shopping-progress-v2')||'null');
+  if(saved&&typeof saved==='object'&&!Array.isArray(saved))acquired=saved;
+}catch(_){}
+// Even an empty v2 object is a saved checklist, not a migration trigger.
+if(acquired===null){
+  acquired={};
   try{const old=JSON.parse(localStorage.getItem('terraria-shopping-progress-v1')||'{}')||{};for(const [id,v] of Object.entries(old))if(v)acquired['legacy:'+id]=true}catch(_){}
 }
 let favorites=new Set();
