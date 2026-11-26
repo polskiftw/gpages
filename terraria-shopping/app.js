@@ -52,24 +52,31 @@ const projectNodes=graphReady?[...nodeMap.values()].filter(n=>n.endpoint):fallba
 const componentNodes=graphReady?[...nodeMap.values()]:fallbackNodes;
 const shoppingCache=new Map();
 
-let acquired=null;
-try{
-  const saved=JSON.parse(localStorage.getItem('terraria-shopping-progress-v2')||'null');
-  if(saved&&typeof saved==='object'&&!Array.isArray(saved))acquired=saved;
-}catch(_){}
+const progressKey='terraria-shopping-progress-v2', favoritesKey='terraria-shopping-favorites-v1';
+function readAcquired(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(progressKey)||'null');
+    if(saved&&typeof saved==='object'&&!Array.isArray(saved))return saved;
+  }catch(_){}
+  return null;
+}
+function readFavorites(){
+  try{const saved=JSON.parse(localStorage.getItem(favoritesKey)||'null');if(Array.isArray(saved))return new Set(saved.map(String))}catch(_){}
+  return null;
+}
+let acquired=readAcquired();
 // Even an empty v2 object is a saved checklist, not a migration trigger.
 if(acquired===null){
   acquired={};
   try{const old=JSON.parse(localStorage.getItem('terraria-shopping-progress-v1')||'{}')||{};for(const [id,v] of Object.entries(old))if(v)acquired['legacy:'+id]=true}catch(_){}
 }
-let favorites=new Set();
-try{const saved=JSON.parse(localStorage.getItem('terraria-shopping-favorites-v1')||'[]');if(Array.isArray(saved))favorites=new Set(saved.map(String))}catch(_){favorites=new Set()}
+let favorites=readFavorites()??new Set();
 const favoriteSortSnapshot=new Set(favorites);
-const saveFavorites=()=>localStorage.setItem('terraria-shopping-favorites-v1',JSON.stringify([...favorites]));
+const saveFavorites=()=>localStorage.setItem(favoritesKey,JSON.stringify([...favorites]));
 if(fishMode){try{fishMode.checked=localStorage.getItem('terraria-shopping-fish-mode-v1')==='1'}catch(_){}}
 let fishModeProgress=fishMode?.checked?{...acquired}:null;
 const fishModeEligibility=new Map();
-const save=()=>localStorage.setItem('terraria-shopping-progress-v2',JSON.stringify(acquired));
+const save=()=>localStorage.setItem(progressKey,JSON.stringify(acquired));
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const wikiName=name=>W+encodeURIComponent(String(name).replaceAll(' ','_'));
 const wikiItem=id=>W+(items[id]?.wiki||encodeURIComponent(String(items[id]?.name||id).replaceAll(' ','_')));
@@ -97,7 +104,8 @@ const hasFishingRoute=(name,info=null)=>!!info?.fish||!!fishingRouteFor(name,inf
 const keyFor=(name,explicitId=null)=>explicitId?'legacy:'+explicitId:(legacyExact(name)?'legacy:'+legacyExact(name):'gen:'+name);
 const isMissing=key=>!acquired[key];
 const checkedCount=()=>Object.values(acquired).filter(Boolean).length;
-function setAcquired(key,v){acquired[key]=!!v;if(!v)delete acquired[key];save();const open=new Set($$('details.project[open]').map(el=>el.dataset.name));render(open)}
+// Apply local edits to the latest saved state, not this tab's startup copy.
+function setAcquired(key,v){acquired=readAcquired()??acquired;acquired[key]=!!v;if(!v)delete acquired[key];save();const open=new Set($$('details.project[open]').map(el=>el.dataset.name));render(open)}
 function checkbox(key,label){return `<input class="check" type="checkbox" data-key="${esc(key)}" ${acquired[key]?'checked':''} aria-label="Mark ${esc(label)} acquired">`}
 function addQty(map,name,qty){map.set(name,(map.get(name)||0)+qty)}
 function mergeLeaves(into,from){for(const [name,qty] of from)addQty(into,name,qty)}
@@ -288,7 +296,10 @@ content.addEventListener('click',e=>{
   e.stopPropagation();
   const name=String(button.dataset.name||'');
   if(!name)return;
-  if(favorites.has(name))favorites.delete(name);else favorites.add(name);
+  // Use the clicked star's intent even when the saved set changed in another tab.
+  const remove=button.getAttribute('aria-pressed')==='true';
+  favorites=readFavorites()??favorites;
+  if(remove)favorites.delete(name);else favorites.add(name);
   try{saveFavorites()}catch(_){}
   const active=favorites.has(name);
   button.classList.toggle('active',active);

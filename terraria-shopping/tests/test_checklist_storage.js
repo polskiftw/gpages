@@ -38,9 +38,18 @@ function start(storage) {
   return {
     count: () => Number(nodes.get('#stats').innerHTML.match(/<strong>(\d+)<\/strong> checked/)[1]),
     reset: () => nodes.get('#resetChecks').emit('click'),
-    uncheck: key => nodes.get('#content').emit('change', {
-      target: {matches: selector => selector === '.check', checked: false, dataset: {key}},
+    check: (key, checked = true) => nodes.get('#content').emit('change', {
+      target: {matches: selector => selector === '.check', checked, dataset: {key}},
     }),
+    clickStar(name, pressed = false) {
+      const button = {
+        dataset: {name}, classList: {toggle() {}},
+        getAttribute: () => String(pressed), setAttribute() {},
+      };
+      nodes.get('#content').emit('click', {
+        target: {closest: () => button}, preventDefault() {}, stopPropagation() {},
+      });
+    },
   };
 }
 
@@ -79,8 +88,46 @@ test('unchecking the final migrated item survives reload', () => {
   const storage = new Map([[v1, legacy]]);
   const page = start(storage);
   assert.equal(page.count(), 1);
-  page.uncheck('legacy:compass');
+  page.check('legacy:compass', false);
   assert.equal(page.count(), 0);
   assert.equal(storage.get(v2), '{}');
   assert.equal(start(storage).count(), 0);
+});
+
+test('two already-open pages can acquire different items without losing progress', () => {
+  const storage = new Map();
+  const a = start(storage), b = start(storage);
+  a.check('gen:Compass');
+  b.check('gen:Demon Conch');
+  assert.equal(start(storage).count(), 2);
+});
+
+test('an edit in an older page cannot resurrect items cleared by Reset', () => {
+  const storage = new Map([[v1, legacy], [v2, '{"gen:Compass":true}']]);
+  const a = start(storage), b = start(storage);
+  a.reset();
+  b.check('gen:Demon Conch');
+  assert.deepEqual(JSON.parse(storage.get(v2)), {'gen:Demon Conch': true});
+  assert.equal(start(storage).count(), 1);
+});
+
+test('two already-open pages can uncheck different items without resurrecting either', () => {
+  const storage = new Map([[v2, '{"gen:Compass":true,"gen:Demon Conch":true}']]);
+  const a = start(storage), b = start(storage);
+  a.check('gen:Compass', false);
+  b.check('gen:Demon Conch', false);
+  assert.equal(storage.get(v2), '{}');
+  assert.equal(start(storage).count(), 0);
+});
+
+test('favorite edits across pages preserve other favorites and honor the rendered star', () => {
+  const storage = new Map();
+  const a = start(storage), b = start(storage);
+  a.clickStar('Shellphone');
+  b.clickStar('Ankh Shield');
+  assert.deepEqual(JSON.parse(storage.get(favorites)), ['Shellphone', 'Ankh Shield']);
+  b.clickStar('Shellphone'); // Its unpressed star requests an add, not a toggle of storage.
+  assert.deepEqual(JSON.parse(storage.get(favorites)), ['Shellphone', 'Ankh Shield']);
+  a.clickStar('Shellphone', true);
+  assert.deepEqual(JSON.parse(storage.get(favorites)), ['Ankh Shield']);
 });
