@@ -9,6 +9,8 @@ const generatedFishing=window.TERRARIA_GENERATED_FISHING||{};
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const search=$('#search'), sort=$('#sort'), missingOnly=$('#missingOnly'), fishMode=$('#fishMode'), content=$('#content'), stats=$('#stats'), status=$('#status'), clearSearch=$('#clearSearch');
 const PAGE=80;
+// Match straight or curly apostrophes and omitted punctuation without changing item names.
+const searchText=s=>s.toLowerCase().replace(/['’]/g,'');
 let view='projects', shown=PAGE;
 
 const recipes=Array.isArray(D.recipes)?D.recipes:[];
@@ -243,7 +245,7 @@ function buildProjectBody(name){
 function projectSearchBlob(name){
   const cp=curatedByName.get(name), rs=displayRecipes(name);const immediate=rs.flatMap(r=>r.i||[]).map(x=>x[0]);const stations=rs.map(r=>r.s||'');
   let enrich='';if(cp)enrich=[cp.group,cp.mode,cp.when,cp.note,...cp.items.flatMap(x=>{const i=items[x[0]]||{};return[i.name,i.source,i.fishSource,fishingRoute(i.name),i.type,i.note]})].join(' ');
-  return[name,...immediate,...stations,enrich].join(' ').toLowerCase();
+  return searchText([name,...immediate,...stations,enrich].join(' '));
 }
 function nodeSort(a,b){
   if(view==='projects'){
@@ -261,7 +263,7 @@ function projectCard(n){
   return`<details class="card project" data-name="${esc(n.name)}"><summary class="projectsummary"><div class="projecttop"><div><div class="projecttitle">${esc(n.name)}</div><div class="projectmeta">${fish}${remainders}</div></div><div class="projectactions">${favorite}<span class="chev">›</span></div></div></summary><div class="projectbody" data-loaded="0"><div class="loading">Opening shopping list…</div></div></details>`;
 }
 function renderCatalog(openNames=new Set()){
-  const base=view==='projects'?projectNodes:componentNodes;const q=search.value.trim().toLowerCase();let list=base;
+  const base=view==='projects'?projectNodes:componentNodes;const q=searchText(search.value.trim());let list=base;
   if(q)list=list.filter(n=>projectSearchBlob(n.name).includes(q));if(fishMode?.checked)list=list.filter(n=>hasMissingFishAtSnapshot(n.name));list=[...list].sort(nodeSort);
   const visible=list.slice(0,shown),label=view==='projects'?'Projects':'All craftable items';
   let html=`<div class="sectionhead"><h2>${label}</h2><span>${list.length} matches</span></div><div class="projectgrid">${visible.map(projectCard).join('')}</div>`;
@@ -270,9 +272,9 @@ function renderCatalog(openNames=new Set()){
   content.innerHTML=html;for(const d of $$('details.project'))if(openNames.has(d.dataset.name)){d.open=true;loadBody(d)}
   $('#showMore')?.addEventListener('click',()=>{const keepOpen=new Set($$('details.project[open]').map(el=>el.dataset.name));shown+=PAGE;render(keepOpen)});renderStats(list.length)
 }
-function sourceSearchText(id){const i=items[id],a=av(id),ps=curatedProjects.filter(p=>p.items.some(x=>x[0]===id)).map(p=>p.name).join(' ');return[i.name,i.fishSource||'',fishingRoute(i.name),i.source||'',i.type,a.mode,cleanWhen(a.when),a.source||'',i.note||'',ps].join(' ').toLowerCase()}
+function sourceSearchText(id){const i=items[id],a=av(id),ps=curatedProjects.filter(p=>p.items.some(x=>x[0]===id)).map(p=>p.name).join(' ');return searchText([i.name,i.fishSource||'',fishingRoute(i.name),i.source||'',i.type,a.mode,cleanWhen(a.when),a.source||'',i.note||'',ps].join(' '))}
 function renderSources(wantFish){
-  const q=search.value.trim().toLowerCase();let ids=Object.keys(items).filter(id=>hasFishingRoute(items[id].name,items[id])===wantFish);if(q)ids=ids.filter(id=>sourceSearchText(id).includes(q));if(missingOnly.checked)ids=ids.filter(id=>isMissing(keyFor(items[id].name,id)));
+  const q=searchText(search.value.trim());let ids=Object.keys(items).filter(id=>hasFishingRoute(items[id].name,items[id])===wantFish);if(q)ids=ids.filter(id=>sourceSearchText(id).includes(q));if(missingOnly.checked)ids=ids.filter(id=>isMissing(keyFor(items[id].name,id)));
   ids.sort((a,b)=>sort.value==='name'?items[a].name.localeCompare(items[b].name):av(a).rank-av(b).rank||items[a].name.localeCompare(items[b].name));
   const title=wantFish?'Ingredients with a fishing route':'Ingredients still needed on land';let html=`<div class="sectionhead"><h2>${title}</h2><span>${ids.length} items</span></div><div class="ingredientgrid">`;
   for(const id of ids){const i=items[id],key=keyFor(i.name,id),ps=curatedProjects.filter(p=>p.items.some(x=>x[0]===id));const src=wantFish?(fishingRouteFor(i.name,i)||i.source):i.source;html+=`<article class="card ingredient"><div class="row">${checkbox(key,i.name)}<div><div class="itemname">${esc(i.name)}</div><div class="itemmeta"><span class="pill">${esc(i.type)}</span>${avPills(id,wantFish)}</div><div class="source">${esc(src)}</div>${i.note?`<div class="note">${esc(i.note)}</div>`:''}<div class="tags">${ps.map(p=>`<span class="tag">${esc(p.name)}</span>`).join('')}</div></div><a class="wiki" href="${wikiItem(id)}" target="_blank" rel="noopener">Wiki ↗</a></div></article>`}
