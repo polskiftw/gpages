@@ -230,15 +230,15 @@ function entryAvPills(entry){
   return avObjectPills(a);
 }
 function shoppingRow(entry){
-  if(fishMode?.checked&&!entry.fishable)return'';
-  if(missingOnly.checked&&!isMissing(entry.key))return'';
   const meta=entryAvPills(entry);
   return`<div class="row">${checkbox(entry.key,entry.name)}<div><div class="itemname">${esc(entry.name)} ${entry.qty>1?`<span class="qty">×${entry.qty}</span>`:''}</div>${meta?`<div class="itemmeta">${meta}</div>`:''}</div><a class="wiki" href="${entry.id?wikiItem(entry.id):wikiName(entry.name)}" target="_blank" rel="noopener">Wiki ↗</a></div>`;
 }
 function buildProjectBody(name){
-  const summary=shoppingSummary(name), entries=fishMode?.checked?summary.entries.filter(e=>e.fishable):summary.entries;let rows='';
+  const summary=shoppingSummary(name);
+  const entries=summary.entries.filter(e=>(!fishMode?.checked||e.fishable)&&(!missingOnly.checked||isMissing(e.key)));
+  let rows='';
   for(const entry of entries)rows+=shoppingRow(entry);
-  if(!rows)rows=`<div class="empty">${fishMode?.checked?'All fishing-route items are checked.':'Everything in this shopping list is checked.'}</div>`;
+  if(!entries.length)rows=`<div class="empty">${fishMode?.checked?'All fishing-route items are checked.':'Everything in this shopping list is checked.'}</div>`;
   const label=fishMode?.checked?'Fishing list':'Shopping list';
   return`<div class="bodyhead">${label} • ${entries.length} unique item${entries.length===1?'':'s'}</div><div class="rows">${rows}</div>`+recipeOptionsHtml(name);
 }
@@ -313,7 +313,12 @@ content.addEventListener('click',e=>{
 content.addEventListener('change',e=>{if(e.target.matches('.check'))setAcquired(e.target.dataset.key,e.target.checked)});
 $$('.segments button').forEach(b=>b.addEventListener('click',()=>{view=b.dataset.view;shown=PAGE;render();scrollTo({top:0,behavior:'smooth'})}));
 search.addEventListener('input',()=>{shown=PAGE;render()});sort.addEventListener('change',()=>render());missingOnly.addEventListener('change',()=>render(new Set($$('details.project[open]').map(el=>el.dataset.name))));
-fishMode?.addEventListener('change',()=>{try{localStorage.setItem('terraria-shopping-fish-mode-v1',fishMode.checked?'1':'0')}catch(_){}resetFishModeSnapshot();shown=PAGE;render(new Set($$('details.project[open]').map(el=>el.dataset.name)))});
+fishMode?.addEventListener('change',()=>{
+  try{localStorage.setItem('terraria-shopping-fish-mode-v1',fishMode.checked?'1':'0')}catch(_){}
+  // A new snapshot should include saved checks from other tabs.
+  if(fishMode.checked)acquired=readAcquired()??acquired;
+  resetFishModeSnapshot();shown=PAGE;render(new Set($$('details.project[open]').map(el=>el.dataset.name)));
+});
 clearSearch.addEventListener('click',()=>{search.value='';search.focus();shown=PAGE;render()});
 $('#resetChecks').addEventListener('click',()=>{if(confirm('Clear every acquired checkmark?')){acquired={};save();resetFishModeSnapshot();render()}});
 const stamp=D.generatedAt?new Date(D.generatedAt).toLocaleString():null;$('#dataLine').textContent=graphReady?`Official Wiki recipe data • updated ${stamp}`:`Source data checked ${E.checked||'recently'} • full recipe data pending`;

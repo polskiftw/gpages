@@ -10,11 +10,11 @@ const app = readFileSync(join(__dirname, '..', 'app.js'), 'utf8');
 const v1 = 'terraria-shopping-progress-v1';
 const v2 = 'terraria-shopping-progress-v2';
 const favorites = 'terraria-shopping-favorites-v1';
+const fishMode = 'terraria-shopping-fish-mode-v1';
 const legacy = JSON.stringify({compass: true});
 
 function start(storage) {
-  // Run the real entry point and event listeners with a minimal DOM. No
-  // recipe data is needed to render the global checked count.
+  // Run the real entry point and event listeners with a minimal DOM.
   const nodes = new Map();
   const document = {
     querySelector(selector) {
@@ -34,10 +34,26 @@ function start(storage) {
     getItem: key => storage.get(key) ?? null,
     setItem: (key, value) => storage.set(key, value),
   };
-  runInNewContext(app, {window: {}, document, localStorage, confirm: () => true});
+  const window = {
+    TERRARIA_RECIPE_DATA: {
+      nodes: [['Test Project', 2, 1]],
+      recipes: [{r: 'Test Project', s: 'Work Bench', i: [['Radar', 1], ['Demon Conch', 1]]}],
+    },
+    TERRARIA_ENRICHMENT: {items: {
+      radar: {name: 'Radar', type: 'Loot', fish: true},
+      conch: {name: 'Demon Conch', type: 'Loot', fish: true},
+    }},
+  };
+  runInNewContext(app, {window, document, localStorage, confirm: () => true});
   return {
     count: () => Number(nodes.get('#stats').innerHTML.match(/<strong>(\d+)<\/strong> checked/)[1]),
     reset: () => nodes.get('#resetChecks').emit('click'),
+    setFishMode(enabled) {
+      const toggle = nodes.get('#fishMode');
+      toggle.checked = enabled;
+      toggle.emit('change');
+    },
+    projectHTML: () => nodes.get('#content').innerHTML,
     check: (key, checked = true) => nodes.get('#content').emit('change', {
       target: {matches: selector => selector === '.check', checked, dataset: {key}},
     }),
@@ -130,4 +146,41 @@ test('favorite edits across pages preserve other favorites and honor the rendere
   assert.deepEqual(JSON.parse(storage.get(favorites)), ['Shellphone', 'Ankh Shield']);
   a.clickStar('Shellphone', true);
   assert.deepEqual(JSON.parse(storage.get(favorites)), ['Ankh Shield']);
+});
+
+test('re-enabling Fish Mode snapshots saved checks from another open page without writing progress', () => {
+  const storage = new Map();
+  const a = start(storage), b = start(storage);
+  a.check('legacy:radar');
+  a.check('legacy:conch');
+  const complete = storage.get(v2);
+  b.setFishMode(true);
+  assert.doesNotMatch(b.projectHTML(), /data-name="Test Project"/);
+  assert.equal(storage.get(v2), complete);
+  assert.equal(storage.get(fishMode), '1');
+
+  a.check('legacy:conch', false);
+  const partial = storage.get(v2);
+  b.setFishMode(false);
+  b.setFishMode(true);
+  assert.match(b.projectHTML(), /1\/2 FISHABLE/);
+  assert.equal(storage.get(v2), partial);
+  b.check('legacy:conch');
+  assert.match(b.projectHTML(), /2\/2 FISHABLE/);
+});
+
+test('enabling Fish Mode honors an explicit reset and falls back on invalid saved checks', () => {
+  const storage = new Map([[v2, '{"legacy:radar":true,"legacy:conch":true}']]);
+  const a = start(storage), b = start(storage);
+  a.reset();
+  b.setFishMode(true);
+  assert.match(b.projectHTML(), /0\/2 FISHABLE/);
+  assert.equal(storage.get(v2), '{}');
+
+  b.check('legacy:radar');
+  storage.set(v2, '{invalid');
+  b.setFishMode(false);
+  b.setFishMode(true);
+  assert.match(b.projectHTML(), /1\/2 FISHABLE/);
+  assert.equal(storage.get(v2), '{invalid');
 });
