@@ -36,3 +36,5 @@ jobs:
         run: node --test terraria-shopping/tests/test_checklist_storage.js
       - name: Test search matching
         run: node --test terraria-shopping/tests/test_search.js
+      - name: Test ingredient list counts
+        run: node --test terraria-shopping/tests/test_list_count.js
