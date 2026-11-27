@@ -13,7 +13,7 @@
 <main>
   <div class="topline"><a class="back" href="../">‹ gpages</a><span class="version">Bubblewrap · Linux · Client-side</span></div>
   <h1>Bubblewrap Launcher Generator</h1>
-  <p class="subtitle">Click together a sandbox and download a ready-to-edit <code>start-isolated.sh</code>. Choose which host folders it can see, what it can change, and whether it gets network, GPU, CUDA, or desktop access.</p>
+  <p class="subtitle">Click together a sandbox and download a ready-to-edit <code>start-isolated.sh</code>. Choose which host folders it can see, what it can change, and whether it gets network, GPU, CUDA, desktop, or audio access.</p>
 
   <section class="card intro">
     <strong>Everything happens in this browser tab.</strong> Nothing runs on GitHub Pages, and no paths are uploaded. The downloaded script will run locally on Linux with your own user privileges. <strong>Start with a preset, adjust the permissions, then inspect the script before running it.</strong>
@@ -94,7 +94,7 @@
       </section>
 
       <section class="card" aria-labelledby="gpuTitle">
-        <h2 id="gpuTitle">5. Graphics &amp; CUDA</h2>
+        <h2 id="gpuTitle">5. Graphics, CUDA &amp; audio</h2>
         <label class="field"><span>GPU hardware</span>
           <select id="gpu">
             <option value="none">No host GPU devices</option>
@@ -110,6 +110,15 @@
           <input id="wayland" type="checkbox">
           <span><strong>Allow Wayland desktop connection</strong><small>Optional desktop-session socket for GUI apps. Not needed for headless CUDA. Grants access to the graphical session.</small></span>
         </label>
+        <label class="field"><span>Audio access</span>
+          <select id="audio">
+            <option value="none">Disabled (no automatic audio access)</option>
+            <option value="pipewire">Native PipeWire</option>
+            <option value="pulse">PulseAudio compatibility (including pipewire-pulse)</option>
+            <option value="both">Both PipeWire and PulseAudio compatibility</option>
+          </select>
+        </label>
+        <p class="hint">Audio sockets are detected when the launcher runs. Independent of Wayland, GPU, and networking. Audio access may permit recording or control of the host audio session; a read-only socket mount does not mean playback-only.</p>
         <p class="hint">GPU access uses existing device nodes, not a second driver installation. The script discovers NVIDIA devices and CUDA paths <strong>when launched</strong>, so it can adapt to driver updates.</p>
       </section>
 

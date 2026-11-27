@@ -7,7 +7,7 @@ const PROFILE_FIELDS = [
   ["profileName", "name"], ["shell", "shell"], ["workdir", "workdir"],
   ["home", "home"], ["runtime", "runtime"], ["gpu", "gpu"], ["extraTools", "extraTools"],
   ["launchMode", "launchMode"], ["mcpHostDir", "mcpHostDir"],
-  ["network", "network"], ["cudaToolkit", "cudaToolkit"], ["wayland", "wayland"],
+  ["network", "network"], ["cudaToolkit", "cudaToolkit"], ["wayland", "wayland"], ["audio", "audio"],
   ["pid", "pid"], ["ipc", "ipc"], ["uts", "uts"], ["clearenv", "clearenv"],
   ["privateIdentity", "privateIdentity"]
 ];
@@ -249,6 +249,7 @@ function update() {
     profile.mounts.length + " mounts",
     profile.network ? "host network" : "network isolated",
     (profile.gpu === "nvidia" ? "NVIDIA + DRI" : profile.gpu === "dri" ? "DRI only" : "no GPU"),
+    ({none: "audio off", pipewire: "PipeWire audio", pulse: "PulseAudio-compatible audio", both: "PipeWire + PulseAudio audio"})[checked.audio] || "invalid audio mode",
     profile.launchMode === "mcp" ? "MCP server on startup" : "interactive shell on startup",
     profile.privateIdentity ? "private identity files" : "host identity files",
     profile.runtime === "full" ? "full system tools" : new Set([...checked.tools, "bash", "sh", "env"]).size + " selected tools incl. shell essentials"

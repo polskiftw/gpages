@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {test} from "node:test";
 import {mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync} from "node:fs";
 import {tmpdir} from "node:os";
+import {createServer} from "node:net";
 import path from "node:path";
 import {spawnSync} from "node:child_process";
 import {buildLauncher, makePreset, validateProfile} from "../generator.mjs";
@@ -13,7 +14,7 @@ function syntax(script) {
   const result = spawnSync("bash", ["-n"], {input: script, encoding: "utf8"});
   assert.equal(result.status, 0, result.stderr);
 }
-function runWithBwrapStub(profile, extraArgs = [], cwd = undefined) {
+function runWithBwrapStub(profile, extraArgs = [], cwd = undefined, env = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), "bwrap-generator-test-"));
   const bin = path.join(dir, "bin");
   mkdirSync(bin);
@@ -27,7 +28,7 @@ function runWithBwrapStub(profile, extraArgs = [], cwd = undefined) {
     run: () => spawnSync("bash", [scriptPath, ...extraArgs], {
       encoding: "utf8",
       cwd,
-      env: {...process.env, CAPTURE_FILE: capture, PATH: bin + ":/usr/local/bin:/usr/bin:/bin"}
+      env: {...process.env, ...env, CAPTURE_FILE: capture, PATH: bin + ":/usr/local/bin:/usr/bin:/bin"}
     }),
     clean: () => rmSync(dir, {recursive: true, force: true})
   };
@@ -165,7 +166,7 @@ test("all profile controls have shared render and input-event bindings", () => {
   const fields = [...block[1].matchAll(/\["([^"]+)", "([^"]+)"\]/g)];
   const ids = fields.map((match) => match[1]);
   assert.equal(ids.length, new Set(ids).size, "Duplicate bound field");
-  for (const required of ["launchMode", "mcpHostDir"]) {
+  for (const required of ["launchMode", "mcpHostDir", "audio"]) {
     assert.ok(ids.includes(required), "Missing UI event binding for " + required);
   }
   assert.equal((app.match(/for \(const \[id, key\] of PROFILE_FIELDS\)/g) || []).length, 2,
@@ -556,4 +557,136 @@ test("MCP smoke test imports from server folder without changing startup workdir
   assert.match(script, /\(cd \/opt\/mcp && \/opt\/mcp\/.venv\/bin\/python -c/);
   assert.match(script, /PASS: sandbox working directory: \$PWD \(HOME=\$HOME\)/);
   assert.doesNotMatch(script, /'cd \/opt\/mcp; test -r server\.py/);
+});
+
+
+test("audio is opt-in and legacy profiles remain unchanged", () => {
+  for (const name of ["empty", "bridge", "developer", "minecraft"]) {
+    const p = makePreset(name);
+    assert.equal(p.audio, "none");
+    const script = buildLauncher(p).script;
+    delete p.audio;
+    assert.equal(validateProfile(p).profile.audio, "none");
+    assert.equal(buildLauncher(p).script, script);
+    assert.doesNotMatch(script, /host_pipewire_socket|host_pulse_socket|PULSE_SERVER|session_args/);
+  }
+  assert.ok(validateProfile(make({audio: "bad"})).errors.length);
+});
+
+test("managed audio paths and environment cannot conflict with custom settings", () => {
+  for (const target of ["/run", "/run/user/1000", "/run/user/1000/pipewire-0"]) {
+    assert.ok(validateProfile(make({audio: "both", mounts: [{source: "/tmp/example", target, access: "ro"}]})).errors.some(e => e.includes("reserves /run")));
+  }
+  for (const key of ["home", "workdir"]) {
+    assert.ok(validateProfile(make({audio: "both", [key]: "/run/custom"})).errors.some(e => e.includes("reserves /run")));
+  }
+  for (const name of ["XDG_RUNTIME_DIR", "PIPEWIRE_RUNTIME_DIR", "PIPEWIRE_REMOTE", "PULSE_SERVER", "WAYLAND_DISPLAY", "XDG_SESSION_TYPE"]) {
+    assert.ok(validateProfile(make({audio: "both", wayland: true, env: [{name, value: "x"}]})).errors.some(e => e.includes("managed by session")));
+  }
+  assert.deepEqual(validateProfile(make({audio: "none", env: [{name: "PULSE_SERVER", value: "custom"}]})).errors, []);
+});
+
+async function withSessionSockets(names, fn) {
+  const dir = mkdtempSync(path.join(tmpdir(), "bw-audio-"));
+  const servers = [];
+  try {
+    for (const name of names) {
+      const socket = path.join(dir, name);
+      mkdirSync(path.dirname(socket), {recursive: true});
+      const server = createServer();
+      servers.push(server);
+      await new Promise((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(socket, resolve);
+      });
+    }
+    await fn(dir);
+  } finally {
+    await Promise.all(servers.map(server => new Promise(resolve => server.close(resolve))));
+    rmSync(dir, {recursive: true, force: true});
+  }
+}
+function inspectSession(profile, dir, overrides = {}) {
+  const ctx = runWithBwrapStub(profile, ["/bin/true"], undefined, {
+    XDG_RUNTIME_DIR: dir, WAYLAND_DISPLAY: "wayland-7", PIPEWIRE_RUNTIME_DIR: "",
+    PIPEWIRE_REMOTE: "", PULSE_SERVER: "", ...overrides
+  });
+  try {
+    const result = ctx.run();
+    assert.equal(result.status, 0, result.stderr);
+    return {args: readFileSync(ctx.capture, "utf8").trim().split("\n"), stderr: result.stderr};
+  } finally { ctx.clean(); }
+}
+function countArg(args, ...parts) {
+  return args.filter((arg, i) => parts.every((part, j) => args[i + j] === part)).length;
+}
+test("all audio and Wayland combinations mount exactly the selected sockets and share one runtime", async () => {
+  await withSessionSockets(["pipewire-0", "pulse/native", "wayland-7", "bus"], dir => {
+    const runtime = "/run/user/" + process.getuid();
+    for (const audio of ["none", "pipewire", "pulse", "both"]) {
+      for (const wayland of [false, true]) {
+        const profile = make({audio, wayland});
+        const {script, warnings} = buildLauncher(profile);
+        syntax(script);
+        const {args, stderr} = inspectSession(profile, dir);
+        const native = audio === "pipewire" || audio === "both";
+        const pulse = audio === "pulse" || audio === "both";
+        const session = native || pulse || wayland;
+        assert.equal(stderr, "");
+        assert.equal(countArg(args, "--tmpfs", "/run"), Number(session));
+        assert.equal(countArg(args, "--dir", "/run/user"), Number(session));
+        assert.equal(countArg(args, "--dir", runtime), Number(session));
+        assert.equal(countArg(args, "--setenv", "XDG_RUNTIME_DIR", runtime), Number(session));
+        assert.equal(countArg(args, "--ro-bind", dir + "/pipewire-0", runtime + "/pipewire-0"), Number(native));
+        assert.equal(countArg(args, "--ro-bind", dir + "/pulse/native", runtime + "/pulse/native"), Number(pulse));
+        assert.equal(countArg(args, "--dir", runtime + "/pulse"), Number(pulse));
+        assert.equal(countArg(args, "--setenv", "PULSE_SERVER", "unix:" + runtime + "/pulse/native"), Number(pulse));
+        assert.equal(countArg(args, "--bind", dir + "/wayland-7", runtime + "/wayland-0"), Number(wayland));
+        assert.equal(countArg(args, "--setenv", "WAYLAND_DISPLAY", "wayland-0"), Number(wayland));
+        assert.equal(countArg(args, "--unshare-net"), 1);
+        assert.equal(countArg(args, "--unshare-ipc"), 1);
+        assert.equal(countArg(args, "--clearenv"), 1);
+        assert.equal(args.includes(dir), false, "never mount the whole host runtime");
+        assert.equal(args.includes(dir + "/bus"), false);
+        assert.equal(args.includes("/dev/snd"), false);
+        const destinations = args.flatMap((arg, i) =>
+          ["--bind", "--ro-bind"].includes(arg) && args[i + 2]?.startsWith(runtime + "/") ? [args[i + 2]] : []);
+        assert.equal(destinations.length, Number(native) + Number(pulse) + Number(wayland));
+        assert.equal(new Set(destinations).size, destinations.length);
+        if (session) assert.ok(args.indexOf("/run") < args.indexOf("XDG_RUNTIME_DIR"));
+        assert.equal(warnings.some(w => w.includes("recording")), audio !== "none");
+        if (!native) assert.doesNotMatch(script, /host_pipewire_socket/);
+        if (!pulse) assert.doesNotMatch(script, /host_pulse_socket/);
+        if (!wayland) assert.doesNotMatch(script, /host_wayland_socket/);
+      }
+    }
+  });
+});
+test("missing audio sockets warn without hiding working Wayland or audio", async () => {
+  await withSessionSockets(["pipewire-0", "wayland-7"], dir => {
+    mkdirSync(path.join(dir, "pulse"));
+    writeFileSync(path.join(dir, "pulse/native"), "");
+    const {args, stderr} = inspectSession(make({audio: "both", wayland: true}), dir);
+    assert.match(stderr, /PulseAudio-compatible socket not found/);
+    assert.equal(countArg(args, "--tmpfs", "/run"), 1);
+    assert.ok(args.includes(dir + "/pipewire-0"));
+    assert.ok(args.includes(dir + "/wayland-7"));
+    assert.equal(args.includes(dir + "/pulse/native"), false);
+    assert.equal(countArg(args, "--setenv", "PULSE_SERVER"), 0);
+    const missing = inspectSession(make({audio: "pulse"}), dir);
+    assert.match(missing.stderr, /PulseAudio-compatible socket not found/);
+    assert.equal(countArg(missing.args, "--tmpfs", "/run"), 0);
+    assert.equal(countArg(missing.args, "--setenv", "XDG_RUNTIME_DIR"), 0);
+  });
+});
+test("native PipeWire supports runtime override and clears inherited client overrides", async () => {
+  await withSessionSockets(["pipewire-0"], dir => {
+    const {args} = inspectSession(make({audio: "pipewire", clearenv: false}), dir + "/missing", {
+      PIPEWIRE_RUNTIME_DIR: dir, PIPEWIRE_REMOTE: "other-server"
+    });
+    assert.equal(countArg(args, "--ro-bind", dir + "/pipewire-0", "/run/user/" + process.getuid() + "/pipewire-0"), 1);
+    assert.equal(countArg(args, "--unsetenv", "PIPEWIRE_RUNTIME_DIR"), 1);
+    assert.equal(countArg(args, "--unsetenv", "PIPEWIRE_REMOTE"), 1);
+    assert.equal(countArg(args, "--clearenv"), 0);
+  });
 });

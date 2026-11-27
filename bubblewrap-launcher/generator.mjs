@@ -19,6 +19,7 @@ const BASE = {
   gpu: "none",
   cudaToolkit: false,
   wayland: false,
+  audio: "none",
   pid: true,
   ipc: true,
   uts: true,
@@ -100,11 +101,15 @@ export function validateProfile(input) {
   if (!["shell", "mcp"].includes(p.launchMode)) errors.push("Choose an MCP bridge or interactive-shell startup mode.");
   if (p.launchMode === "mcp" && !isHostPath(p.mcpHostDir)) errors.push("MCP server host folder must be an absolute path, ~/path, or $HOME/path.");
   if (!["none", "dri", "nvidia"].includes(p.gpu)) errors.push("Choose a valid GPU mode.");
+  if (!["none", "pipewire", "pulse", "both"].includes(p.audio)) errors.push("Choose a valid audio mode.");
+  const audioEnabled = p.audio !== "none";
+  const inRun = (s) => s === "/run" || s.startsWith("/run/");
   if (!isTargetPath(p.workdir) || p.workdir === "/") errors.push("Working directory must be an absolute sandbox path.");
   if (!isTargetPath(p.home) || p.home === "/") errors.push("HOME must be an absolute sandbox path.");
   p.workdir = cleanPath(String(p.workdir || ""));
   p.home = cleanPath(String(p.home || ""));
   if (p.workdir === "/proc" || p.workdir === "/dev" || p.home === "/proc" || p.home === "/dev") errors.push("HOME and workdir cannot be /proc or /dev.");
+  if (audioEnabled && (inRun(p.home) || inRun(p.workdir))) errors.push("Audio passthrough reserves /run for the private session runtime; choose HOME and workdir outside /run.");
   if (p.mounts.length > 150) errors.push("Too many mounts (maximum 150).");
 
   const destinations = new Set();
@@ -118,6 +123,7 @@ export function validateProfile(input) {
     if (!["rw", "ro", "mask"].includes(m.access)) errors.push("Mount " + (i + 1) + ": invalid permission.");
     if (!isTargetPath(m.target)) errors.push("Mount " + (i + 1) + ": sandbox path must be absolute, without . or .. segments.");
     if (reserved.has(m.target)) errors.push("Mount " + (i + 1) + ": " + m.target + " is reserved for the sandbox runtime.");
+    if (audioEnabled && inRun(m.target)) errors.push("Mount " + (i + 1) + ": audio passthrough reserves /run for the private session runtime. Use a different destination.");
     if (destinations.has(m.target)) errors.push("Mount " + (i + 1) + ": duplicate sandbox destination " + m.target + ".");
     if (p.launchMode === "mcp" && (m.target === "/opt" || m.target === "/opt/mcp")) errors.push("Mount " + (i + 1) + ": /opt/mcp is reserved for the automatically mounted MCP server.");
     destinations.add(m.target);
@@ -151,6 +157,12 @@ export function validateProfile(input) {
     if (hasControls(e.value)) errors.push("Environment row " + (i + 1) + ": values must be one line.");
     if (envKeys.has(e.name)) errors.push("Environment variable " + e.name + " is duplicated.");
     envKeys.add(e.name);
+    if (audioEnabled && (e.name === "XDG_RUNTIME_DIR" ||
+        (["pipewire", "both"].includes(p.audio) && ["PIPEWIRE_RUNTIME_DIR", "PIPEWIRE_REMOTE"].includes(e.name)) ||
+        (["pulse", "both"].includes(p.audio) && e.name === "PULSE_SERVER") ||
+        (p.wayland && ["WAYLAND_DISPLAY", "XDG_SESSION_TYPE"].includes(e.name)))) {
+      errors.push("Environment variable " + e.name + " is managed by session passthrough. Remove the custom override.");
+    }
     if (["HOME", "PATH", "PWD"].includes(e.name)) warnings.push("Overriding " + e.name + " can break shell setup.");
     return e;
   });
@@ -171,6 +183,7 @@ export function validateProfile(input) {
   if (p.gpu !== "none") warnings.push("GPU device access exposes real host hardware interfaces and increases sandbox privileges.");
   if (p.cudaToolkit && p.gpu !== "nvidia") warnings.push("CUDA toolkit access does not itself grant NVIDIA GPU device access.");
   if (p.wayland) warnings.push("Wayland socket access permits interaction with the desktop session, not merely GPU compute.");
+  if (audioEnabled) warnings.push("Audio socket access may allow playback, microphone or monitor recording, and control of the host audio session. Read-only socket mounts do not restrict protocol permissions.");
   if (!p.clearenv) warnings.push("Inherited host environment variables may expose credentials and private settings.");
   if (!p.privateIdentity && p.launchMode === "mcp") warnings.push("The MCP bridge will see your host passwd/group/hosts files. Enable private sandbox identity files to make account lookups agree with the sandbox HOME.");
   const homeMount = p.mounts.filter((m) => p.home === m.target || p.home.startsWith(m.target + "/")).at(-1);
@@ -408,11 +421,17 @@ export function buildLauncher(input) {
       "fi"
     );
   }
-  if (p.wayland) {
+  const nativeAudio = p.audio === "pipewire" || p.audio === "both";
+  const pulseAudio = p.audio === "pulse" || p.audio === "both";
+  if (p.wayland || nativeAudio || pulseAudio) {
     lines.push(
-      "# Mount exactly one Wayland socket; never expose the entire host runtime directory.",
+      "# Share only selected session sockets, never the whole host runtime directory.",
       "uid=\"$(id -u)\"",
       "host_runtime_dir=\"@@{XDG_RUNTIME_DIR:-/run/user/$uid}\"",
+      "session_args=()"
+    );
+    if (p.wayland) {
+      lines.push(
       "host_wayland_socket=''",
       "if [[ -n \"@@{WAYLAND_DISPLAY:-}\" ]]; then",
       "  if [[ \"$WAYLAND_DISPLAY\" == /* ]]; then",
@@ -431,12 +450,44 @@ export function buildLauncher(input) {
       "    host_wayland_socket=\"$candidate\"",
       "  done",
       "fi",
-      "if [[ -n \"$host_wayland_socket\" && -S \"$host_wayland_socket\" ]]; then",
+        "if [[ -n \"$host_wayland_socket\" && -S \"$host_wayland_socket\" ]]; then",
+        "  session_args+=(--bind \"$host_wayland_socket\" \"/run/user/$uid/wayland-0\")",
+        "  session_args+=(--setenv WAYLAND_DISPLAY wayland-0 --setenv XDG_SESSION_TYPE wayland)",
+        "else",
+        "  echo 'Warning: no unambiguous Wayland session socket found; GPU compute still works.' >&2",
+        "fi"
+      );
+    }
+    if (nativeAudio) {
+      lines.push(
+        "# Native PipeWire: expose only the default local socket.",
+        "host_pipewire_socket=\"@@{PIPEWIRE_RUNTIME_DIR:-$host_runtime_dir}/pipewire-0\"",
+        "if [[ -S \"$host_pipewire_socket\" ]]; then",
+        "  session_args+=(--ro-bind \"$host_pipewire_socket\" \"/run/user/$uid/pipewire-0\")",
+        ...(!p.clearenv ? ["  session_args+=(--unsetenv PIPEWIRE_RUNTIME_DIR --unsetenv PIPEWIRE_REMOTE)"] : []),
+        "else",
+        "  echo 'Warning: native PipeWire socket not found; native audio unavailable.' >&2",
+        "fi"
+      );
+    }
+    if (pulseAudio) {
+      lines.push(
+        "# PulseAudio protocol (including PipeWire's pipewire-pulse service).",
+        "host_pulse_socket=\"$host_runtime_dir/pulse/native\"",
+        "if [[ -S \"$host_pulse_socket\" ]]; then",
+        "  session_args+=(--perms 0700 --dir \"/run/user/$uid/pulse\")",
+        "  session_args+=(--ro-bind \"$host_pulse_socket\" \"/run/user/$uid/pulse/native\")",
+        "  session_args+=(--setenv PULSE_SERVER \"unix:/run/user/$uid/pulse/native\")",
+        "else",
+        "  echo 'Warning: PulseAudio-compatible socket not found; PulseAudio audio unavailable.' >&2",
+        "fi"
+      );
+    }
+    lines.push(
+      "if (( @@{#session_args[@]} )); then",
       "  bwrap_args+=(--tmpfs /run --dir /run/user --perms 0700 --dir \"/run/user/$uid\")",
-      "  bwrap_args+=(--bind \"$host_wayland_socket\" \"/run/user/$uid/wayland-0\")",
-      "  bwrap_args+=(--setenv XDG_RUNTIME_DIR \"/run/user/$uid\" --setenv WAYLAND_DISPLAY wayland-0 --setenv XDG_SESSION_TYPE wayland)",
-      "else",
-      "  echo 'Warning: no unambiguous Wayland session socket found; GPU compute still works.' >&2",
+      "  bwrap_args+=(--setenv XDG_RUNTIME_DIR \"/run/user/$uid\")",
+      "  bwrap_args+=(\"@@{session_args[@]}\")",
       "fi"
     );
   }
