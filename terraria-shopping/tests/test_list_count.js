@@ -76,3 +76,50 @@ test('Fish mode count respects both the fishing and missing filters', () => {
   assertCount(html, 1);
   assert.match(html, /Fishing list • 1 unique item<\/div>/);
 });
+
+test('keyboard Show More focuses the first appended card without moving pointer focus', () => {
+  const fixture = Array.from({length: 162}, (_, i) => 'Card ' + String(i).padStart(3, '0'));
+  const run = detail => {
+    let html = '', button, summaries = [];
+    const nodes = new Map();
+    const node = () => {
+      const listeners = new Map();
+      return {value: '', checked: false, style: {},
+        addEventListener: (type, fn) => listeners.set(type, fn),
+        emit: (type, event) => listeners.get(type)(event)};
+    };
+    const content = node();
+    Object.defineProperty(content, 'innerHTML', {
+      get: () => html,
+      set(value) {
+        html = value;
+        button = value.includes('id="showMore"') ? node() : null;
+        summaries = [...value.matchAll(/class="card project" data-name="([^"]+)"/g)].map(([, name]) => ({
+          name, focus() { document.activeElement = this; },
+        }));
+      },
+    });
+    nodes.set('#content', content);
+    const document = {
+      querySelector(selector) {
+        if (selector === '#showMore') return button;
+        if (!nodes.has(selector)) nodes.set(selector, node());
+        return nodes.get(selector);
+      },
+      querySelectorAll: selector => selector === 'details.project > summary' ? summaries : [],
+    };
+    const data = {nodes: fixture.map(name => [name, 1, 1]),
+      recipes: fixture.map(r => ({r, s: 'Work Bench', i: [['Ore', 1]]}))};
+    runInNewContext(app, {window: {TERRARIA_RECIPE_DATA: data}, document, localStorage: {getItem: () => null}});
+    for (const [size, next] of [[160, 'Card 080'], [162, 'Card 160']]) {
+      const pressed = button;
+      document.activeElement = pressed;
+      pressed.emit('click', {detail, currentTarget: pressed});
+      assert.equal(summaries.length, size);
+      assert.equal(document.activeElement, detail ? pressed : summaries[size === 160 ? 80 : 160], next);
+    }
+    assert.equal(button, null);
+  };
+  run(0);
+  run(1);
+});

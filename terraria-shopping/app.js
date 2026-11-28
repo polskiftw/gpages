@@ -270,7 +270,13 @@ function renderCatalog(openNames=new Set()){
   if(list.length>visible.length)html+=`<div class="morewrap"><button class="more" id="showMore">Show ${Math.min(PAGE,list.length-visible.length)} more • ${list.length-visible.length} remaining</button></div>`;
   if(!list.length)html=`<div class="card empty">${fishMode?.checked?'No craftables have unfinished fishing-route items in this Fish Mode snapshot.':'No craftables match the current search.'}</div>`;
   content.innerHTML=html;for(const d of $$('details.project'))if(openNames.has(d.dataset.name)){d.open=true;loadBody(d)}
-  $('#showMore')?.addEventListener('click',()=>{const keepOpen=new Set($$('details.project[open]').map(el=>el.dataset.name));shown+=PAGE;render(keepOpen)});renderStats(list.length)
+  $('#showMore')?.addEventListener('click',event=>{
+    const keyboard=event.detail===0&&document.activeElement===event.currentTarget;
+    const keepOpen=new Set($$('details.project[open]').map(el=>el.dataset.name));
+    shown+=PAGE;render(keepOpen);
+    if(keyboard)$$('details.project > summary')[visible.length]?.focus();
+  });
+  renderStats(list.length)
 }
 function sourceSearchText(id){const i=items[id],a=av(id),ps=curatedProjects.filter(p=>p.items.some(x=>x[0]===id)).map(p=>p.name).join(' ');return searchText([i.name,i.fishSource||'',fishingRoute(i.name),i.source||'',i.type,a.mode,cleanWhen(a.when),a.source||'',i.note||'',ps].join(' '))}
 function renderSources(wantFish){
